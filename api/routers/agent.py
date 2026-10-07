@@ -117,7 +117,7 @@ async def rebuild_agent_data(request: RebuildAgentDataRequest):
     for source_id in sources:
         has_rows = await repo_query(
             f"SELECT VALUE id FROM {table} WHERE source = $s LIMIT 1",
-            {"s": source_id},
+            {"s": ensure_record_id(source_id)},
         )
         if not has_rows:
             continue

@@ -381,3 +381,22 @@ async def test_agent_settings_round_trip(corpus):
     assert fresh.rerank_model == "" and fresh.memory is False
     assert fresh.page_embedding_model == "google/gemini-embedding-2"
     AgentSettings._instances.pop(AgentSettings.record_id, None)
+
+
+@pytest.mark.asyncio
+async def test_rebuild_endpoint_finds_sources_with_pages(corpus):
+    from api.routers.agent import RebuildAgentDataRequest, rebuild_agent_data
+
+    with patch(
+        "api.routers.agent.CommandService.submit_command_job",
+        new=AsyncMock(return_value="command:1"),
+    ) as submit:
+        pages = await rebuild_agent_data(
+            RebuildAgentDataRequest(what="page_embeddings")
+        )
+        concepts = await rebuild_agent_data(RebuildAgentDataRequest(what="concepts"))
+    assert pages.submitted == 2 and concepts.submitted == 2  # l4, l6; not `outside`
+    assert {c.args[2]["source_id"] for c in submit.await_args_list} == {
+        corpus["l4"],
+        corpus["l6"],
+    }
