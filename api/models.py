@@ -15,6 +15,10 @@ class NotebookUpdate(BaseModel):
     archived: Optional[bool] = Field(
         None, description="Whether the notebook is archived"
     )
+    grounding: Optional[Literal["strict", "general"]] = Field(
+        None,
+        description="strict: answer only from the notebook; general: may add marked general knowledge",
+    )
 
 
 class NotebookResponse(BaseModel):
@@ -22,6 +26,7 @@ class NotebookResponse(BaseModel):
     name: str
     description: str
     archived: bool
+    grounding: Literal["strict", "general"] = "strict"
     created: str
     updated: str
     source_count: int

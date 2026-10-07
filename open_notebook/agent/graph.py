@@ -82,7 +82,8 @@ async def _notebook_info(notebook_id: Optional[str]) -> Dict[str, Any]:
     if not notebook_id:
         return {}
     rows = await repo_query(
-        "SELECT name, description FROM $nb", {"nb": ensure_record_id(notebook_id)}
+        "SELECT name, description, grounding FROM $nb",
+        {"nb": ensure_record_id(notebook_id)},
     )
     return rows[0] if rows else {}
 
@@ -308,10 +309,15 @@ WRITE_INSTRUCTION = (
     "(tool results and viewed pages). The research notes are a guide; check them against the "
     "evidence. Cite with the addresses exactly as the tools printed them."
 )
+WRITE_INSTRUCTION_GENERAL = (
+    "Write the final answer to my last question now. Base it on the evidence gathered above "
+    "(tool results and viewed pages), citing addresses exactly as the tools printed them; where "
+    "the notebook falls short you may add general knowledge, clearly marked as not from the notebook."
+)
 
 
 def make_answer_writer(
-    model, system: str, writer
+    model, system: str, writer, strict: bool = True
 ) -> Callable[[List[BaseMessage], int], Awaitable[str]]:
     """The writer step: one streamed call that turns the research transcript into
     the answer, with the answer rules in place of the researcher's instructions."""
@@ -326,7 +332,11 @@ def make_answer_writer(
         prompt = (
             [SystemMessage(content=system)]
             + transcript
-            + [HumanMessage(content=WRITE_INSTRUCTION)]
+            + [
+                HumanMessage(
+                    content=WRITE_INSTRUCTION if strict else WRITE_INSTRUCTION_GENERAL
+                )
+            ]
         )
         final = await _stream_step(model, prompt, writer, step)
         answer = extract_text_content(final.content)
@@ -432,14 +442,15 @@ async def agent_node(state: AgentState, config: RunnableConfig) -> dict:
         effort = state.get("effort") or DEFAULT_EFFORT
         max_steps = EFFORT_STEPS.get(effort, EFFORT_STEPS[DEFAULT_EFFORT])
         info = await _notebook_info(notebook_id)
-        prompt_data = {
+        strict = info.get("grounding") != "general"
+        prompt_data: Dict[str, Any] = {
             "notebook_name": info.get("name"),
             "notebook_description": info.get("description"),
             "document_count": len(scope.sources),
             "note_count": len(scope.notes),
             "today": date.today().isoformat(),
             "max_steps": max_steps,
-            "strict": True,
+            "strict": strict,
         }
         prompter = Prompter(prompt_template="agent/system")
         system = prompter.render(data={**prompt_data, "researcher": True})
@@ -475,7 +486,9 @@ async def agent_node(state: AgentState, config: RunnableConfig) -> dict:
             writer,
             reviewer=reviewer,
             review_rounds=REVIEW_ROUNDS.get(effort, 0),
-            answer_writer=make_answer_writer(answer_model, answer_system, writer),
+            answer_writer=make_answer_writer(
+                answer_model, answer_system, writer, strict=strict
+            ),
         )
 
         answer = clean_thinking_content(answer).strip()

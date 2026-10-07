@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import { useNotebookChat } from '@/lib/hooks/use-notebook-chat'
 import { useNotes } from '@/lib/hooks/use-notes'
+import { useNotebook, useUpdateNotebook } from '@/lib/hooks/use-notebooks'
 import { ChatPanel } from '@/components/sources/ChatPanel'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { Card, CardContent } from '@/components/ui/card'
@@ -23,6 +24,9 @@ export function ChatColumn({ notebookId, contextSelections, sources, sourcesLoad
 
   // Fetch notes for this notebook
   const { data: notes = [], isLoading: notesLoading } = useNotes(notebookId)
+
+  const { data: notebook } = useNotebook(notebookId)
+  const updateNotebook = useUpdateNotebook()
 
   // Initialize notebook chat hook
   const chat = useNotebookChat({
@@ -112,6 +116,8 @@ export function ChatColumn({ notebookId, contextSelections, sources, sourcesLoad
       agentActivity={chat.activity}
       effort={chat.effort}
       onEffortChange={chat.setEffort}
+      grounding={notebook?.grounding ?? 'strict'}
+      onGroundingChange={(grounding) => updateNotebook.mutate({ id: notebookId, data: { grounding } })}
     />
   )
 }

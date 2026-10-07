@@ -107,6 +107,7 @@ async def get_notebooks(
                 name=nb.get("name", ""),
                 description=nb.get("description", ""),
                 archived=nb.get("archived", False),
+                grounding=nb.get("grounding") or "strict",
                 created=str(nb.get("created", "")),
                 updated=str(nb.get("updated", "")),
                 source_count=nb.get("source_count", 0),
@@ -259,6 +260,7 @@ async def get_notebook(notebook_id: str):
             name=nb.get("name", ""),
             description=nb.get("description", ""),
             archived=nb.get("archived", False),
+            grounding=nb.get("grounding") or "strict",
             created=str(nb.get("created", "")),
             updated=str(nb.get("updated", "")),
             source_count=nb.get("source_count", 0),
@@ -290,6 +292,8 @@ async def update_notebook(notebook_id: str, notebook_update: NotebookUpdate):
             notebook.description = notebook_update.description or ""
         if notebook_update.archived is not None:
             notebook.archived = notebook_update.archived
+        if notebook_update.grounding is not None:
+            notebook.grounding = notebook_update.grounding
 
         await notebook.save()
 
@@ -309,6 +313,7 @@ async def update_notebook(notebook_id: str, notebook_update: NotebookUpdate):
                 name=nb.get("name", ""),
                 description=nb.get("description", ""),
                 archived=nb.get("archived", False),
+                grounding=nb.get("grounding") or "strict",
                 created=str(nb.get("created", "")),
                 updated=str(nb.get("updated", "")),
                 source_count=nb.get("source_count", 0),
@@ -321,6 +326,7 @@ async def update_notebook(notebook_id: str, notebook_update: NotebookUpdate):
             name=notebook.name,
             description=notebook.description,
             archived=notebook.archived or False,
+            grounding=notebook.grounding or "strict",
             created=str(notebook.created),
             updated=str(notebook.updated),
             source_count=0,

@@ -1,8 +1,11 @@
+export type Grounding = 'strict' | 'general'
+
 export interface NotebookResponse {
   id: string
   name: string
   description: string
   archived: boolean
+  grounding?: Grounding
   created: string
   updated: string
   source_count: number
@@ -78,6 +81,7 @@ export interface UpdateNotebookRequest {
   name?: string
   description?: string
   archived?: boolean
+  grounding?: Grounding
 }
 
 export interface NotebookDeletePreview {

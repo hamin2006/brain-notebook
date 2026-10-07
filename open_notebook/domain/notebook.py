@@ -23,6 +23,8 @@ class Notebook(ObjectModel):
     description: str
     archived: Optional[bool] = False
     last_viewed_at: Optional[datetime] = None
+    # Agent grounding policy: "strict" (default) or "general" (migration 28).
+    grounding: Optional[Literal["strict", "general"]] = None
 
     @field_validator("name")
     @classmethod

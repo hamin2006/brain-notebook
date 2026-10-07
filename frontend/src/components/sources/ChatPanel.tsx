@@ -13,10 +13,11 @@ import {
   SourceChatMessage,
   SourceChatContextIndicator,
   BaseChatSession,
-  ChatEffort
+  ChatEffort,
+  Grounding
 } from '@/lib/types/api'
 import type { AgentActivity } from '@/lib/hooks/use-notebook-chat'
-import { AgentActivityView, EffortSelect, ResearchSteps, localizedLocator } from './AgentActivity'
+import { AgentActivityView, EffortSelect, GroundingSelect, ResearchSteps, localizedLocator } from './AgentActivity'
 import { PagePreviewDialog, PageTarget, parsePageLocator } from './PagePreviewDialog'
 import { ModelSelector } from './ModelSelector'
 import { ContextIndicator } from '@/components/common/ContextIndicator'
@@ -61,6 +62,9 @@ interface ChatPanelProps {
   agentActivity?: AgentActivity | null
   effort?: ChatEffort
   onEffortChange?: (effort: ChatEffort) => void
+  // Notebook setting: answer only from the notebook, or add general knowledge
+  grounding?: Grounding
+  onGroundingChange?: (grounding: Grounding) => void
 }
 
 export function ChatPanel({
@@ -83,7 +87,9 @@ export function ChatPanel({
   notebookId,
   agentActivity,
   effort,
-  onEffortChange
+  onEffortChange,
+  grounding,
+  onGroundingChange
 }: ChatPanelProps) {
   const { t } = useTranslation()
   const [sessionManagerOpen, setSessionManagerOpen] = useState(false)
@@ -247,6 +253,8 @@ export function ChatPanel({
           onModelChange={onModelChange}
           effort={effort}
           onEffortChange={onEffortChange}
+          grounding={grounding}
+          onGroundingChange={onGroundingChange}
         />
       </CardContent>
     </Card>
@@ -271,6 +279,9 @@ interface ChatComposerProps {
   onModelChange?: (model?: string) => void
   effort?: ChatEffort
   onEffortChange?: (effort: ChatEffort) => void
+  // Notebook setting: answer only from the notebook, or add general knowledge
+  grounding?: Grounding
+  onGroundingChange?: (grounding: Grounding) => void
 }
 
 function ChatComposer({
@@ -279,7 +290,9 @@ function ChatComposer({
   modelOverride,
   onModelChange,
   effort,
-  onEffortChange
+  onEffortChange,
+  grounding,
+  onGroundingChange
 }: ChatComposerProps) {
   const { t } = useTranslation()
   const chatInputId = useId()
@@ -324,6 +337,12 @@ function ChatComposer({
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground">{t('chat.effort')}</span>
           <EffortSelect value={effort} onChange={onEffortChange} disabled={isStreaming} />
+        </div>
+      )}
+      {onGroundingChange && grounding && (
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">{t('chat.grounding')}</span>
+          <GroundingSelect value={grounding} onChange={onGroundingChange} disabled={isStreaming} />
         </div>
       )}
 

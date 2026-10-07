@@ -1,0 +1,15 @@
+-- Down migration 28: drop agent extensions.
+
+DEFINE EVENT OVERWRITE source_delete ON TABLE source WHEN ($after == NONE) THEN {
+    delete source_embedding where source == $before.id;
+    delete source_insight where source == $before.id;
+    delete source_page where source == $before.id;
+    delete source_section where source == $before.id;
+};
+
+REMOVE TABLE IF EXISTS memory;
+REMOVE TABLE IF EXISTS concept_relation;
+REMOVE TABLE IF EXISTS concept_mention;
+REMOVE TABLE IF EXISTS concept;
+REMOVE FIELD IF EXISTS image_embedding ON TABLE source_page;
+REMOVE FIELD IF EXISTS grounding ON TABLE notebook;

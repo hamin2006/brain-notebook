@@ -1,0 +1,57 @@
+-- Migration 28: agent extensions (agentic RAG plan, Phase 5).
+-- Grounding policy per notebook; page-image embeddings for visual search; a
+-- concept graph extracted from document sections; and agent memory.
+
+-- "strict" answers only from the notebook; "general" may add marked general knowledge.
+DEFINE FIELD IF NOT EXISTS grounding ON TABLE notebook TYPE option<string>;
+
+-- Multimodal embedding of the rendered page, in the page-embedding model's space.
+DEFINE FIELD IF NOT EXISTS image_embedding ON TABLE source_page TYPE option<array<float>>;
+
+-- Concept graph. A concept is shared across documents (key = normalized name);
+-- mentions and relations belong to the source they were extracted from.
+DEFINE TABLE IF NOT EXISTS concept SCHEMAFULL;
+DEFINE FIELD IF NOT EXISTS name ON TABLE concept TYPE string;
+DEFINE FIELD IF NOT EXISTS key ON TABLE concept TYPE string;
+DEFINE FIELD IF NOT EXISTS embedding ON TABLE concept TYPE option<array<float>>;
+DEFINE INDEX IF NOT EXISTS idx_concept_key ON TABLE concept COLUMNS key UNIQUE;
+
+DEFINE TABLE IF NOT EXISTS concept_mention SCHEMAFULL;
+DEFINE FIELD IF NOT EXISTS concept ON TABLE concept_mention TYPE record<concept>;
+DEFINE FIELD IF NOT EXISTS source ON TABLE concept_mention TYPE record<source>;
+DEFINE FIELD IF NOT EXISTS section ON TABLE concept_mention TYPE int;
+DEFINE FIELD IF NOT EXISTS page_start ON TABLE concept_mention TYPE int;
+DEFINE FIELD IF NOT EXISTS page_end ON TABLE concept_mention TYPE int;
+DEFINE FIELD IF NOT EXISTS context ON TABLE concept_mention TYPE option<string>;
+DEFINE INDEX IF NOT EXISTS idx_concept_mention_concept ON TABLE concept_mention COLUMNS concept;
+DEFINE INDEX IF NOT EXISTS idx_concept_mention_source ON TABLE concept_mention COLUMNS source;
+
+DEFINE TABLE IF NOT EXISTS concept_relation SCHEMAFULL;
+DEFINE FIELD IF NOT EXISTS from_concept ON TABLE concept_relation TYPE record<concept>;
+DEFINE FIELD IF NOT EXISTS to_concept ON TABLE concept_relation TYPE record<concept>;
+DEFINE FIELD IF NOT EXISTS relation ON TABLE concept_relation TYPE string;
+DEFINE FIELD IF NOT EXISTS source ON TABLE concept_relation TYPE record<source>;
+DEFINE FIELD IF NOT EXISTS section ON TABLE concept_relation TYPE int;
+DEFINE FIELD IF NOT EXISTS page_start ON TABLE concept_relation TYPE int;
+DEFINE FIELD IF NOT EXISTS page_end ON TABLE concept_relation TYPE int;
+DEFINE INDEX IF NOT EXISTS idx_concept_relation_from ON TABLE concept_relation COLUMNS from_concept;
+DEFINE INDEX IF NOT EXISTS idx_concept_relation_to ON TABLE concept_relation COLUMNS to_concept;
+DEFINE INDEX IF NOT EXISTS idx_concept_relation_source ON TABLE concept_relation COLUMNS source;
+
+-- Agent memory: things the user asked to remember, or stated preferences.
+-- notebook NONE = applies everywhere.
+DEFINE TABLE IF NOT EXISTS memory SCHEMAFULL;
+DEFINE FIELD IF NOT EXISTS notebook ON TABLE memory TYPE option<record<notebook>>;
+DEFINE FIELD IF NOT EXISTS content ON TABLE memory TYPE string;
+DEFINE FIELD IF NOT EXISTS embedding ON TABLE memory TYPE option<array<float>>;
+DEFINE FIELD IF NOT EXISTS created ON TABLE memory DEFAULT time::now() VALUE $before OR time::now();
+DEFINE INDEX IF NOT EXISTS idx_memory_notebook ON TABLE memory COLUMNS notebook;
+
+DEFINE EVENT OVERWRITE source_delete ON TABLE source WHEN ($after == NONE) THEN {
+    delete source_embedding where source == $before.id;
+    delete source_insight where source == $before.id;
+    delete source_page where source == $before.id;
+    delete source_section where source == $before.id;
+    delete concept_mention where source == $before.id;
+    delete concept_relation where source == $before.id;
+};

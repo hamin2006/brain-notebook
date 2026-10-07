@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { MarkdownRenderer } from '@/components/ui/markdown-renderer'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import type { AgentActivity as Activity } from '@/lib/hooks/use-notebook-chat'
-import type { AgentStep, ChatEffort } from '@/lib/types/api'
+import type { AgentStep, ChatEffort, Grounding } from '@/lib/types/api'
 
 type Translate = (key: string, options?: Record<string, unknown>) => string
 
@@ -107,6 +107,30 @@ export function EffortSelect({
         <SelectItem value="quick">{t('chat.effortQuick')}</SelectItem>
         <SelectItem value="standard">{t('chat.effortStandard')}</SelectItem>
         <SelectItem value="deep">{t('chat.effortDeep')}</SelectItem>
+      </SelectContent>
+    </Select>
+  )
+}
+
+/** Whether answers may add general knowledge (a notebook setting). */
+export function GroundingSelect({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: Grounding
+  onChange: (grounding: Grounding) => void
+  disabled?: boolean
+}) {
+  const { t } = useTranslation()
+  return (
+    <Select value={value} onValueChange={v => onChange(v as Grounding)} disabled={disabled}>
+      <SelectTrigger className="h-8 w-[210px] text-xs" aria-label={t('chat.grounding')}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="strict">{t('chat.groundingStrict')}</SelectItem>
+        <SelectItem value="general">{t('chat.groundingGeneral')}</SelectItem>
       </SelectContent>
     </Select>
   )

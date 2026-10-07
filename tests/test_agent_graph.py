@@ -69,7 +69,7 @@ def _writer(text="The answer [source:l4#p94]."):
     return ScriptedModel([{"text": text}])
 
 
-async def _run(model, tools, scope=None, effort="standard", writer=None):
+async def _run(model, tools, scope=None, effort="standard", writer=None, notebook=None):
     """Run the graph with `model` as the research ("tools") model and `writer`
     as the answer ("chat") model."""
     scope = scope or AgentScope(
@@ -93,7 +93,7 @@ async def _run(model, tools, scope=None, effort="standard", writer=None):
         patch("open_notebook.agent.graph.build_tools", return_value=tools),
         patch(
             "open_notebook.agent.graph._notebook_info",
-            new=AsyncMock(return_value={"name": "AI 360"}),
+            new=AsyncMock(return_value=notebook or {"name": "AI 360"}),
         ),
     ):
         async for mode, chunk in graph.astream(  # type: ignore[call-overload]
@@ -411,3 +411,25 @@ async def test_final_answer_falls_back_when_tool_choice_none_is_rejected():
     flattened = model.calls[-1]
     assert not any(getattr(m, "tool_calls", None) for m in flattened)
     assert any("[Result of search]" in str(m.content) for m in flattened)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "grounding, rule, instruction",
+    [
+        (None, "Use only the notebook", "using only the evidence"),
+        ("strict", "Use only the notebook", "using only the evidence"),
+        ("general", "may add general knowledge", "you may add general knowledge"),
+    ],
+)
+async def test_notebook_grounding_sets_the_answer_rules(grounding, rule, instruction):
+    writer = _writer()
+    await _run(
+        ScriptedModel([{"text": "- findings"}]),
+        [],
+        writer=writer,
+        notebook={"name": "AI 360", "grounding": grounding},
+    )
+    written = writer.calls[0]
+    assert rule in written[0].content
+    assert instruction in written[-1].content
