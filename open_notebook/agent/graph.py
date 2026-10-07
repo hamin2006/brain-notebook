@@ -57,6 +57,9 @@ MAX_CONCURRENT_SUBAGENTS = 4
 DEFAULT_EFFORT = "standard"
 HISTORY_MESSAGES = 20
 MAX_ANSWER_TOKENS = 8192
+# Thinking budget per research step: tool choice needs little deliberation, and
+# uncapped Qwen3.7 steps spent up to ~35 s reasoning.
+RESEARCH_REASONING_TOKENS = 2048
 
 
 class AgentState(TypedDict):
@@ -506,8 +509,11 @@ async def agent_node(state: AgentState, config: RunnableConfig) -> dict:
         effort = state.get("effort") or DEFAULT_EFFORT
         max_steps = EFFORT_STEPS.get(effort, EFFORT_STEPS[DEFAULT_EFFORT])
         info = await _notebook_info(notebook_id)
-        model = await provision_langchain_model(
-            "", None, "tools", max_tokens=MAX_ANSWER_TOKENS
+        model = limit_reasoning(
+            await provision_langchain_model(
+                "", None, "tools", max_tokens=MAX_ANSWER_TOKENS
+            ),
+            RESEARCH_REASONING_TOKENS,
         )
         history = list(state["messages"])
         summary = state.get("summary")
