@@ -1,13 +1,13 @@
-# Contributing to Open Notebook
+# Contributing to Brain Notebook
 
-Thank you for your interest in contributing to Open Notebook! We welcome contributions from developers of all skill levels. This guide will help you understand our contribution workflow and what makes a good contribution.
+Thank you for your interest in contributing to Brain Notebook! We welcome contributions from developers of all skill levels. This guide will help you understand our contribution workflow and what makes a good contribution.
 
 ## 🚦 Discussions for Ideas, Issues for Work
 
-Open Notebook separates **exploration** from **execution**:
+Brain Notebook separates **exploration** from **execution**:
 
-- **Feature requests, ideas, behavior changes, product/design/architecture proposals, and contribution proposals start in [GitHub Discussions](https://github.com/lfnovo/open-notebook/discussions/new?category=ideas).** This is where the community explores the problem and maintainers make the product or design decision.
-- **Reproducible bugs start in [GitHub Issues](https://github.com/lfnovo/open-notebook/issues/new/choose).**
+- **Feature requests, ideas, behavior changes, product/design/architecture proposals, and contribution proposals start in [GitHub Discussions](https://github.com/hamin2006/brain-notebook/issues/new?category=ideas).** This is where the community explores the problem and maintainers make the product or design decision.
+- **Reproducible bugs start in [GitHub Issues](https://github.com/hamin2006/brain-notebook/issues/new/choose).**
 - **Implementation starts from an approved Issue.** Once an idea is sufficiently clear and accepted, a maintainer creates an Issue from the Discussion, scopes it, and assigns it before coding begins.
 
 This means non-trivial contributions follow one of two paths:
@@ -48,18 +48,18 @@ By participating in this project, you are expected to uphold our [Code of Conduc
 ### Reporting Bugs
 
 1. **Search existing issues** - Check if the bug was already reported
-2. **Create a bug report** - Use the [Bug Report template](https://github.com/lfnovo/open-notebook/issues/new?template=bug_report.yml)
+2. **Create a bug report** - Use the [Bug Report template](https://github.com/hamin2006/brain-notebook/issues/new?template=bug_report.yml)
 3. **Provide details** - Include:
    - Steps to reproduce
    - Expected vs actual behavior
    - Logs, screenshots, or error messages
-   - Your environment (OS, Docker version, Open Notebook version)
+   - Your environment (OS, Docker version, Brain Notebook version)
 4. **Indicate if you want to fix it** - Check the "I would like to work on this" box if you're interested
 
 ### Suggesting Features
 
 1. **Search existing Discussions and Issues** - Check whether the problem is already being explored or worked on
-2. **Start an Idea Discussion** - Use the [Ideas form](https://github.com/lfnovo/open-notebook/discussions/new?category=ideas)
+2. **Start an Idea Discussion** - Use the [Ideas form](https://github.com/hamin2006/brain-notebook/issues/new?category=ideas)
 3. **Start with the problem and outcome** - Explain what you are trying to do, what is difficult today, and what success would look like
 4. **Add possible directions if useful** - Implementation ideas and references are welcome, but not required
 5. **Join the exploration** - Help answer questions, evaluate trade-offs, or test prototypes
@@ -187,7 +187,6 @@ Current priorities and what is out of scope live in [VISION.md](../../VISION.md)
 
 ### Community Support
 
-- **Discord**: [Join our Discord server](https://discord.gg/37XJPXfz2w) for real-time help
 - **GitHub Discussions**: For questions, ideas, features, product direction, design, and architecture
 - **GitHub Issues**: For reproducible bugs and approved work items
 
@@ -211,6 +210,5 @@ We recognize contributions through:
 
 ---
 
-Thank you for contributing to Open Notebook! Your contributions help make research more accessible and private for everyone.
+Thank you for contributing to Brain Notebook! Your contributions help make research more accessible and private for everyone.
 
-For questions about this guide or contributing in general, please reach out on [Discord](https://discord.gg/37XJPXfz2w) or open a GitHub Discussion.

@@ -1,6 +1,6 @@
 # Development Setup
 
-This is the one page for running Open Notebook from a source checkout. Other pages (README.dev.md, the contributing guide, the quick start) link here instead of repeating it.
+This is the one page for running Brain Notebook from a source checkout for development. To run it as a long-lived service, see [From source + systemd](../1-INSTALLATION/from-source.md). Other pages (README.dev.md, the contributing guide, the quick start) link here instead of repeating it.
 
 The stack has four processes. Start them in this order, because each one depends on the one before it:
 
@@ -17,20 +17,24 @@ The worker is not optional. Source processing, embeddings and podcasts are backg
 
 - **Python 3.11 or 3.12** (`pyproject.toml` requires `>=3.11,<3.13`; `.python-version` pins 3.12, which uv picks up)
 - **[uv](https://docs.astral.sh/uv/)** for Python dependencies
-- **Node.js 20.9 or newer** (Next.js 16 requires it; CI and the Docker image use Node 22)
+- **Node.js 22** (20.9 is the minimum Next.js 16 accepts; the Docker image uses 22)
 - **Docker** with the Compose plugin, for SurrealDB
 - **ffmpeg** if you work on podcasts or audio/video sources (the Docker image installs it)
 
 ## 1. Clone and install
 
 ```bash
-git clone https://github.com/<your-user>/open-notebook.git   # your fork
-cd open-notebook
-git remote add upstream https://github.com/lfnovo/open-notebook.git
+git clone https://github.com/hamin2006/brain-notebook.git
+cd brain-notebook
+git remote add upstream https://github.com/lfnovo/open-notebook.git   # optional: to merge upstream fixes
 
 uv sync                          # Python deps, including the dev group (pytest, ruff, mypy)
 cd frontend && npm install && cd ..
 ```
+
+Upstream Brain Notebook is merged occasionally (`git fetch upstream && git merge upstream/main`). Code identifiers
+keep upstream's names to keep that possible; expect conflicts in files the fork rewrote (chat routers, the source
+graph, chat UI).
 
 ## 2. Create `.env`
 
@@ -101,7 +105,9 @@ Running migration N
 Migrations completed successfully. Database is now at version N
 ```
 
-To use AI features, add a provider credential and models in the app under **Manage → Models**. See [AI Providers](../4-AI-PROVIDERS/index.md) for per-provider instructions.
+To use AI features, set up models: `OPENROUTER_API_KEY=… python3 scripts/brain/provision_models.py`, or by hand under **Manage → Models** ([Models for the research agent](../4-AI-PROVIDERS/index.md#models-for-the-research-agent)). Upload a PDF to exercise the whole ingestion pipeline (the worker log shows each stage), then ask in notebook chat; the research steps show which tools ran.
+
+Optional services: SearXNG for web search (`scripts/brain/searxng`, see [Web search](../5-CONFIGURATION/research-agent.md#running-searxng)), and an MCP client pointed at `http://localhost:5055/mcp`.
 
 ## Before you open a PR
 
@@ -113,11 +119,9 @@ Optional: `uv run pre-commit install` installs git hooks (`.pre-commit-config.ya
 
 | Command | What it does | Use it for |
 |---|---|---|
-| `make dev` | Builds the image from your checkout with `examples/docker-compose-dev.yml` (reads `docker.env`) | Checking that a change works in the container |
-| `make full` | Same, with `examples/docker-compose-full-local.yml` | Fully local stack in Docker |
-| `make docker-build-local` | Builds the production image for your platform, no push | PRs that touch the `Dockerfile` |
+| `docker compose build` | Builds `brain-notebook:local` from your checkout (the root compose file) | Checking the production image |
 
-Publishing images is a maintainer task: see [.github/RELEASE_PROCESS.md](../../.github/RELEASE_PROCESS.md).
+`make dev` / `make full` use upstream's example compose files; check they build from your checkout. The `docker-push*` / `docker-release` targets publish upstream's images and don't apply to this fork.
 
 ## Troubleshooting
 

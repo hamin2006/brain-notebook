@@ -1,110 +1,160 @@
 # Architecture
 
-A map of the codebase: the processes, where each concern lives, and how data flows. It stays short on purpose. Each subsystem has its own page with the details:
+A map of the codebase: the processes, where each concern lives, and how data flows. Subsystem pages have details:
 
-- [credentials.md](credentials.md): provider credentials, encryption, the provider registry, model provisioning
-- [content-processing.md](content-processing.md): chunking, embedding, context building
-- [podcasts.md](podcasts.md): episode and speaker profiles, podcast jobs
+- [plans/agentic-rag.md](plans/agentic-rag.md): the design of the research agent and ingestion (goals, tool design, findings, eval results, decisions)
+- [content-processing.md](content-processing.md): extraction, page-aware ingestion, chunking, embedding
+- [credentials.md](credentials.md): provider credentials, encryption, provider registry, provisioning
 - [prompts.md](prompts.md): prompt templates and `Prompter`
 - [frontend.md](frontend.md): Next.js layers and data flows
+- [podcasts.md](podcasts.md): episode and speaker profiles, podcast jobs
 - [decisions/](decisions/README.md): why things are the way they are
 
 ## Processes
 
 ```
-Browser
+Browser / MCP client
    │
    ▼
-Next.js frontend ── :3000 in dev (`npm run dev`), :8502 in the Docker image
-   │  proxies /api/* to INTERNAL_API_URL (default http://localhost:5055)
+Next.js frontend ── :3000 (dev or systemd), :8502 in the Docker image
+   │  proxies /api/* and /mcp to INTERNAL_API_URL (default http://localhost:5055), 10 min timeout
    ▼
-FastAPI API ─────── :5055 (`api/main.py`)          Background worker
-   │                                                (`surreal-commands-worker --import-modules commands`)
-   │  submits jobs ───────────────► job queue in SurrealDB ◄──────── picks up jobs
-   ▼                                                      │
-SurrealDB ───────── :8000 ◄───────────────────────────────┘
+FastAPI API ─────── :5055 (`api/main.py`)                    Background worker
+   │  REST, SSE chat streams, /mcp (FastMCP)                  (`surreal-commands-worker --import-modules commands`)
+   │  runs the research agent in-process                       ingestion, embeddings, analysis, page images,
+   │  submits jobs ───────────► job queue in SurrealDB ◄──────  concept graph, transformations, podcasts
+   ▼                                              │
+SurrealDB v2 ────── :8000 ◄───────────────────────┘
+   (documents, graph edges, BM25, vectors)
+
+External: AI providers via Esperanto / OpenRouter (rerank, multimodal embeddings);
+          SearXNG (optional, :8888 or the compose network) for web search
 ```
 
-- **Frontend** (`frontend/`): Next.js 16 App Router, React 19, TypeScript, TanStack Query, Zustand, Tailwind 4, i18next. It talks only to the API.
-- **API** (`api/`): FastAPI. On startup it waits for SurrealDB and runs pending migrations. It serves CRUD, chat and Ask synchronously (chat and Ask call LangGraph directly) and hands long-running work to the worker.
-- **Worker** (`commands/`): [surreal-commands](https://github.com/lfnovo/surreal-commands) reads jobs from SurrealDB and runs the functions registered with `@command`. Without it, source processing, embeddings and podcasts never run ([ADR-004](decisions/ADR-004-background-workers.md)).
-- **SurrealDB** (v2): documents, graph edges, full-text (BM25) and vector search in one database ([ADR-001](decisions/ADR-001-surrealdb.md)).
-- **Chat history** is not in SurrealDB: LangGraph's `SqliteSaver` keeps it in `./data/sqlite-db/checkpoints.sqlite` (`LANGGRAPH_CHECKPOINT_FILE` in `open_notebook/config.py`, a constant). Uploads go to `./data/uploads/` and podcast audio to `./data/podcasts/`.
+- **Frontend** (`frontend/`): Next.js 16 App Router, React 19, TypeScript, TanStack Query, Zustand, Tailwind 4,
+  i18next. Talks only to the API.
+- **API** (`api/`): FastAPI. On startup it waits for SurrealDB and runs pending migrations (currently up to 29).
+  Serves CRUD, the agent (chat, source chat, Ask) with SSE streaming, the MCP endpoint, and hands long work to the
+  worker.
+- **Worker** (`commands/`): [surreal-commands](https://github.com/lfnovo/surreal-commands) runs `@command`
+  functions from the job queue ([ADR-004](decisions/ADR-004-background-workers.md)).
+- **SurrealDB** (v2): documents, graph edges, full-text and vector search in one database
+  ([ADR-001](decisions/ADR-001-surrealdb.md)).
+- **Chat history**: LangGraph checkpoints in `./data/sqlite-db/checkpoints.sqlite` via an `AsyncSqliteSaver`
+  (`open_notebook/graphs/checkpoint.py`). Uploads in `./data/uploads/`, podcast audio in `./data/podcasts/`.
 
-The Docker image runs the API, worker and frontend under supervisord (`supervisord.conf`); the `-single` image also runs SurrealDB.
+The Docker image runs API, worker and frontend under supervisord; the `single` target also runs SurrealDB. From
+source, `scripts/brain/install_services.sh` runs them as systemd user services.
 
 ## Backend layout
 
 | Path | What lives there |
 |---|---|
-| `api/main.py` | App setup: middleware (password auth, body-size limit, CORS), exception handlers, router registration (`prefix="/api"`), startup migrations |
-| `api/routers/` | One module per resource (22 of them, plus the `_chat_shared.py` helper). Most call domain models and `repo_*` functions directly |
-| `api/*_service.py` | Shared or orchestration logic: `command_service.py` (job submission), `credentials_service.py` (credential lifecycle, discovery), `podcast_service.py` |
-| `api/models.py` | Pydantic request and response schemas |
-| `open_notebook/domain/` | Domain models on `ObjectModel` / `RecordModel` (`base.py`): `Notebook`, `Source`, `Note`, `SourceInsight`, `ChatSession`, `Transformation`, `Credential`, settings singletons |
-| `open_notebook/ai/` | `provider_registry.py` (provider metadata), `models.py` (`Model`, `DefaultModels`, `ModelManager`), `provision.py`, `key_provider.py`, `model_discovery.py`, `connection_tester.py` |
-| `open_notebook/graphs/` | LangGraph workflows (below) |
-| `open_notebook/podcasts/` | `EpisodeProfile`, `SpeakerProfile`, `PodcastEpisode` |
-| `open_notebook/database/` | `repository.py` (`repo_query`, `repo_create`, …; one connection per call, no pool) and migrations |
-| `open_notebook/utils/` | Chunking, embedding, context building, encryption, error classification, URL validation |
-| `commands/` | Background commands: `process_source`, `run_transformation`, `embed_note`, `embed_insight`, `embed_source`, `create_insight`, `rebuild_embeddings`, `generate_podcast` |
-| `prompts/` | Jinja templates for ask, chat, source chat, transformations and podcasts |
+| `api/main.py` | App setup: middleware (CORS, body-size limit, password auth), exception handlers, routers (`prefix="/api"`), the `/mcp` route, startup migrations, lifespan (MCP session manager, checkpointer shutdown) |
+| `api/routers/` | One module per resource. Agent-related: `chat.py` (`/chat/execute`, `/chat/execute/stream`), `source_chat.py`, `search.py` (Ask), `agent.py` (`/agent/settings`, `/agent/memories`, `/agent/rebuild`), `sources.py` (incl. `/sources/{id}/pages/{page}/image`) |
+| `api/mcp_server.py` | FastMCP server: `ask` + the agent's primitives, scoped by notebook |
+| `open_notebook/agent/` | **The research agent** (below) |
+| `open_notebook/domain/` | Domain models on `ObjectModel` / `RecordModel`: `Notebook` (incl. `grounding`), `Source` (incl. `metadata`), `Note`, `SourceInsight`, `ChatSession`, `Transformation`, `Credential`, settings singletons incl. `AgentSettings` |
+| `open_notebook/ai/` | Provider registry, `Model` / `DefaultModels` / `ModelManager`, `provision.py` (`provision_langchain_model`, `limit_reasoning`), `openrouter.py` (rerank and multimodal embeddings over HTTP), key provider, discovery |
+| `open_notebook/graphs/` | `source.py` (ingestion graph), `transformation.py`, `prompt.py`, `checkpoint.py`; `chat.py`, `source_chat.py`, `ask.py` are upstream's pre-agent graphs, no longer used by the routers |
+| `open_notebook/utils/` | `pdf_pages.py` (page extraction, LaTeXiT decoding, build grouping, rendering), `sections.py` (outline models), `concepts.py` (concept extraction models, aliases), chunking, embedding, encryption, error classification, URL validation |
+| `open_notebook/database/` | `repository.py` (`repo_query` etc.; one connection per call) and migrations (`N.surrealql` + `N_down.surrealql`, registered in `async_migrate.py`) |
+| `commands/` | Background commands (below) |
+| `prompts/` | Jinja templates: `agent/` (system, subagent, review, compact), `sources/` (page caption, outline, section/document summary, concepts), plus upstream's ask/chat/transformation/podcast templates |
+| `scripts/brain/` | Deployment: `install_services.sh`, `build_frontend.sh`, `deploy_pc.sh`, `provision_models.py`, `ingest_folder.py`, SearXNG compose |
+| `evals/agent/` | The 35-question agent eval (`questions.json`, `run_eval.py`) |
+
+## The research agent (`open_notebook/agent/`)
+
+| Module | Role |
+|---|---|
+| `graph.py` | The LangGraph graph: one async node, `agent_node`. Loads scope, settings, memories; compacts history; runs `run_loop` with the research model and the tool list; hands the transcript to the answer writer; returns the answer plus a compact trace. `get_agent_graph()` (checkpointed) and `get_ephemeral_agent_graph()` (Ask, MCP) |
+| `tools.py` | The primitives: `list`, `grep`, `search` (passage/section/document/page, `like`, `image`), `outline`, `read`, `view`, `graph`, `note`, `calculate`; arg schemas (`AddressList` accepts stringified lists); `build_tools(scope)` |
+| `retrieval.py` | Search backends: BM25 + vector legs, reciprocal rank fusion, rerank, section/document rows, page-image hits, concept graph queries |
+| `scope.py` | `AgentScope` (sources, notes, notebook, attachments, pending images), `load_scope`, `per_source` (per-source equality queries; see below) |
+| `addresses.py` | Address parsing/formatting (`source:abc#p12-18`, `#s3`, `/summary`, `note:xyz`) |
+| `memory.py` | Memory recall/save/delete and the `remember` / `forget` tools |
+| `web.py` | SearXNG search, SSRF-safe fetching (public IPs only, per-hop checks, IP pinning), page/PDF text extraction, the web tools |
+| `sessions.py` | Chat-session helpers on the async checkpointer |
+
+### A turn
+
+```
+agent_node(state, config)
+  ├─ scope = load_scope(source_ids, note_ids, notebook)      # what may be read
+  ├─ settings, memories, notebook grounding
+  ├─ compact older messages into state.summary (research model)
+  ├─ tools = build_tools(scope) + delegate [+ remember/forget] [+ web_search/web_read]
+  ├─ run_loop(research model, tools, transcript, max_steps by effort, reviewer if deep)
+  │     each step: model.bind_tools → tool calls (parallel) → results appended;
+  │     viewed page images injected as a HumanMessage; repeated calls deduped;
+  │     emits {"type": "step"|"step_result"} through the LangGraph stream writer
+  └─ answer_writer(chat model): flattened transcript + answer rules → streamed text_delta
+→ state.messages += AIMessage(answer, additional_kwargs.agent_trace); summary/summarized
+```
+
+Only the question and answer (plus trace) are checkpointed; tool traffic, images and attachments (passed in
+`config["configurable"]["attachments"]`) are not. Delegated sub-agents run `run_loop` with a single-source scope and
+no writer.
+
+### Models
+
+`provision_langchain_model(content, model_id, default_type)` picks a model: content over 105K tokens → the
+`large_context` default; else an explicit `model_id`; else the default for `default_type`. The agent uses `tools`
+for research and `chat` (or the session override) for the answer; ingestion uses `transformation` (captions,
+analysis) and `tools` (concepts). `limit_reasoning(model, max_tokens)` sets OpenRouter's `reasoning.max_tokens`
+(2,048 per research step, 3,072 for the writer, 1,024 for utility calls). Errors go through `classify_error()` into
+typed exceptions the API maps to status codes.
+
+## Ingestion (worker)
+
+```
+process_source ─► graphs/source.py: extract (PDF → per-page via pdfplumber; others → content-core)
+                    └─ save_source: store source_page rows
+                         ├─ visual pages? ─► caption_pages ─► vectorize ─► analyze_source
+                         └─ otherwise ─────► vectorize ─────────────────► analyze_source (paged sources)
+analyze_source ─► outline + metadata ─► section summaries ─► document summary insight
+                    ├─► embed_pages        (page-image embeddings)
+                    └─► extract_concepts   (concept graph)
+embed_source / embed_note / embed_insight, run_transformation, create_insight, rebuild_embeddings, generate_podcast
+```
+
+Details: [content-processing.md](content-processing.md), [concept/ingestion](../2-CORE-CONCEPTS/ingestion.md).
 
 ## Data model
 
-Defined by the migrations in `open_notebook/database/migrations/` (read them for exact fields).
+From the migrations (read them for exact fields). Upstream tables plus Brain Notebook's (migrations 26–29):
 
 | Table | Holds |
 |---|---|
-| `notebook` | Name, description, `archived` flag (a filter, not a soft delete; deleting removes the record) |
-| `source` | `title`, `full_text`, `asset` (file path or URL), `topics`, `command` (the processing job) |
-| `source_embedding` | One chunk of a source: `source`, `order`, `content`, `embedding` |
-| `source_insight` | Transformation output for a source: `source`, `insight_type`, `content`, `embedding` |
-| `note` | Title, content, `note_type`, `embedding` |
-| `chat_session` | Session metadata only; messages live in the SQLite checkpoint, keyed by session id |
-| `transformation` | Prompt-based transformations: `name`, `title`, `prompt`, `apply_default`, optional `model_id` |
-| `model` | A configured model: `provider`, `name`, `type`, optional `credential` link |
-| `credential` | Provider credentials, API key encrypted ([credentials.md](credentials.md)) |
-| `episode_profile`, `speaker_profile`, `episode` | Podcast configuration and generated episodes ([podcasts.md](podcasts.md)) |
-| `open_notebook:*` records | Singletons: `default_models`, `default_prompts`, `content_settings` (plus legacy `provider_configs`, kept only for migration) |
+| `notebook` | Name, description, `archived`, `grounding` |
+| `source` | `title`, `full_text`, `asset` (file path or URL), `metadata` (doc type, course, sequence, topics, page count…), `command` |
+| `source_page` | Per page: `text`, `equations`, `image_ratio`, `caption`, `image_embedding`; unique `(source, page)` |
+| `source_embedding` | Chunks: `order`, `content`, `embedding`, `page_start`, `page_end` |
+| `source_section` | Outline sections: `index`, `title`, `page_start`, `page_end`, `summary`, `embedding`; unique `(source, index)` |
+| `source_insight` | Transformation output, incl. the "Document Summary" from analysis |
+| `concept`, `concept_alias` | Concepts (id derived from the normalized name) and their alternative names |
+| `concept_mention`, `concept_relation` | Where a concept appears (source, section, pages) and stated relations between concepts |
+| `memory` | Agent memories (`notebook` or none = everywhere), embedded |
+| `note`, `chat_session`, `transformation`, `model`, `credential`, podcast tables | As in upstream Open Notebook |
+| `open_notebook:*` records | Singletons: `default_models`, `content_settings`, `agent_settings`, … |
 
-Relationships are graph edges, not foreign keys:
+Graph edges: `reference` (source → notebook), `artifact` (note → notebook), `refers_to` (chat session → notebook or
+source). The `source_delete` event removes a source's pages, chunks, sections, insights and graph rows.
 
-- `reference`: source → notebook (a source can be in several notebooks)
-- `artifact`: note → notebook
-- `refers_to`: chat session → notebook or source
+**SurrealDB v2 quirk:** `WHERE source IN $ids` returns no rows on tables with a composite unique index on
+`(source, …)` (`source_page`, `source_section`). Query those per source with equality (`scope.per_source`).
+Integration tests (`tests/integration/`) run the real queries against SurrealDB.
 
-Search is two SurrealDB functions, `fn::text_search` (BM25 over titles, full text, chunks, insights and notes) and `fn::vector_search` (over the stored embeddings).
+## Request paths
 
-## Workflows (`open_notebook/graphs/`)
-
-| Graph | Invoked by | Shape |
-|---|---|---|
-| `source.py` | `process_source` command | `content_process` (content-core extraction) → `save_source` → `transform_content` (one branch per requested transformation). Embedding is a separate `embed_source` job |
-| `transformation.py` | `run_transformation` command, `POST /api/transformations/execute` | One node: apply a transformation prompt to a source |
-| `chat.py` | `api/routers/chat.py` | One node, checkpointed in SQLite (notebook chat) |
-| `source_chat.py` | `api/routers/source_chat.py` | One node, checkpointed in SQLite, streamed as SSE |
-| `ask.py` | `POST /api/search/ask` | Search strategy → one answer per search (parallel) → final answer, streamed as SSE |
-| `prompt.py` | `api/routers/notes.py` | One node: generate a note title |
-
-Nodes are `async def`, except in the two checkpointed chat graphs, which use sync nodes with a new event loop because `SqliteSaver` is synchronous.
-
-## How a model call happens
-
-1. A graph node calls `provision_langchain_model(content, model_id, default_type, **kwargs)` (`open_notebook/ai/provision.py`).
-2. Content over 105,000 tokens switches to the `large_context` default model. Otherwise an explicit `model_id` wins, then the default for `default_type` (`chat`, `transformation`, `tools`, …) from `DefaultModels`. No model → `ConfigurationError`, which the API returns as 422.
-3. `ModelManager.get_model()` loads the `Model` record. If it links a credential, the credential's config goes straight to Esperanto's `AIFactory`; otherwise `provision_provider_keys()` fills environment variables from stored credentials ([credentials.md](credentials.md#provisioning-two-paths)).
-4. The Esperanto model is converted with `.to_langchain()`. All provider calls go through [Esperanto](https://github.com/lfnovo/esperanto); nothing calls a provider SDK directly. Calls time out after `ESPERANTO_LLM_TIMEOUT` (Open Notebook sets 180 s when it's unset).
-5. On failure, the node passes the exception through `classify_error()` (`open_notebook/utils/error_classifier.py`). It matches the error text (auth, rate limit, model not found, network/timeout, context length, …) and raises the matching `open_notebook.exceptions` type with a user-readable message. The API's exception handlers turn that into a status code, and the frontend shows the message.
-
-## Background jobs
-
-1. A router submits a job: `CommandService.submit_command_job("open_notebook", "<command>", args)`. The job is stored in SurrealDB and its id returned at once.
-2. The worker runs the `@command` function. Its `retry` config decides what is retried; exceptions in `stop_on` fail the job immediately.
-3. Clients poll `GET /api/commands/jobs/{job_id}`, or a resource-specific status endpoint such as `GET /api/sources/{source_id}/status`.
-
-Example: `POST /api/sources` with `async_processing=true` (what the UI sends) saves the source, submits `process_source`, and returns. Without that flag, the API runs the same command inline (`execute_command_sync`) and responds when it finishes. The worker extracts the content, runs transformations, and submits `embed_source` if embedding was requested.
-
-## Request path in the API
-
-`CORSMiddleware` → `MaxBodySizeMiddleware` (rejects bodies over `OPEN_NOTEBOOK_MAX_UPLOAD_SIZE_MB` with 413) → `PasswordAuthMiddleware` (Bearer password, if one is set) → router. Typed exceptions from anywhere below map to status codes in `api/main.py`; see [api-reference.md](api-reference.md#errors).
+- **Chat**: `POST /api/chat/execute/stream` → `_prepare_turn` (session, scope, attachments) → agent graph
+  `astream(stream_mode=["custom", "values"])` → SSE events `step`, `step_result`, `text_delta`, `ai_message`,
+  `complete` / `error`. A failed turn removes the question from the checkpoint. `/chat/execute` is the non-streaming
+  variant.
+- **Ask**: `POST /api/search/ask` → ephemeral agent graph; steps are streamed as the strategy, the answer as the
+  final answer.
+- **MCP**: `/mcp` → FastMCP tools call the same tool functions with a notebook scope, or the ephemeral graph for `ask`.
+- **Middleware**: `CORSMiddleware` → `MaxBodySizeMiddleware` (413 over `OPEN_NOTEBOOK_MAX_UPLOAD_SIZE_MB`) →
+  `PasswordAuthMiddleware` (Bearer, if a password is set) → router. Typed exceptions map to status codes in
+  `api/main.py`; see [api-reference.md](api-reference.md#errors).

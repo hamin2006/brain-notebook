@@ -48,7 +48,7 @@ Every playbook ends the same way: tests, a CHANGELOG entry under `[Unreleased]`,
 
 **Example:** SiliconFlow and Z.ai (PR #1443), MiniMax text-to-speech (PR #1444)
 
-Open Notebook never calls provider SDKs directly; every model is created through [Esperanto](https://github.com/lfnovo/esperanto). So step 0 is: **Esperanto must already support the provider**, under the same provider name. If support arrived in a newer Esperanto release, bump `esperanto` in `pyproject.toml` and run `uv lock`.
+Brain Notebook never calls provider SDKs directly; every model is created through [Esperanto](https://github.com/lfnovo/esperanto). So step 0 is: **Esperanto must already support the provider**, under the same provider name. If support arrived in a newer Esperanto release, bump `esperanto` in `pyproject.toml` and run `uv lock`.
 
 The provider registry is the source of truth. Most backend tables and the frontend read from it, but a few copies are still maintained by hand. This is the full list for a provider with a single API key (the common case):
 
@@ -106,6 +106,23 @@ Providers that need several config fields (like `azure`, `vertex`, `openai_compa
 
 ---
 
+## Playbook: Add an Agent Tool
+
+Tools should be general primitives that compose (see the tool table in [the plan](plans/agentic-rag.md)), not
+shortcuts for one kind of question.
+
+| Step | File(s) | What to do |
+|------|---------|------------|
+| 1 | `open_notebook/agent/tools.py` (or its own module, like `web.py`, `memory.py`) | `async def tool_x(scope, …) -> str`. Take and return [addresses](../2-CORE-CONCEPTS/research-agent.md#addresses-and-citations); raise `ToolError` for mistakes the model can fix (the message says how); keep output bounded |
+| 2 | Same | An args `BaseModel` (use `AddressList` for address lists) and a `TOOL_SPECS` entry with a description written for the model; or build `StructuredTool`s and add them conditionally in `agent_node` (as memory and web tools are) |
+| 3 | `open_notebook/agent/retrieval.py` | Queries. Remember the `IN` quirk: per-source equality (`per_source`) on `source_page` / `source_section` |
+| 4 | `prompts/agent/system.jinja` | One line on when to use it, if the description isn't enough |
+| 5 | `api/mcp_server.py` | Expose it over MCP if it's useful to external clients |
+| 6 | `frontend/src/components/sources/AgentActivity.tsx` + locales | A `TOOL_KEYS` label (all 14 locales) |
+| 7 | Tests | Unit test with patched retrieval; an integration test in `tests/integration/` if it adds queries; run the [agent eval](testing.md#the-agent-eval) |
+
+---
+
 ## Playbook: Database Migration
 
 | Step | File(s) | What to do |
@@ -117,7 +134,8 @@ Providers that need several config fields (like `azure`, `vertex`, `openai_compa
 
 - Applied versions are recorded in the `_sbl_migrations` table and never re-run.
 - One migration per PR that needs one, numbered in merge order. Never consolidate migrations after one lands on `main`: dev images apply it immediately ([ADR-006](decisions/ADR-006-migration-granularity.md)).
-- Test against a database with existing data, not only an empty one.
+- Test against a database with existing data, not only an empty one. `tests/integration/` migrates a fresh database to the latest version on every test.
+- Brain Notebook's migrations are 26–29 (pages, sections, agent extensions, concept aliases).
 
 ---
 
@@ -173,6 +191,7 @@ You can't forget a locale silently: each non-en-US locale ends with `satisfies T
 | Database access | `open_notebook/database/repository.py` (`repo_query`, `repo_create`, …) | `tests/` |
 | Migrations | `open_notebook/database/migrations/` + `async_migrate.py` | run on API startup |
 | AI provisioning and providers | `open_notebook/ai/` | `tests/` |
+| Research agent | `open_notebook/agent/` | `tests/test_agent_*.py`, `tests/integration/`, `evals/agent/` |
 | Graphs | `open_notebook/graphs/` | `tests/` |
 | Prompts | `prompts/**/*.jinja` | `tests/` (podcast templates) |
 | Background commands | `commands/` | `tests/` |

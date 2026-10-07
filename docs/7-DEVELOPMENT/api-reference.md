@@ -44,10 +44,12 @@ Use `/docs` for request and response shapes. This map shows where things are:
 
 | Area | Paths |
 |---|---|
-| Notebooks | `/api/notebooks`, `/api/notebooks/{id}/sources/{source_id}` (link/unlink), `/api/recently-viewed` |
-| Sources | `/api/sources` (multipart create with optional file upload), `/api/sources/json`, `/api/sources/{id}/status`, `/api/sources/{id}/retry`, `/api/sources/{id}/insights`, `/api/sources/{id}/download` |
+| Notebooks | `/api/notebooks` (incl. `grounding`), `/api/notebooks/{id}/sources/{source_id}` (link/unlink), `/api/recently-viewed` |
+| Sources | `/api/sources` (multipart create with optional file upload), `/api/sources/json`, `/api/sources/{id}/status`, `/api/sources/{id}/retry`, `/api/sources/{id}/insights`, `/api/sources/{id}/download`, `/api/sources/{id}/pages/{page}/image` (a rendered PDF page, PNG) |
 | Notes, insights | `/api/notes`, `/api/insights/{id}`, `/api/insights/{id}/save-as-note` |
-| Chat | `/api/chat/sessions`, `/api/chat/execute`, `/api/chat/context`; source chat under `/api/sources/{id}/chat/sessions` |
+| Chat (research agent) | `/api/chat/sessions`, `/api/chat/execute/stream` (SSE), `/api/chat/execute`; source chat under `/api/sources/{id}/chat/sessions` |
+| Research agent | `/api/agent/settings` (GET/PUT), `/api/agent/memories` (GET), `/api/agent/memories/{id}` (DELETE), `/api/agent/rebuild` (POST: `page_embeddings` / `concepts`) |
+| MCP | `/mcp` (streamable HTTP, not under `/api`): see [MCP Integration](../5-CONFIGURATION/mcp-integration.md) |
 | Search and Ask | `/api/search`, `/api/search/ask` (streaming), `/api/search/ask/simple` |
 | Transformations | `/api/transformations`, `/api/transformations/execute`, `/api/transformations/default-prompt` |
 | Models and providers | `/api/models`, `/api/models/defaults`, `/api/models/sync`, `/api/models/auto-assign`, `/api/providers` |
@@ -69,14 +71,32 @@ If the worker isn't running, jobs stay queued.
 
 ## Streaming
 
-`POST /api/search/ask` and the source-chat message endpoint return Server-Sent Events (`text/event-stream`). Each event is a `data: {json}` line with a `type` field. For Ask, the types are `strategy`, `answer`, `final_answer`, `complete` and `error`.
+Chat, source chat and Ask stream Server-Sent Events (`text/event-stream`): `data: {json}` lines with a `type` field.
+
+**Notebook chat**, `POST /api/chat/execute/stream`:
+
+| Event | Fields | Meaning |
+|---|---|---|
+| `step` | `step`, `tool`, `args` | The agent started a tool call (`tool` = `answer` when the writer starts) |
+| `step_result` | `step`, `tool`, `summary` | First line of that tool's result |
+| `text_delta` | `step`, `text` | Answer text as it's generated |
+| `ai_message` | `message` | The saved answer, with `trace` (the steps) |
+| `complete` / `error` | `message` on error | End of the turn |
+
+Request fields besides `session_id` and `message`: `effort` (`quick` / `standard` / `deep`), `source_ids` and
+`note_ids` (the scope; omit for the whole notebook), `model_override` (the answer model), `images` (up to 4
+`data:image/...` URLs, used for this turn only). `context` is accepted for compatibility; only its ids are used.
 
 ```bash
-curl -N http://localhost:5055/api/search/ask \
-  -H "Authorization: Bearer $OPEN_NOTEBOOK_PASSWORD" \
+curl -N http://localhost:5055/api/chat/execute/stream \
   -H "Content-Type: application/json" \
-  -d '{"question": "What are the main findings?", "strategy_model": "model:...", "answer_model": "model:...", "final_answer_model": "model:..."}'
+  -d '{"session_id": "chat_session:...", "message": "What are Adam's defaults?", "context": {}, "effort": "quick"}'
 ```
+
+**Source chat** forwards the same `step` / `step_result` / `text_delta` events, then `ai_message` with `content`.
+
+**Ask**, `POST /api/search/ask`: `strategy` (the research steps so far), `final_answer`, `complete`, `error`. The
+request still takes `strategy_model`, `answer_model` and `final_answer_model`; only the last is used (as the writer).
 
 Check `/docs` for the exact request fields.
 

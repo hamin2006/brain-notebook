@@ -18,13 +18,25 @@ Pages (src/app/, App Router) → Feature components (src/components/) → Hooks 
 
 Provider tree in `app/layout.tsx` (outermost → innermost): ErrorBoundary → ThemeProvider → QueryProvider → I18nProvider → ConnectionGuard → Toaster.
 
-## Flow walkthrough: notebook chat
+## Flow walkthrough: notebook chat (research agent)
 
-1. `notebooks/[id]/page.tsx` passes `notebookId` to `ChatColumn`.
-2. `useNotebookChat()` queries sessions, manages message state, returns `{ messages, sendMessage(), setModelOverride() }`.
-3. On send: `buildContext()` assembles selected sources/notes (token/char counts), calls `chatApi.sendMessage()`, and applies an **optimistic update** (message added locally, removed on error).
-4. Response updates the TanStack Query cache; related source/note mutations elsewhere invalidate broadly so stale UI refreshes.
-5. Model override before a session exists is stored as pending and applied on session creation.
+1. `notebooks/[id]/page.tsx` passes `notebookId` and the context selections to `ChatColumn`, which also reads the
+   notebook (for `grounding`) and renders `ChatPanel` with `allowImages`.
+2. `useNotebookChat()` (`lib/hooks/use-notebook-chat.ts`) manages sessions, messages, `effort` and the live
+   `activity`. `scope()` turns the selections into `source_ids` / `note_ids` (anything not "not included").
+3. On send it adds the user message optimistically (with attached image previews), then calls
+   `chatApi.streamMessage()` (`POST /api/chat/execute/stream`, proxied by `app/api/chat/execute/stream/route.ts`) and
+   reads the SSE stream. `applyAgentEvent()` (pure, tested) folds `step` / `step_result` / `text_delta` into
+   `{steps, text}`; `AgentActivityView` shows them under *Researching…*. `ai_message` replaces the live view with the
+   saved answer (with `trace`), rendered with `ResearchSteps` and references.
+4. `ChatComposer` (in `ChatPanel.tsx`) holds the model, `EffortSelect`, `GroundingSelect` (updates the notebook) and
+   image attachments (`ImageAttachments.tsx`: paste or pick, scaled to ≤1600 px JPEG data URLs, max 4).
+5. References: `lib/utils/source-references.tsx` parses addresses with locators (`[source:abc#p94]`), numbers each
+   location, and labels it via `localizedLocator`; clicking a page reference opens `PagePreviewDialog`, which fetches
+   `/api/sources/{id}/pages/{n}/image` with the auth token.
+
+Settings → Research agent is `app/(dashboard)/settings/components/AgentSettingsCard.tsx` with hooks in
+`lib/hooks/use-agent.ts`. App-wide links to the repository come from `lib/project.ts`.
 
 ## Flow walkthrough: file upload
 

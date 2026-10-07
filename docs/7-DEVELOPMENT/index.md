@@ -1,6 +1,6 @@
 # Development
 
-Documentation for people (and coding agents) working on the Open Notebook codebase.
+Documentation for people (and coding agents) working on the Brain Notebook codebase.
 
 ## Start here
 
@@ -33,7 +33,6 @@ The normative rules for coding agents (and humans in a hurry) are in the `AGENTS
 
 - **GitHub Discussions**: questions, ideas, product direction, design and architecture
 - **GitHub Issues**: reproducible bugs and approved work items
-- **Discord**: [join the server](https://discord.gg/37XJPXfz2w) for real-time help
 
 ## Libraries we maintain
 

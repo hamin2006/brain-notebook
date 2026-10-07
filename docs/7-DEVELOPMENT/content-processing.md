@@ -1,6 +1,28 @@
-# Content Processing: Chunking, Embedding, Context & Encryption
+# Content Processing: Pages, Chunking, Embedding, Context & Encryption
 
-Design notes for the utilities in `open_notebook/utils/` that turn raw content into searchable, LLM-consumable data. These are cross-cutting: sources, notes and insights all flow through them.
+Design notes for the code that turns raw content into searchable, LLM-consumable data. The user-level view of the
+pipeline is [How Documents Are Ingested](../2-CORE-CONCEPTS/ingestion.md).
+
+## Page-aware PDF ingestion (`utils/pdf_pages.py`, `graphs/source.py`, `commands/`)
+
+- `extract_pdf_pages(path)` reads each page with pdfplumber into `PdfPage(number, text, equations, image_ratio)`.
+  `clean_page_text` removes residual junk; `latexit_source()` decodes LaTeXiT payloads (base64 → 4-byte qCompress
+  length + zlib → binary plist, `source` key) so the 4×-repeated invisible text becomes `$…$`.
+- `group_builds(pages)` merges animation builds: a page is a build step of the previous one when it covers ≥ 90% of
+  its text (`SequenceMatcher`) and isn't shorter. The last page carries the text; page numbers are kept as ranges.
+- `graphs/source.py` uses page extraction for PDFs with a text layer (others go through content-core), stores
+  `source_page` rows, and chains the jobs: `caption_pages` (pages with `image_ratio ≥ 0.25`, Transformation Model,
+  4 concurrent, `NO_VISUAL_CONTENT` sentinel) → `embed_source` → `analyze_source` → `embed_pages` +
+  `extract_concepts`.
+- `embed_source` builds **page-ranged chunks** (`_paged_chunks`: page text + caption, header `Title — pp. N–M`,
+  `page_start` / `page_end` on each `source_embedding`) instead of the generic splitter when pages exist.
+- `analyze_source` (`commands/analyze_commands.py`): `plan_outline` (page index → `OutlinePlan` JSON; on failure,
+  fixed page windows), `summarize_sections` (per section; empty reply → retry → plain extract), document summary
+  from section summaries (empty → joined section summaries). Writes `source.metadata`, `source_section` (embedded),
+  and replaces the "Document Summary" insight.
+- **PDFium is not thread-safe**: every pypdfium2 call holds `PDFIUM_LOCK` (it crashed the worker with heap corruption
+  when captions rendered pages in parallel).
+- Model calls in these jobs use `limit_reasoning()` so reasoning models can't return empty replies.
 
 ## Chunking (`utils/chunking.py`)
 
@@ -35,7 +57,8 @@ All embedding is fire-and-forget through the surreal-commands worker — nothing
 
 ## Context building (`utils/context_builder.py`)
 
-The single implementation behind both context consumers:
+Upstream's context builder. The research agent doesn't use it (it reads through its tools); it still backs
+`POST /api/chat/context` (podcast content selection) and the legacy chat graphs:
 
 - `build_notebook_context()` backs `POST /api/chat/context` (chat panel + podcast generation): it assembles source/note contexts from the inclusion config, whose status strings are matched textually ("not in" skips, "insights" → short context, "full content" → long context). Without a config, every source and note is included with its short context. Per-item failures are logged and skipped.
 - `build_source_context()` backs the source-chat graph: it requests the source's long context and adds insights as separate budgeted items. Full source text is retained when it fits. For an oversized source, up to 20% of the token budget is reserved for fitting insights in fetch order, unused space returns to the source, and a near-maximal token-aligned source prefix carries an explicit truncation notice. Prefix selection uses a cached binary search plus bounded forward validation for local BPE non-monotonicity; the offline word-count fallback stays logarithmic. Budget enforcement and `total_tokens` use the shared Markdown renderer that supplies the prompt, while internal counts/status metadata are not rendered to the model. If the budget cannot fit the rendered source headers, the notice, and at least one non-whitespace source character, the source item is omitted and metadata reports `source_text_status="omitted_budget"` rather than presenting notice-only text as source content.
