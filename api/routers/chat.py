@@ -135,7 +135,8 @@ class ExecuteChatRequest(BaseModel):
     session_id: str = Field(..., description="Chat session ID")
     message: str = Field(..., description="User message content")
     context: Dict[str, Any] = Field(
-        ..., description="Chat context with sources and notes"
+        default_factory=dict,
+        description="Legacy: chat context with sources and notes (only their ids are used)",
     )
     model_override: Optional[str] = Field(
         None, description="Optional model override for this message"

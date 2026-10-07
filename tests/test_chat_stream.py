@@ -103,3 +103,13 @@ def test_scope_from_request_prefers_explicit_ids_then_context():
     assert _scope_from_request(
         ExecuteChatRequest(session_id="s", message="m", context={})
     ) == (None, None)
+
+
+def test_context_is_optional():
+    # The chat UI sends only source_ids / note_ids; a required `context` made every
+    # turn fail with 422.
+    request = ExecuteChatRequest(
+        session_id="s", message="m", source_ids=["source:a"], note_ids=[]
+    )
+    assert request.context == {}
+    assert _scope_from_request(request) == (["source:a"], [])
