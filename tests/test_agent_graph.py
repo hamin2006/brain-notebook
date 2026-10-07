@@ -1,7 +1,7 @@
 """The agent loop: tool calls, streaming events, dedupe, budget, images, errors."""
 
 import json
-from typing import Any, List
+from typing import Any, List, Optional
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -17,10 +17,16 @@ from open_notebook.exceptions import IncompleteGenerationError
 class ScriptedModel:
     """Streams scripted replies; each reply is text and/or tool calls."""
 
-    def __init__(self, replies: List[dict]):
+    def __init__(self, replies: List[dict], reviews: Optional[List[str]] = None):
         self.replies = replies
+        self.reviews = reviews or []
         self.calls: List[List[Any]] = []
         self.tool_choice = None
+
+    async def ainvoke(self, prompt):  # the deep-mode reviewer
+        from langchain_core.messages import AIMessage
+
+        return AIMessage(content=self.reviews.pop(0))
 
     def bind_tools(self, tools, tool_choice=None):
         bound = ScriptedModel.__new__(ScriptedModel)
@@ -203,3 +209,82 @@ async def test_a_failing_tool_becomes_an_error_message():
         "Error: read failed (RuntimeError: database hiccup)"
         in model.calls[1][-1].content
     )
+
+
+@pytest.mark.asyncio
+async def test_deep_mode_review_sends_the_agent_back_for_gaps():
+    reads = []
+
+    async def read(address: str):
+        reads.append(address)
+        return "--- p94 ---\nAdam: alpha = 0.001, beta1 = 0.9, beta2 = 0.999"
+
+    model = ScriptedModel(
+        [
+            {"text": "Adam uses momentum."},  # draft 1: incomplete
+            {"tools": [("read", {"address": "source:l4#p94"})]},
+            {
+                "text": "Adam uses alpha = 0.001, beta1 = 0.9, beta2 = 0.999 [source:l4#p94]."
+            },
+        ],
+        reviews=[
+            '{"sufficient": false, "missing": ["the default hyperparameters"]}',
+            '{"sufficient": true, "missing": []}',
+        ],
+    )
+    events, final = await _run(model, [_tool("read", read)], effort="deep")
+    assert final["messages"][-1].content.endswith("[source:l4#p94].")
+    assert reads == ["source:l4#p94"]
+    gap_prompt = model.calls[1][-1]
+    assert "the default hyperparameters" in gap_prompt.content
+    assert [
+        e["summary"]
+        for e in events
+        if e.get("tool") == "review" and e["type"] == "step_result"
+    ] == [
+        "the default hyperparameters",
+        "complete",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_unreadable_review_does_not_force_another_round():
+    model = ScriptedModel([{"text": "Answer [source:l4#p1]."}], reviews=["not json"])
+    _, final = await _run(model, [], effort="deep")
+    assert final["messages"][-1].content == "Answer [source:l4#p1]."
+
+
+@pytest.mark.asyncio
+async def test_delegate_runs_one_scoped_subagent_per_document():
+    from open_notebook.agent.graph import make_delegate_tool
+
+    scope = AgentScope(
+        sources={
+            "source:l3": ScopedSource("source:l3", "Lecture 3"),
+            "source:l4": ScopedSource("source:l4", "Lecture 4"),
+        },
+        notes={},
+    )
+    seen_scopes = []
+
+    def fake_build_tools(sub_scope):
+        seen_scopes.append(set(sub_scope.sources))
+        return []
+
+    model = ScriptedModel(
+        [
+            {"text": "L3 treats dropout as regularization [source:l3#p123]."},
+            {"text": "L4 calls dropout implicit regularization [source:l4#p61]."},
+        ]
+    )
+    with patch("open_notebook.agent.graph.build_tools", side_effect=fake_build_tools):
+        tool = make_delegate_tool(model, scope, lambda e: None)
+        out = await tool.ainvoke(
+            {
+                "task": "How is dropout presented?",
+                "addresses": ["source:l3", "source:l4", "source:nope"],
+            }
+        )
+    assert seen_scopes == [{"source:l3"}, {"source:l4"}]
+    assert '### source:l3 "Lecture 3"' in out and "[source:l4#p61]" in out
+    assert "### source:nope\nError:" in out

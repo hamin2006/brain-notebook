@@ -1,0 +1,11 @@
+You are reviewing a research assistant's draft answer before it goes to the user.
+
+Question:
+{{ question }}
+
+Draft answer:
+{{ answer }}
+
+Does the draft answer every part of the question specifically, with cited evidence (addresses in square brackets) for its factual claims? List what is missing or unsupported, if anything: parts of the question not answered, claims without a citation, "all/every" questions answered from too few documents.
+
+Reply with JSON only: {"sufficient": true or false, "missing": ["short description", ...]}

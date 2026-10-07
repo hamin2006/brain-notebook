@@ -14,7 +14,7 @@ streaming chat endpoint.
 import asyncio
 import json
 from datetime import date
-from typing import Annotated, Any, Dict, List, Optional
+from typing import Annotated, Any, Awaitable, Callable, Dict, List, Optional, Tuple
 
 from ai_prompter import Prompter
 from langchain_core.messages import (
@@ -27,13 +27,16 @@ from langchain_core.messages import (
 )
 from langchain_core.messages.tool import ToolCall
 from langchain_core.runnables import RunnableConfig
+from langchain_core.tools import StructuredTool
 from langgraph.config import get_stream_writer
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from loguru import logger
+from pydantic import BaseModel, Field
 from typing_extensions import TypedDict
 
-from open_notebook.agent.scope import AgentScope, load_scope
+from open_notebook.agent.addresses import AddressError, parse_address
+from open_notebook.agent.scope import AgentScope, ToolError, load_scope
 from open_notebook.agent.tools import build_tools
 from open_notebook.ai.provision import provision_langchain_model
 from open_notebook.database.repository import ensure_record_id, repo_query
@@ -44,6 +47,10 @@ from open_notebook.utils.error_classifier import classify_error
 from open_notebook.utils.text_utils import extract_text_content
 
 EFFORT_STEPS = {"quick": 4, "standard": 10, "deep": 20}
+REVIEW_ROUNDS = {"deep": 2}  # sufficiency reviews per turn, by effort
+SUBAGENT_STEPS = 5
+MAX_DELEGATED_DOCUMENTS = 12
+MAX_CONCURRENT_SUBAGENTS = 4
 DEFAULT_EFFORT = "standard"
 HISTORY_MESSAGES = 20
 MAX_ANSWER_TOKENS = 8192
@@ -163,6 +170,156 @@ def _image_message(scope: AgentScope) -> Optional[HumanMessage]:
     return HumanMessage(content=content)
 
 
+async def run_loop(
+    model,
+    tool_list: List[Any],
+    scope: AgentScope,
+    working: List[BaseMessage],
+    max_steps: int,
+    writer,
+    reviewer: Optional[Callable[[str], Awaitable[List[str]]]] = None,
+    review_rounds: int = 0,
+) -> Tuple[str, List[Dict[str, Any]]]:
+    """Call tools until the model answers or the budget runs out. Returns (answer, trace).
+
+    With a reviewer, a finished draft is checked; listed gaps send the model back
+    to research (at most `review_rounds` times, budget permitting).
+    """
+    tools = {t.name: t for t in tool_list}
+    llm = model.bind_tools(tool_list)
+    seen: Dict[str, str] = {}
+    trace: List[Dict[str, Any]] = []
+    reviews = 0
+    for step in range(1, max_steps + 1):
+        message = await _stream_step(llm, working, writer, step)
+        working.append(message)
+        if not message.tool_calls:
+            answer = extract_text_content(message.content)
+            if reviewer and reviews < review_rounds and step < max_steps:
+                reviews += 1
+                writer({"type": "step", "step": step, "tool": "review", "args": {}})
+                missing = await reviewer(answer)
+                writer(
+                    {
+                        "type": "step_result",
+                        "step": step,
+                        "tool": "review",
+                        "summary": "; ".join(missing) or "complete",
+                    }
+                )
+                if missing:
+                    trace.append(
+                        {"tool": "review", "args": {}, "result": "; ".join(missing)}
+                    )
+                    working.append(
+                        HumanMessage(
+                            content="A reviewer found gaps in that draft:\n- "
+                            + "\n- ".join(missing)
+                            + "\nInvestigate them with the tools, then give the complete answer."
+                        )
+                    )
+                    continue
+            return answer, trace
+        results = await _run_tools(message.tool_calls, tools, seen, writer, step)
+        working.extend(results)
+        trace += [
+            {
+                "tool": c["name"],
+                "args": c.get("args") or {},
+                "result": _first_line(str(r.content)),
+            }
+            for c, r in zip(message.tool_calls, results)
+        ]
+        image = _image_message(scope)
+        if image is not None:
+            working.append(image)
+
+    # Out of budget: answer from what was gathered, without more tools.
+    writer({"type": "step", "step": max_steps + 1, "tool": "answer", "args": {}})
+    working.append(
+        HumanMessage(
+            content="You have used your research budget. Answer now from the evidence above, "
+            "citing addresses, and say briefly what you could not verify."
+        )
+    )
+    final = await _stream_step(
+        model.bind_tools(tool_list, tool_choice="none"), working, writer, max_steps + 1
+    )
+    return extract_text_content(final.content), trace
+
+
+async def review_answer(model, question: str, draft: str) -> List[str]:
+    """Gaps a reviewer finds in a draft; [] when sufficient or when the review is unreadable.
+
+    An unreadable review means "we did not ask", not "insufficient" (the
+    distinction RAGFlow draws with VerdictUnknown), so it never forces a loop.
+    """
+    prompt = Prompter(prompt_template="agent/review").render(
+        data={"question": question, "answer": draft}
+    )
+    try:
+        reply = await model.ainvoke(prompt)
+        text = clean_thinking_content(extract_text_content(reply.content))
+        verdict = json.loads(text[text.find("{") : text.rfind("}") + 1])
+    except Exception as e:
+        logger.warning(f"Answer review skipped: {e}")
+        return []
+    if verdict.get("sufficient", True):
+        return []
+    return [str(m) for m in verdict.get("missing") or []][:5]
+
+
+class DelegateArgs(BaseModel):
+    task: str = Field(description="What to find out in each document")
+    addresses: List[str] = Field(
+        description="Document addresses, one sub-agent each (max 12)"
+    )
+
+
+def make_delegate_tool(model, scope: AgentScope, writer) -> StructuredTool:
+    """delegate: one quick sub-agent per document, in parallel, each with a fresh context."""
+
+    async def run_one(address: str, task: str, semaphore: asyncio.Semaphore) -> str:
+        try:
+            source = scope.source(parse_address(address).record_id)
+        except (ToolError, AddressError) as e:
+            return f"### {address}\nError: {e}"
+        sub_scope = AgentScope(sources={source.id: source}, notes={})
+        sub_tools = [t for t in build_tools(sub_scope) if t.name not in ("note",)]
+        system = Prompter(prompt_template="agent/subagent").render(
+            data={"label": source.label, "source_id": source.id, "task": task}
+        )
+        async with semaphore:
+            answer, _ = await run_loop(
+                model,
+                sub_tools,
+                sub_scope,
+                [SystemMessage(content=system), HumanMessage(content=task)],
+                SUBAGENT_STEPS,
+                lambda event: None,  # sub-agent steps stay internal
+            )
+        return f'### {source.id} "{source.label}"\n{clean_thinking_content(answer).strip()}'
+
+    async def delegate(task: str, addresses: List[str]) -> str:
+        if not addresses:
+            return "Error: give one or more document addresses."
+        targets = list(dict.fromkeys(addresses))[:MAX_DELEGATED_DOCUMENTS]
+        semaphore = asyncio.Semaphore(MAX_CONCURRENT_SUBAGENTS)
+        results = await asyncio.gather(*(run_one(a, task, semaphore) for a in targets))
+        return "\n\n".join(results)
+
+    return StructuredTool.from_function(
+        coroutine=delegate,
+        name="delegate",
+        description=(
+            "Run the same task on several documents in parallel, one sub-agent each with a fresh context; "
+            "returns a short cited answer per document. Use it to compare documents, trace a concept "
+            "across many, or collect something from every document."
+        ),
+        args_schema=DelegateArgs,
+    )
+
+
 async def agent_node(state: AgentState, config: RunnableConfig) -> dict:
     writer = get_stream_writer()
     try:
@@ -174,7 +331,6 @@ async def agent_node(state: AgentState, config: RunnableConfig) -> dict:
             note_ids = all_notes if note_ids is None else note_ids
         scope = await load_scope(source_ids or [], note_ids or [], notebook_id)
         tool_list = build_tools(scope)
-        tools = {t.name: t for t in tool_list}
 
         effort = state.get("effort") or DEFAULT_EFFORT
         max_steps = EFFORT_STEPS.get(effort, EFFORT_STEPS[DEFAULT_EFFORT])
@@ -196,51 +352,27 @@ async def agent_node(state: AgentState, config: RunnableConfig) -> dict:
         model = await provision_langchain_model(
             system, model_id, "chat", max_tokens=MAX_ANSWER_TOKENS
         )
-        llm = model.bind_tools(tool_list)
 
+        tool_list = tool_list + [make_delegate_tool(model, scope, writer)]
         working: List[BaseMessage] = [SystemMessage(content=system)] + list(
             state["messages"][-HISTORY_MESSAGES:]
         )
-        seen: Dict[str, str] = {}
-        trace: List[Dict[str, Any]] = []
-        answer = ""
-        for step in range(1, max_steps + 1):
-            message = await _stream_step(llm, working, writer, step)
-            working.append(message)
-            if not message.tool_calls:
-                answer = extract_text_content(message.content)
-                break
-            results = await _run_tools(message.tool_calls, tools, seen, writer, step)
-            working.extend(results)
-            trace += [
-                {
-                    "tool": c["name"],
-                    "args": c.get("args") or {},
-                    "result": _first_line(str(r.content)),
-                }
-                for c, r in zip(message.tool_calls, results)
-            ]
-            image = _image_message(scope)
-            if image is not None:
-                working.append(image)
-        else:
-            # Out of budget: answer from what was gathered, without more tools.
-            writer(
-                {"type": "step", "step": max_steps + 1, "tool": "answer", "args": {}}
-            )
-            working.append(
-                HumanMessage(
-                    content="You have used your research budget. Answer now from the evidence above, "
-                    "citing addresses, and say briefly what you could not verify."
-                )
-            )
-            final = await _stream_step(
-                model.bind_tools(tool_list, tool_choice="none"),
-                working,
-                writer,
-                max_steps + 1,
-            )
-            answer = extract_text_content(final.content)
+        question = extract_text_content(state["messages"][-1].content)
+        reviewer = (
+            (lambda draft: review_answer(model, question, draft))
+            if REVIEW_ROUNDS.get(effort)
+            else None
+        )
+        answer, trace = await run_loop(
+            model,
+            tool_list,
+            scope,
+            working,
+            max_steps,
+            writer,
+            reviewer=reviewer,
+            review_rounds=REVIEW_ROUNDS.get(effort, 0),
+        )
 
         answer = clean_thinking_content(answer).strip()
         if not answer:
