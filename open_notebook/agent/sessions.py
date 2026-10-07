@@ -11,7 +11,9 @@ from open_notebook.agent.graph import get_agent_graph
 async def thread_messages(session_id: str) -> list:
     """The checkpointed messages of a chat session ([] when it has none)."""
     graph = await get_agent_graph()
-    state = await graph.aget_state(RunnableConfig(configurable={"thread_id": session_id}))
+    state = await graph.aget_state(
+        RunnableConfig(configurable={"thread_id": session_id})
+    )
     return list((state.values or {}).get("messages", [])) if state else []
 
 
@@ -28,7 +30,12 @@ async def discard_unanswered(session_id: str, message: HumanMessage) -> None:
     try:
         graph = await get_agent_graph()
         config = RunnableConfig(configurable={"thread_id": session_id})
-        if any(getattr(m, "id", None) == message.id for m in await thread_messages(session_id)):
-            await graph.aupdate_state(config, {"messages": [RemoveMessage(id=message.id or "")]})
+        if any(
+            getattr(m, "id", None) == message.id
+            for m in await thread_messages(session_id)
+        ):
+            await graph.aupdate_state(
+                config, {"messages": [RemoveMessage(id=message.id or "")]}
+            )
     except Exception:
         logger.exception(f"Could not discard unanswered message in {session_id}")

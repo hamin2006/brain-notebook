@@ -17,7 +17,6 @@ from open_notebook.exceptions import (
     InvalidInputError,
     OpenNotebookError,
 )
-from open_notebook.graphs.ask import graph as ask_graph
 
 router = APIRouter()
 
@@ -74,6 +73,24 @@ async def search_knowledge_base(search_request: SearchRequest):
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
 
+RESEARCH_TOOLS = {"search", "grep", "list", "outline", "read", "view", "delegate"}
+
+
+def _ask_state(
+    question: str, model_id: str, source_ids, note_ids, notebook_ids
+) -> dict:
+    from langchain_core.messages import HumanMessage
+
+    return {
+        "messages": [HumanMessage(content=question)],
+        "notebook_id": notebook_ids[0] if len(notebook_ids) == 1 else None,
+        "source_ids": source_ids,
+        "note_ids": note_ids,
+        "model_override": model_id,
+        "effort": "standard",
+    }
+
+
 async def stream_ask_response(
     question: str,
     strategy_model: Model,
@@ -81,47 +98,57 @@ async def stream_ask_response(
     final_answer_model: Model,
     notebook_ids: List[str],
 ) -> AsyncGenerator[str, None]:
-    """Stream the ask response as Server-Sent Events."""
+    """Answer with the research agent, streamed in the Ask page's event format.
+
+    Each research step is added to the "strategy" the page shows; the agent's
+    answer is the final answer. The strategy and answer models of the old Ask
+    pipeline are accepted for compatibility; the final answer model runs the agent.
+    """
+    from open_notebook.agent.graph import (
+        get_ephemeral_agent_graph,
+        knowledge_base_scope,
+    )
+
     try:
+        source_ids, note_ids = await knowledge_base_scope(notebook_ids)
+        graph = get_ephemeral_agent_graph()
+        state = _ask_state(
+            question, final_answer_model.id or "", source_ids, note_ids, notebook_ids
+        )
+        searches: List[dict] = []
         final_answer = None
-
-        # LangGraph accepts a partial state dict at runtime, but its typed
-        # overloads require the full state type (langgraph typing limitation).
-        async for chunk in ask_graph.astream(  # type: ignore[call-overload]
-            input=dict(question=question, notebook_ids=notebook_ids),
-            config=dict(
-                configurable=dict(
-                    strategy_model=strategy_model.id,
-                    answer_model=answer_model.id,
-                    final_answer_model=final_answer_model.id,
-                )
-            ),
-            stream_mode="updates",
+        async for mode, chunk in graph.astream(  # type: ignore[call-overload]
+            state, stream_mode=["custom", "values"]
         ):
-            if "agent" in chunk:
-                strategy_data = {
-                    "type": "strategy",
-                    "reasoning": chunk["agent"]["strategy"].reasoning,
-                    "searches": [
-                        {"term": search.term, "instructions": search.instructions}
-                        for search in chunk["agent"]["strategy"].searches
-                    ],
-                }
-                yield f"data: {json.dumps(strategy_data)}\n\n"
-
-            elif "provide_answer" in chunk:
-                for answer in chunk["provide_answer"]["answers"]:
-                    answer_data = {"type": "answer", "content": answer}
-                    yield f"data: {json.dumps(answer_data)}\n\n"
-
-            elif "write_final_answer" in chunk:
-                final_answer = chunk["write_final_answer"]["final_answer"]
-                final_data = {"type": "final_answer", "content": final_answer}
-                yield f"data: {json.dumps(final_data)}\n\n"
-
-        # Send completion signal
-        completion_data = {"type": "complete", "final_answer": final_answer}
-        yield f"data: {json.dumps(completion_data)}\n\n"
+            if mode == "custom":
+                if chunk.get("type") == "step" and chunk.get("tool") in RESEARCH_TOOLS:
+                    args = chunk.get("args") or {}
+                    term = (
+                        args.get("query")
+                        or args.get("pattern")
+                        or args.get("address")
+                        or args.get("source")
+                        or ""
+                    )
+                    searches.append(
+                        {
+                            "term": str(term) or chunk["tool"],
+                            "instructions": chunk["tool"],
+                        }
+                    )
+                    strategy = {
+                        "type": "strategy",
+                        "reasoning": "Researching the notebook with search, reading and page views.",
+                        "searches": searches,
+                    }
+                    yield f"data: {json.dumps(strategy)}\n\n"
+            else:
+                messages = chunk.get("messages") or []
+                if messages and getattr(messages[-1], "type", None) == "ai":
+                    final_answer = messages[-1].content
+        if final_answer:
+            yield f"data: {json.dumps({'type': 'final_answer', 'content': final_answer})}\n\n"
+        yield f"data: {json.dumps({'type': 'complete', 'final_answer': final_answer})}\n\n"
 
     except Exception as e:
         from open_notebook.utils.error_classifier import classify_error
@@ -235,23 +262,24 @@ async def ask_knowledge_base_simple(ask_request: AskRequest):
                 detail="Ask feature requires an embedding model. Please configure one in the Models section.",
             )
 
-        # Run the ask graph and get final result
-        final_answer = None
-        # LangGraph accepts a partial state dict at runtime, but its typed
-        # overloads require the full state type (langgraph typing limitation).
-        async for chunk in ask_graph.astream(  # type: ignore[call-overload]
-            input=dict(question=ask_request.question, notebook_ids=notebook_ids),
-            config=dict(
-                configurable=dict(
-                    strategy_model=strategy_model.id,
-                    answer_model=answer_model.id,
-                    final_answer_model=final_answer_model.id,
-                )
-            ),
-            stream_mode="updates",
-        ):
-            if "write_final_answer" in chunk:
-                final_answer = chunk["write_final_answer"]["final_answer"]
+        # Run the research agent over the scope and return its answer
+        from open_notebook.agent.graph import (
+            get_ephemeral_agent_graph,
+            knowledge_base_scope,
+        )
+
+        source_ids, note_ids = await knowledge_base_scope(notebook_ids)
+        result = await get_ephemeral_agent_graph().ainvoke(  # type: ignore[call-overload]
+            _ask_state(
+                ask_request.question,
+                final_answer_model.id or "",
+                source_ids,
+                note_ids,
+                notebook_ids,
+            )
+        )
+        messages = result.get("messages") or []
+        final_answer = messages[-1].content if messages else None
 
         if not final_answer:
             raise HTTPException(status_code=500, detail="No answer generated")

@@ -449,6 +449,32 @@ async def get_agent_graph():
     return _graph
 
 
+_ephemeral_graph = None
+
+
+def get_ephemeral_agent_graph():
+    """The agent graph without a checkpointer, for one-off questions (Ask)."""
+    global _ephemeral_graph
+    if _ephemeral_graph is None:
+        _ephemeral_graph = build_graph().compile()
+    return _ephemeral_graph
+
+
+async def knowledge_base_scope(notebook_ids: List[str]) -> tuple[List[str], List[str]]:
+    """Sources and notes of the given notebooks, or of the whole knowledge base."""
+    if not notebook_ids:
+        sources: List[Any] = await repo_query("SELECT VALUE id FROM source")
+        notes: List[Any] = await repo_query("SELECT VALUE id FROM note")
+        return [str(s) for s in sources], [str(n) for n in notes]
+    source_ids: List[str] = []
+    note_ids: List[str] = []
+    for notebook_id in notebook_ids:
+        sources, notes = await notebook_members(notebook_id)
+        source_ids += [s for s in sources if s not in source_ids]
+        note_ids += [n for n in notes if n not in note_ids]
+    return source_ids, note_ids
+
+
 def reset_agent_graph() -> None:
     """Drop the compiled graph (tests, or after the checkpointer is closed)."""
     global _graph
