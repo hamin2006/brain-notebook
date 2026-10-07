@@ -21,6 +21,7 @@ from loguru import logger
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from api.auth import PasswordAuthMiddleware
+from api.mcp_server import mcp as mcp_server
 from api.middleware import MaxBodySizeMiddleware, get_max_upload_size_bytes
 from api.routers import (
     agent,
@@ -210,8 +211,10 @@ async def lifespan(app: FastAPI):
 
     logger.success("API initialization completed successfully")
 
-    # Yield control to the application
-    yield
+    # Yield control to the application (the MCP endpoint needs its session
+    # manager running for as long as the app serves requests)
+    async with mcp_server.session_manager.run():
+        yield
 
     # Shutdown: close the async chat checkpointer (its aiosqlite thread would
     # otherwise keep the process alive)
@@ -226,6 +229,9 @@ app = FastAPI(
     description="API for Open Notebook - Research Assistant",
     lifespan=lifespan,
 )
+
+# MCP endpoint at /mcp (streamable HTTP): the notebook's research tools for MCP clients.
+app.router.routes.extend(mcp_server.streamable_http_app().routes)
 
 if CORS_IS_DEFAULT_WILDCARD:
     logger.warning(

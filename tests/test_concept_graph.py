@@ -113,7 +113,8 @@ async def test_extract_concepts_writes_mentions_and_relations():
     }  # fmt: skip
     model = MagicMock()
     model.ainvoke = AsyncMock(return_value=AIMessage(content=json.dumps(extraction)))
-    upserts, inserted = [], {}
+    upserts: list = []
+    inserted: dict = {}
 
     async def fake_query(sql, params=None):
         if "FROM source_section" in sql:

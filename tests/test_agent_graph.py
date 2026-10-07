@@ -532,7 +532,7 @@ async def test_memories_are_shown_and_memory_tools_offered():
         },
         {"id": "memory:b", "content": "Prefers short answers", "notebook": None},
     ]
-    seen_tools = []
+    seen_tools: List[str] = []
     original = ScriptedModel.bind_tools
 
     def capture(self, tools, tool_choice=None):
@@ -558,7 +558,7 @@ async def test_memories_are_shown_and_memory_tools_offered():
 async def test_memory_off_hides_memories_and_tools():
     model = ScriptedModel([{"text": "- findings"}])
     writer = _writer()
-    seen_tools = []
+    seen_tools: List[str] = []
     original = ScriptedModel.bind_tools
 
     def capture(self, tools, tool_choice=None):

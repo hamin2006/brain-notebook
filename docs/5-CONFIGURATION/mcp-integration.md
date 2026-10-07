@@ -2,6 +2,31 @@
 
 Open Notebook can be seamlessly integrated into your AI workflows using the **Model Context Protocol (MCP)**, enabling direct access to your notebooks, sources, and chat functionality from AI assistants like Claude Desktop and VS Code extensions.
 
+## Built-in MCP server (Brain fork)
+
+This fork's API serves its own MCP endpoint at `/mcp` (streamable HTTP), with the research agent's tools:
+
+| Tool | What it does |
+|---|---|
+| `list_notebooks` | Notebooks with ids and document counts |
+| `ask` | The built-in research agent answers a question with page citations (`[source:abc#p12]`) |
+| `list_documents`, `grep`, `search`, `outline`, `read`, `graph` | The agent's primitives, scoped to a notebook (`notebook` = id or name; omit for all) |
+| `view` | A PDF page as an image, so the client's own model can look at diagrams |
+
+**Claude Code:**
+
+```bash
+claude mcp add --transport http brain http://localhost:5055/mcp
+```
+
+From another machine (e.g. over Tailscale), use the API host's address and list it in
+`OPEN_NOTEBOOK_MCP_ALLOWED_HOSTS` on the API (comma-separated `host:port` patterns, e.g.
+`100.120.164.122:*`); requests for other hosts are rejected (DNS-rebinding protection).
+If `OPEN_NOTEBOOK_PASSWORD` is set, add `--header "Authorization: Bearer <password>"`.
+
+The community `open-notebook-mcp` package described below wraps the REST API instead and works
+with upstream Open Notebook.
+
 ## What is MCP?
 
 The [Model Context Protocol](https://modelcontextprotocol.io) is an open standard that allows AI applications to securely connect to external data sources and tools. With the Open Notebook MCP server, you can:

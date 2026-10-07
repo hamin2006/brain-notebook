@@ -42,7 +42,9 @@ async def test_page_search_by_description():
     ):
         out = await tool_search(SCOPE, query="parallel conv branches", level="page")
     assert 'source:l6#p47-48 "Lecture 6": Inception module diagram' in out
-    assert embed.await_args.args[1][0]["content"][0]["text"] == "parallel conv branches"
+    call = embed.await_args
+    assert call is not None
+    assert call.args[1][0]["content"][0]["text"] == "parallel conv branches"
 
 
 @pytest.mark.asyncio
@@ -91,7 +93,12 @@ async def test_embed_pages_renders_each_build_once_and_stores_ranges():
         writes.append((params["a"], params["b"], params["v"]))
         return []
 
-    rendered = []
+    rendered: list = []
+
+    def render(path, page, side):
+        rendered.append(page)
+        return b"png"
+
     with (
         patch.object(
             cmd.AgentSettings,
@@ -109,7 +116,7 @@ async def test_embed_pages_renders_each_build_once_and_stores_ranges():
         patch.object(
             cmd,
             "render_page_png",
-            side_effect=lambda path, page, side: rendered.append(page) or b"png",
+            side_effect=render,
         ),
         patch.object(
             cmd, "embed_multimodal", new=AsyncMock(return_value=[[1.0], [2.0]])
