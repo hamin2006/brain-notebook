@@ -1,6 +1,6 @@
 # AI Providers - Configuration Guide
 
-Open Notebook supports 24 AI providers. You connect them in the web UI under **Manage → Models**; their keys are stored encrypted in the database.
+Brain Notebook supports 24 AI providers. You connect them in the web UI under **Manage → Models**; their keys are stored encrypted in the database.
 
 > **Prerequisite:** `OPEN_NOTEBOOK_ENCRYPTION_KEY` must be set before you can save a provider key. See [Security](security.md#api-key-encryption).
 
@@ -98,6 +98,12 @@ Language and text-to-speech.
 
 ### OpenRouter
 
+**Brain Notebook's recommended provider.** One key covers the research model, the answer model, embeddings, and the
+two features that call OpenRouter directly: reranking (`/rerank`) and page-image embeddings (multimodal
+`/embeddings`). `scripts/brain/provision_models.py` sets it all up; see
+[Models for the research agent](../4-AI-PROVIDERS/index.md#models-for-the-research-agent). Reasoning models on
+OpenRouter get a thinking budget per call (`reasoning.max_tokens`), the control both GLM-5.3 and Qwen3.7 honor.
+
 One key for models from many vendors, with unified billing. Model ids include the vendor (`vendor/model`). OpenRouter also serves speech models; Discover Models suggests `microsoft/mai-voice-2` for text-to-speech (it uses Microsoft neural voice names such as `en-US-AvaNeural`, not OpenAI's `alloy`/`nova`) and `openai/whisper-1` / `openai/whisper-large-v3` for speech-to-text.
 
 ### DashScope (Qwen)
@@ -129,7 +135,7 @@ A pay-as-you-go gateway offering language, embedding and speech models. Discover
 
 ### Cohere
 
-Language (`command-a-03-2025` is used for the connection test) and embedding models through Cohere's own v2 API. Reranking is not used by Open Notebook.
+Language (`command-a-03-2025` is used for the connection test) and embedding models through Cohere's own v2 API. Reranking is not used by Brain Notebook.
 
 ### Voyage AI
 
@@ -149,7 +155,7 @@ Text-to-speech and speech-to-text.
 
 ### Ollama (Recommended for Local)
 
-Free local language and embedding models. Enter the server address as **Base URL**, for example `http://host.docker.internal:11434` when Open Notebook runs in Docker and Ollama on the host. Ollama credentials also have a **Context Window (num_ctx)** field (default 8192 tokens).
+Free local language and embedding models. Enter the server address as **Base URL**, for example `http://host.docker.internal:11434` when Brain Notebook runs in Docker and Ollama on the host. Ollama credentials also have a **Context Window (num_ctx)** field (default 8192 tokens).
 
 Networking, model names, context window and the 180-second timeout are covered in the [Ollama guide](ollama.md).
 
@@ -159,7 +165,7 @@ An MLX inference server for M-series Macs, for language and embedding models. Ru
 
 ### LM Studio (Local Alternative)
 
-Use the **OpenAI Compatible** provider with **Base URL** `http://host.docker.internal:1234/v1` (Open Notebook in Docker) or `http://localhost:1234/v1` (from source). No API key is needed. See [OpenAI-Compatible](openai-compatible.md#lm-studio).
+Use the **OpenAI Compatible** provider with **Base URL** `http://host.docker.internal:1234/v1` (Brain Notebook in Docker) or `http://localhost:1234/v1` (from source). No API key is needed. See [OpenAI-Compatible](openai-compatible.md#lm-studio).
 
 ### Other OpenAI-compatible servers
 

@@ -2,7 +2,7 @@
 
 Password protection, credential encryption and production hardening.
 
-Open Notebook's built-in protection is basic: one shared password, no user accounts, CORS open to every origin by default. Treat it as a lock on the door, not as enterprise security. For anything reachable from the internet, put it behind HTTPS and a firewall (see [Production hardening](#production-hardening)).
+Brain Notebook's built-in protection is basic: one shared password, no user accounts, CORS open to every origin by default. Treat it as a lock on the door, not as enterprise security. For anything reachable from the internet, put it behind HTTPS and a firewall (see [Production hardening](#production-hardening)).
 
 All variables on this page go in the `open_notebook` service's `environment:` block (apply with `docker compose up -d`) or in `.env` when running from source. Full list: [Environment Reference](environment-reference.md#security-and-access).
 
@@ -33,7 +33,7 @@ Don't copy an example value from any guide, including this one.
 
 - **The key has no default.** Without it you can't save credentials: **Manage → Models** shows "Encryption key not configured" and the API logs `OPEN_NOTEBOOK_ENCRYPTION_KEY not set. API key encryption will fail until this is configured.`
 - **Use a generated value.** Any string is accepted, but PBKDF2 only slows down guessing; it can't save a short, common or published passphrase.
-- **Replace the placeholder.** The shipped `docker-compose.yml` sets `change-me-to-a-secret-string`. That value is public, and Open Notebook does not warn about it.
+- **Replace the placeholder.** The shipped `docker-compose.yml` sets `change-me-to-a-secret-string`. That value is public, and Brain Notebook does not warn about it.
 - **Don't change it once credentials are saved.** Keys encrypted with the old value can't be decrypted with the new one. Each affected credential shows **Decryption Error** in Manage → Models; delete and re-create it. There is no key-rotation command.
 - **Keep it apart from your backups.** A database backup plus the key gives access to every stored provider key.
 
@@ -77,7 +77,7 @@ Values that are not encrypted at all (from versions before credential encryption
 
 ### When to use it
 
-Set a password for any deployment reachable from something other than your own machine: a cloud host, a shared LAN, a reverse proxy on the internet. Without `OPEN_NOTEBOOK_PASSWORD`, authentication is off and anyone who can reach ports 8502 or 5055 can use the app and its stored provider keys. Open Notebook does not log a warning when the password is unset.
+Set a password for any deployment reachable from something other than your own machine: a cloud host, a shared LAN, a reverse proxy on the internet. Without `OPEN_NOTEBOOK_PASSWORD`, authentication is off and anyone who can reach ports 8502 or 5055 can use the app and its stored provider keys. Brain Notebook does not log a warning when the password is unset.
 
 ```yaml
 services:
@@ -201,6 +201,25 @@ services:
 
 ---
 
+## The Research Agent
+
+The agent acts on your behalf with tools, so a few things matter beyond the password:
+
+- **Content is untrusted input to the agent.** A document or web page can contain text written to manipulate an AI
+  ("ignore previous instructions…"). The agent's tools only read your notebook, save notes/memories you ask for, and
+  (when enabled) search and read public web pages; none of them can run code, change settings or reach other
+  services. Web page text is labeled untrusted and the agent is told never to follow instructions in it.
+- **Web fetching is restricted to the public internet.** `web_read` refuses hosts that resolve to localhost, private
+  or link-local ranges, Tailscale (100.64.0.0/10) and cloud metadata addresses, re-checks every redirect, and pins
+  the vetted IP. See [Web search → Safety](research-agent.md#safety).
+- **SearXNG** listens on localhost (from source) or only on the internal compose network (Docker); don't publish it.
+- **MCP (`/mcp`)** is protected by the same password as the API, and by a host allowlist against DNS rebinding:
+  only localhost unless you add hosts to `OPEN_NOTEBOOK_MCP_ALLOWED_HOSTS`. Any MCP client you connect can read
+  everything in the notebooks it names.
+- **Memory** stores only what the agent was asked to remember, visible and deletable in **Settings → Research agent**.
+
+---
+
 ## Limitations
 
 | Area | Current behavior |
@@ -212,7 +231,7 @@ services:
 | Rate limiting, lockout | None |
 | Audit log | None |
 
-For single sign-on, per-user access or rate limiting, put an authenticating proxy or API gateway in front of Open Notebook.
+For single sign-on, per-user access or rate limiting, put an authenticating proxy or API gateway in front of Brain Notebook.
 
 ---
 

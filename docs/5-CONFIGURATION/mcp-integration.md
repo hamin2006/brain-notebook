@@ -1,219 +1,99 @@
-# Model Context Protocol (MCP) Integration
+# MCP Integration
 
-Open Notebook can be seamlessly integrated into your AI workflows using the **Model Context Protocol (MCP)**, enabling direct access to your notebooks, sources, and chat functionality from AI assistants like Claude Desktop and VS Code extensions.
+Brain Notebook is an [MCP](https://modelcontextprotocol.io) server. Claude Code, Claude Desktop, VS Code and other
+MCP clients can use your notebooks two ways:
 
-## Built-in MCP server (Brain fork)
+- **`ask`**: the built-in research agent answers a question with page citations (10–60 s).
+- **The agent's own tools**: the client's model does the research itself with `list_documents`, `grep`, `search`,
+  `outline`, `read`, `graph` and `view`. `view` returns the page **as an image**, so a client like Claude can read
+  diagrams with its own vision.
 
-This fork's API serves its own MCP endpoint at `/mcp` (streamable HTTP), with the research agent's tools:
+## Endpoint
 
-| Tool | What it does |
+The API serves MCP over streamable HTTP at **`/mcp`** (stateless, JSON responses). The web UI proxies it, so use
+whichever address you open the UI with:
+
+| Setup | URL |
 |---|---|
-| `list_notebooks` | Notebooks with ids and document counts |
-| `ask` | The built-in research agent answers a question with page citations (`[source:abc#p12]`) |
-| `list_documents`, `grep`, `search`, `outline`, `read`, `graph` | The agent's primitives, scoped to a notebook (`notebook` = id or name; omit for all) |
-| `view` | A PDF page as an image, so the client's own model can look at diagrams |
+| Docker Compose | `http://localhost:8502/mcp` (or `http://localhost:5055/mcp` directly) |
+| From source (systemd) | `http://<ui-host>:3000/mcp` |
+| Development | `http://localhost:5055/mcp` |
 
-**Claude Code:**
+## Connect a client
+
+**Claude Code**
 
 ```bash
-claude mcp add --transport http brain http://localhost:5055/mcp
+claude mcp add --transport http brain http://localhost:8502/mcp
 ```
 
-The frontend proxies `/mcp` to the API like `/api`, so from another machine (e.g. over Tailscale)
-use the UI's address — `claude mcp add --transport http brain http://100.120.164.122:3000/mcp` — and
-list that host in `OPEN_NOTEBOOK_MCP_ALLOWED_HOSTS` on the API (comma-separated `host:port` patterns,
-e.g. `100.120.164.122:*`); requests for other hosts are rejected (DNS-rebinding protection).
-If `OPEN_NOTEBOOK_PASSWORD` is set, add `--header "Authorization: Bearer <password>"`.
-
-The community `open-notebook-mcp` package described below wraps the REST API instead and works
-with upstream Open Notebook.
-
-## What is MCP?
-
-The [Model Context Protocol](https://modelcontextprotocol.io) is an open standard that allows AI applications to securely connect to external data sources and tools. With the Open Notebook MCP server, you can:
-
-- 📚 **Access your notebooks** directly from Claude Desktop or VS Code
-- 🔍 **Search your research content** without leaving your AI assistant
-- 💬 **Create and manage chat sessions** with your research as context
-- 📝 **Generate notes** and insights on-the-fly
-- 🤖 **Automate workflows** using the full Open Notebook API
-
-## Quick Setup
-
-### For Claude Desktop
-
-1. **Install the MCP server** (automatically from PyPI):
-
-   ```bash
-   # No manual installation needed! Claude Desktop will use uvx to run it automatically
-   ```
-
-2. **Configure Claude Desktop**:
-
-   **macOS**: Edit `~/Library/Application Support/Claude/claude_desktop_config.json`
-
-   ```json
-   {
-     "mcpServers": {
-       "open-notebook": {
-         "command": "uvx",
-         "args": ["open-notebook-mcp"],
-         "env": {
-           "OPEN_NOTEBOOK_URL": "http://localhost:5055",
-           "OPEN_NOTEBOOK_PASSWORD": "your_password_here"
-         }
-       }
-     }
-   }
-   ```
-
-   **Windows**: Edit `%APPDATA%\Claude\claude_desktop_config.json`
-
-   ```json
-   {
-     "mcpServers": {
-       "open-notebook": {
-         "command": "uvx",
-         "args": ["open-notebook-mcp"],
-         "env": {
-           "OPEN_NOTEBOOK_URL": "http://localhost:5055",
-           "OPEN_NOTEBOOK_PASSWORD": "your_password_here"
-         }
-       }
-     }
-   }
-   ```
-
-3. **Restart Claude Desktop** and start using your notebooks in conversations!
-
-### For VS Code (Cline and other MCP-compatible extensions)
-
-Add to your VS Code settings or `.vscode/mcp.json`:
+**VS Code** (`.vscode/mcp.json`)
 
 ```json
 {
   "servers": {
-    "open-notebook": {
-      "command": "uvx",
-      "args": ["open-notebook-mcp"],
-      "env": {
-        "OPEN_NOTEBOOK_URL": "http://localhost:5055",
-        "OPEN_NOTEBOOK_PASSWORD": "your_password_here"
-      }
-    }
+    "brain": { "type": "http", "url": "http://localhost:8502/mcp" }
   }
 }
 ```
 
-## Configuration
-
-- **OPEN_NOTEBOOK_URL**: URL to your Open Notebook API (default: `http://localhost:5055`)
-- **OPEN_NOTEBOOK_PASSWORD**: Optional - only needed if you've enabled password protection
-
-### For Remote Servers
-
-If your Open Notebook instance is running on a remote server, update the URL accordingly:
+**Claude Desktop** (`claude_desktop_config.json`), through the `mcp-remote` bridge:
 
 ```json
-"OPEN_NOTEBOOK_URL": "http://192.168.1.100:5055"
+{
+  "mcpServers": {
+    "brain": { "command": "npx", "args": ["-y", "mcp-remote", "http://localhost:8502/mcp"] }
+  }
+}
 ```
 
-## What You Can Do
+If `OPEN_NOTEBOOK_PASSWORD` is set, every request needs `Authorization: Bearer <password>`: for Claude Code add
+`--header "Authorization: Bearer <password>"`; for `mcp-remote` add `"--header", "Authorization: Bearer <password>"`
+to `args`.
 
-Once connected, you can ask Claude or your AI assistant to:
+## From another machine
 
-- _"Search my research notebooks for information about [topic]"_
-- _"Create a new note summarizing the key points from our conversation"_
-- _"List all my notebooks"_
-- _"Start a chat session about [specific source or topic]"_
-- _"What sources do I have in my [notebook name] notebook?"_
-- _"Add this PDF to my research notebook"_
-- _"Show me all notes in [notebook name]"_
+Requests are checked against an allowed-hosts list (protection against DNS rebinding): `localhost`, `127.0.0.1` and
+`::1` are allowed; anything else must be listed in **`OPEN_NOTEBOOK_MCP_ALLOWED_HOSTS`** on the API, as
+comma-separated `host:port` patterns:
 
-The MCP server provides full access to Open Notebook's capabilities, allowing you to manage your research seamlessly from within your AI assistant.
+```env
+OPEN_NOTEBOOK_MCP_ALLOWED_HOSTS=100.120.164.122:*,notebook.lan:*
+```
 
-## Available Tools
+(Docker Compose: add `- OPEN_NOTEBOOK_MCP_ALLOWED_HOSTS=...` to the `open_notebook` service's `environment:` block.)
+Then connect to `http://<that host>:<ui port>/mcp`. A private network such as Tailscale is the simplest safe way to
+reach it.
 
-The Open Notebook MCP server exposes these capabilities:
+## Tools
 
-### Notebooks
+Every tool takes an optional `notebook`: a notebook id (`notebook:abc`) or its name (case-insensitive). Omit it to
+use all notebooks.
 
-- List notebooks
-- Get notebook details
-- Create new notebooks
-- Update notebook information
-- Delete notebooks
+| Tool | Arguments | Returns |
+|---|---|---|
+| `list_notebooks` | | Notebooks with ids and document/note counts |
+| `ask` | `question`, `notebook`, `effort` (`quick` / `standard` / `deep`) | The research agent's cited answer |
+| `list_documents` | `doc_type`, `course`, `sequence`, `title_contains`, `sort` | The document catalog |
+| `grep` | `pattern` (regex), `addresses` | Every match, with counts and pages |
+| `search` | `query`, `level` (`passage` / `section` / `document` / `page`), `addresses`, `like`, `limit` | Ranked hits with addresses |
+| `outline` | `source` | Metadata and sections with page ranges |
+| `read` | `address` (`source:abc#p12-18`, `#s3`, `/summary`, `note:xyz`), `limit` | Text |
+| `graph` | `concept`, `limit` | Where a concept appears and its relations, or the most shared concepts |
+| `view` | `address` (a page) | A short text plus the page image |
 
-### Sources
+All tools return [addresses](../2-CORE-CONCEPTS/research-agent.md#addresses-and-citations); the server's
+instructions tell clients to cite them. Results are plain text, the same as the built-in agent sees.
 
-- List sources in a notebook
-- Get source details
-- Add new sources (links, files, text)
-- Update source metadata
-- Delete sources
-
-### Notes
-
-- List notes in a notebook
-- Get note details
-- Create new notes
-- Update notes
-- Delete notes
-
-### Chat
-
-- Create chat sessions
-- Send messages to chat sessions
-- Get chat history
-- List chat sessions
-
-### Search
-
-- Vector search across content
-- Text search across content
-- Filter by notebook
-
-### Models
-
-- List configured AI models
-- Get model details
-- Create model configurations
-- Update model settings
-
-### Settings
-
-- Get application settings
-- Update settings
-
-## MCP Server Repository
-
-The Open Notebook MCP server is developed and maintained by the Epochal team:
-
-**🔗 GitHub**: [Epochal-dev/open-notebook-mcp](https://github.com/Epochal-dev/open-notebook-mcp)
-
-Contributions, issues, and feature requests are welcome!
-
-## Finding the Server
-
-The Open Notebook MCP server is published to the official MCP Registry:
-
-- **Registry**: Search for "open-notebook" at [registry.modelcontextprotocol.io](https://registry.modelcontextprotocol.io)
-- **PyPI**: [pypi.org/project/open-notebook-mcp](https://pypi.org/project/open-notebook-mcp)
-- **GitHub**: [Epochal-dev/open-notebook-mcp](https://github.com/Epochal-dev/open-notebook-mcp)
+`ask` uses the notebook's grounding and your default models; web search is available to it only in notebooks set to
+*Notebook + general knowledge* with web search turned on.
 
 ## Troubleshooting
 
-### Connection Errors
+- **HTTP 421 / "Invalid Host header"**: the host you connect with isn't in `OPEN_NOTEBOOK_MCP_ALLOWED_HOSTS`.
+- **401**: a password is set; send the Bearer header.
+- **`ask` returns nothing after ~30 s through the UI port**: an old UI build with Next.js's default proxy timeout;
+  current builds wait up to 10 minutes (`API_PROXY_TIMEOUT_MS`). Rebuild the UI.
+- **`view` says the file isn't stored**: the source's original file was deleted (`auto_delete_files`); re-add it.
 
-1. Verify the `OPEN_NOTEBOOK_URL` is correct and accessible
-2. If using password protection, ensure `OPEN_NOTEBOOK_PASSWORD` is set correctly
-3. For remote servers, make sure port 5055 is accessible from your machine
-4. Check firewall settings if connecting to a remote server
-
-## Using with Other MCP Clients
-
-The Open Notebook MCP server follows the standard MCP protocol and can be used with any MCP-compatible client. Check your client's documentation for configuration details.
-
-## Learn More
-
-- [Model Context Protocol Documentation](https://modelcontextprotocol.io)
+The community `open-notebook-mcp` package wraps upstream Open Notebook's REST API; it isn't needed here.

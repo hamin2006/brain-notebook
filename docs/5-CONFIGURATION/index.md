@@ -1,9 +1,9 @@
 # Configuration
 
-Open Notebook is configured in two places:
+Brain Notebook is configured in two places:
 
 1. **Environment variables** for infrastructure: the encryption key, the database connection, the API URL, timeouts. The complete list is the [Environment Reference](environment-reference.md).
-2. **The web UI** for everything else: AI provider credentials and models in **Manage → Models**, content processing engines in **Settings**.
+2. **The web UI** for everything else: AI provider credentials and models in **Manage → Models**, content processing engines and the research agent's options in **Settings**.
 
 ---
 
@@ -29,7 +29,7 @@ services:
 
 Replace `<generated-key>` with a value you generate yourself, for example with `openssl rand -hex 32` (on Windows, see [Set your encryption key](../1-INSTALLATION/docker-compose.md#step-2-set-your-encryption-key)). Don't reuse an example value.
 
-The shipped `docker-compose.yml` doesn't load an env file into the container. A `.env` file next to it only fills the `${...}` placeholders in the compose file (`SURREAL_USER`, `SURREAL_PASSWORD`), so a variable that exists only in `.env` never reaches Open Notebook. To keep settings in a file, add `env_file: .env` to the `open_notebook` service.
+The shipped `docker-compose.yml` doesn't load an env file into the container. A `.env` file next to it only fills the `${...}` placeholders in the compose file (`SURREAL_USER`, `SURREAL_PASSWORD`), so a variable that exists only in `.env` never reaches Brain Notebook. To keep settings in a file, add `env_file: .env` to the `open_notebook` service.
 
 ### From source
 
@@ -63,7 +63,11 @@ The shipped compose file already sets these. The hostname in `SURREAL_URL` depen
 
 ### AI providers (in the UI)
 
-Providers are connected in **Manage → Models**: add a configuration, test it, add models and set the default models. Follow [Connect a provider](../4-AI-PROVIDERS/index.md#connect-a-provider) for the steps.
+Providers are connected in **Manage → Models**. The quickest setup is `scripts/brain/provision_models.py` with an OpenRouter key; see [Models for the research agent](../4-AI-PROVIDERS/index.md#models-for-the-research-agent).
+
+### Research agent (in the UI)
+
+**Settings → Research agent**: reranking, visual page search, the concept graph, memory and web search. See [Research Agent Settings](research-agent.md).
 
 Details for each provider: [AI Providers](ai-providers.md). Local options: [Ollama](ollama.md), [oMLX](omlx.md), [OpenAI-Compatible](openai-compatible.md) (LM Studio, vLLM, llama.cpp…), [Local speech with Speaches](local-tts.md).
 
@@ -81,6 +85,8 @@ Set `OPEN_NOTEBOOK_PASSWORD` for anything reachable beyond your own machine. Wit
 
 | Page | Covers |
 |------|--------|
+| [Research Agent Settings](research-agent.md) | Rerank, visual page search, concept graph, memory, web search (SearXNG) |
+| [MCP Integration](mcp-integration.md) | Using your notebooks from Claude Code and other MCP clients |
 | [Environment Reference](environment-reference.md) | Every environment variable: default, which process reads it, what it does |
 | [AI Providers](ai-providers.md) | Supported providers, what each one offers, setup notes |
 | [Ollama](ollama.md) | Local models with Ollama: networking, context window, timeouts |
@@ -92,7 +98,6 @@ Set `OPEN_NOTEBOOK_PASSWORD` for anything reachable beyond your own machine. Wit
 | [Security](security.md) | Password, credential encryption, CORS, hardening |
 | [Reverse Proxy](reverse-proxy.md) | nginx, Caddy, Traefik, custom domains, HTTPS |
 | [Advanced](advanced.md) | Concurrency, timeouts, ports, logging, backups |
-| [MCP Integration](mcp-integration.md) | Using Open Notebook from MCP clients |
 
 ---
 
@@ -105,6 +110,8 @@ Set `OPEN_NOTEBOOK_PASSWORD` for anything reachable beyond your own machine. Wit
 | No encryption key | "Encryption key not configured" in **Manage → Models** | Set `OPEN_NOTEBOOK_ENCRYPTION_KEY` |
 | Encryption key changed | "Decryption Error" on saved credentials | Restore the old key, or delete and re-create the credentials |
 | No default chat model | Chat fails with "No model configured for default for type=chat" | Manage → Models → Default Model Assignments |
+| No Tools Model set | The agent researches with the Chat Model: slower and more expensive | Set a cheap tool-calling model as Tools Model |
+| Reranking/visual search on without an OpenRouter credential | Search works but logs rerank failures; page search errors | Add OpenRouter, or clear both models in Settings → Research agent |
 | Port 5055 not reachable from the browser | "Unable to Connect to API Server" | Publish 5055, or set `API_URL` behind a proxy |
 | `SURREAL_URL` uses `localhost` inside Docker | API won't start, "Database is not reachable yet" in the log | Use the service name: `ws://surrealdb:8000/rpc` |
 

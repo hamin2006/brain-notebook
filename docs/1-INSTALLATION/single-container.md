@@ -56,7 +56,7 @@ services:
 Replace the encryption key with a long random secret you generate yourself (see [Set your encryption key](docker-compose.md#step-2-set-your-encryption-key)). If other devices can reach this machine, also add `- OPEN_NOTEBOOK_PASSWORD=...` or bind the ports to `127.0.0.1`. Then:
 
 ```bash
-docker compose up -d --build
+docker compose up -d
 ```
 
 Open **http://localhost:8502** and set up the models: [Models for the research agent](../4-AI-PROVIDERS/index.md#models-for-the-research-agent). Chat works once the default models are set.

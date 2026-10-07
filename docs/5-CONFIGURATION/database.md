@@ -1,6 +1,31 @@
 # Database - SurrealDB Configuration
 
-Open Notebook stores everything except uploaded files and podcast audio in [SurrealDB](https://surrealdb.com). The API and the background worker both connect to it with the same five variables. Schema migrations run automatically when the API starts.
+Brain Notebook stores everything except uploaded files and podcast audio in [SurrealDB](https://surrealdb.com). The API and the background worker both connect to it with the same five variables. Schema migrations run automatically when the API starts.
+
+Brain Notebook needs **SurrealDB v2** (the compose file pins `surrealdb/surrealdb:v2`) and database migration
+**29** or later, which the API applies on start. A database created by upstream Open Notebook is upgraded in place.
+
+## What's stored
+
+| Tables | Holds |
+|---|---|
+| `notebook`, `source`, `note`, `source_insight`, `reference`, `artifact` | Notebooks, sources, notes, insights and their links (as in Open Notebook); `notebook.grounding`, `source.metadata` |
+| `source_page` | Per-page text, recovered equations, image ratio, caption, page-image embedding |
+| `source_embedding` | Chunks with page ranges and embeddings |
+| `source_section` | Outline sections with page ranges, summaries and embeddings |
+| `concept`, `concept_alias`, `concept_mention`, `concept_relation` | The concept graph |
+| `memory` | The agent's remembered items |
+| `open_notebook:agent_settings` and other `open_notebook:*` records | Settings, default models |
+| `command` | Background job queue |
+
+Everything tied to a source (pages, chunks, sections, insights, graph mentions) is deleted with it.
+
+**Memory use**: SurrealDB is the largest process (about 1.9 GB with ~800 PDF pages ingested), mostly because it keeps
+the embeddings in memory: 4096-dimension text vectors with the recommended embedding model plus 3072-dimension page
+vectors. It grows roughly with how much you ingest.
+
+Chat history is not in SurrealDB: it's a LangGraph checkpoint file in the app's data folder
+(`data/sqlite-db/checkpoints.sqlite`). Back it up with the database.
 
 ---
 
@@ -24,7 +49,7 @@ Set all five explicitly. The API and the job queue fall back to different defaul
 
 The host in `SURREAL_URL` is the database as seen **from wherever the API and worker run**.
 
-| Open Notebook | SurrealDB | `SURREAL_URL` |
+| Brain Notebook | SurrealDB | `SURREAL_URL` |
 |---------------|-----------|---------------|
 | Docker Compose (shipped file) | `surrealdb` service in the same compose file | `ws://surrealdb:8000/rpc` |
 | Docker | On the host machine | `ws://host.docker.internal:8000/rpc` (on Linux, add `extra_hosts: ["host.docker.internal:host-gateway"]` to the service) |
@@ -55,7 +80,7 @@ The compose file passes them to both the `surrealdb` command and the `open_noteb
 
 ## Several instances on one SurrealDB
 
-A SurrealDB server can hold many namespaces, and each namespace many databases. To run several independent Open Notebook instances against one server, give each instance its own `SURREAL_NAMESPACE` or `SURREAL_DATABASE`.
+A SurrealDB server can hold many namespaces, and each namespace many databases. To run several independent Brain Notebook instances against one server, give each instance its own `SURREAL_NAMESPACE` or `SURREAL_DATABASE`.
 
 ---
 

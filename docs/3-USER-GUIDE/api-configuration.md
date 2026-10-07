@@ -33,7 +33,7 @@ openssl rand -hex 32                                   # macOS, Linux
 [guid]::NewGuid().ToString("N") + [guid]::NewGuid().ToString("N")   # Windows PowerShell
 ```
 
-Apply the change by recreating the container (`docker compose up -d --build`).
+Apply the change by recreating the container (`docker compose up -d`).
 
 > **Keep this value safe and stable.** If it changes, stored API keys can't be decrypted and their cards show **Decryption Error** until you restore the original value. If the original value is lost, the stored keys can't be recovered: delete those configurations and add them again.
 
