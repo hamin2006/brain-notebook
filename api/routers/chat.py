@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from langchain_core.messages import HumanMessage, RemoveMessage
+from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 from loguru import logger
 from pydantic import BaseModel, Field
@@ -18,6 +18,11 @@ from api.routers._chat_shared import (
     get_session_or_404,
 )
 from open_notebook.agent.graph import get_agent_graph
+from open_notebook.agent.sessions import (
+    discard_unanswered as _discard_unanswered,
+)
+from open_notebook.agent.sessions import message_count as _message_count
+from open_notebook.agent.sessions import thread_messages as _thread_messages
 from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.domain.notebook import ChatSession, Notebook
 from open_notebook.exceptions import (
@@ -28,38 +33,6 @@ from open_notebook.utils import token_count
 from open_notebook.utils.context_builder import build_notebook_context
 
 router = APIRouter()
-
-
-async def _thread_messages(session_id: str) -> list:
-    graph = await get_agent_graph()
-    state = await graph.aget_state(
-        RunnableConfig(configurable={"thread_id": session_id})
-    )
-    return list((state.values or {}).get("messages", [])) if state else []
-
-
-async def _message_count(session_id: str) -> int:
-    try:
-        return len(await _thread_messages(session_id))
-    except Exception as e:
-        logger.warning(f"Could not fetch message count for session {session_id}: {e}")
-        return 0
-
-
-async def _discard_unanswered(session_id: str, message: HumanMessage) -> None:
-    """Drop a question whose turn failed, so a retry doesn't add it twice. Never raises."""
-    try:
-        graph = await get_agent_graph()
-        config = RunnableConfig(configurable={"thread_id": session_id})
-        if any(
-            getattr(m, "id", None) == message.id
-            for m in await _thread_messages(session_id)
-        ):
-            await graph.aupdate_state(
-                config, {"messages": [RemoveMessage(id=message.id or "")]}
-            )
-    except Exception:
-        logger.exception(f"Could not discard unanswered message in {session_id}")
 
 
 def _scope_from_request(

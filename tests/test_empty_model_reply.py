@@ -140,8 +140,16 @@ def _history(graph, thread_id):
 async def test_source_chat_failed_turn_is_rolled_back_and_retry_is_clean():
     from api.routers.source_chat import stream_source_chat_response
 
-    graph = _toy_graph(["", "the answer"])
-    with patch("api.routers.source_chat.source_chat_graph", graph):
+    graph = _toy_graph(["", "the answer"], saver=InMemorySaver())
+    with (
+        patch(
+            "api.routers.source_chat.get_agent_graph", new=AsyncMock(return_value=graph)
+        ),
+        patch(
+            "open_notebook.agent.sessions.get_agent_graph",
+            new=AsyncMock(return_value=graph),
+        ),
+    ):
         failed = await _events(
             stream_source_chat_response("chat_session:s", "source:1", "question")
         )
@@ -177,6 +185,10 @@ def test_notebook_chat_failed_turn_is_rolled_back_and_retry_is_clean():
     session = MagicMock(model_override=None, save=AsyncMock())
     with (
         patch("api.routers.chat.get_agent_graph", new=AsyncMock(return_value=graph)),
+        patch(
+            "open_notebook.agent.sessions.get_agent_graph",
+            new=AsyncMock(return_value=graph),
+        ),
         patch(
             "api.routers.chat.get_session_or_404",
             new=AsyncMock(return_value=("chat_session:n", session)),

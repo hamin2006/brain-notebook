@@ -17,16 +17,17 @@ from api.routers._chat_shared import (
     get_source_or_404,
     get_verified_source_session,
 )
+from open_notebook.agent.graph import get_agent_graph
+from open_notebook.agent.sessions import (
+    discard_unanswered,
+    message_count,
+    thread_messages,
+)
 from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.domain.notebook import ChatSession
 from open_notebook.exceptions import (
     NotFoundError,
     OpenNotebookError,
-)
-from open_notebook.graphs.source_chat import source_chat_graph as source_chat_graph
-from open_notebook.utils.graph_utils import (
-    get_session_message_count,
-    invoke_chat_turn,
 )
 
 router = APIRouter()
@@ -161,10 +162,7 @@ async def get_source_chat_sessions(source_id: str = Path(..., description="Sourc
                 if session_result and len(session_result) > 0:
                     session_data = session_result[0]
 
-                    # Get message count from LangGraph state
-                    msg_count = await get_session_message_count(
-                        source_chat_graph, session_id
-                    )
+                    msg_count = await message_count(session_id)
 
                     sessions.append(
                         SourceChatSessionResponse(
@@ -212,30 +210,12 @@ async def get_source_chat_session(
             session,
         ) = await get_verified_source_session(source_id, session_id)
 
-        # Get session state from LangGraph to retrieve messages
-        # Use sync get_state() in a thread since SqliteSaver doesn't support async
-        thread_state = await asyncio.to_thread(
-            source_chat_graph.get_state,
-            config=RunnableConfig(configurable={"thread_id": full_session_id}),
+        # Source chat runs the research agent scoped to this source; there are
+        # no "context indicators" (nothing is pasted into the prompt).
+        messages: list[ChatMessage] = extract_chat_messages(
+            await thread_messages(full_session_id)
         )
-
-        # Extract messages from state
-        messages: list[ChatMessage] = []
         context_indicators = None
-
-        if thread_state and thread_state.values:
-            # Extract messages
-            if "messages" in thread_state.values:
-                messages = extract_chat_messages(thread_state.values["messages"])
-
-            # Extract context indicators from the last state
-            if "context_indicators" in thread_state.values:
-                context_data = thread_state.values["context_indicators"]
-                context_indicators = ContextIndicator(
-                    sources=context_data.get("sources", []),
-                    insights=context_data.get("insights", []),
-                    notes=context_data.get("notes", []),
-                )
 
         return SourceChatSessionWithMessagesResponse(
             id=session.id or "",
@@ -288,8 +268,7 @@ async def update_source_chat_session(
 
         await session.save()
 
-        # Get message count from LangGraph state
-        msg_count = await get_session_message_count(source_chat_graph, full_session_id)
+        msg_count = await message_count(full_session_id)
 
         return SourceChatSessionResponse(
             id=session.id or "",
@@ -351,69 +330,46 @@ async def delete_source_chat_session(
 async def stream_source_chat_response(
     session_id: str, source_id: str, message: str, model_override: Optional[str] = None
 ) -> AsyncGenerator[str, None]:
-    """Stream the source chat response as Server-Sent Events."""
+    """Run the research agent on this one source, as Server-Sent Events.
+
+    Agent progress events (step, step_result, text_delta) are forwarded; the
+    answer comes as the `ai_message` event the source chat UI already handles.
+    """
+    # Explicit id so a failed turn can remove it from the checkpoint.
+    user_message = HumanMessage(content=message, id=str(uuid4()))
+    answered = False
     try:
-        # Get current state
-        # Use sync get_state() in a thread since SqliteSaver doesn't support async
-        current_state = await asyncio.to_thread(
-            source_chat_graph.get_state,
-            config=RunnableConfig(configurable={"thread_id": session_id}),
+        yield f"data: {json.dumps({'type': 'user_message', 'content': message, 'timestamp': None})}\n\n"
+        graph = await get_agent_graph()
+        state = {
+            "messages": [user_message],
+            "notebook_id": None,
+            "source_ids": [source_id],
+            "note_ids": [],
+            "model_override": model_override,
+            "effort": None,
+        }
+        config = RunnableConfig(
+            configurable={"thread_id": session_id, "model_id": model_override}
         )
-
-        # Prepare state for execution
-        state_values = current_state.values if current_state else {}
-        state_values["messages"] = state_values.get("messages", [])
-        state_values["source_id"] = source_id
-        state_values["model_override"] = model_override
-
-        # Add user message to state
-        # Explicit id so a failed turn can remove it from the checkpoint.
-        user_message = HumanMessage(content=message, id=str(uuid4()))
-        state_values["messages"].append(user_message)
-
-        # Send user message event
-        user_event = {"type": "user_message", "content": message, "timestamp": None}
-        yield f"data: {json.dumps(user_event)}\n\n"
-
-        # Run the synchronous LangGraph invoke in a thread so it doesn't block the
-        # event loop. While blocked, even the already-yielded SSE events can't
-        # flush and every other request stalls until the LLM finishes. Mirrors the
-        # get_state() calls above.
-        # invoke_chat_turn also drops the question from the checkpoint when the
-        # turn fails, so a retry doesn't add it twice.
-        result = await asyncio.to_thread(
-            invoke_chat_turn,
-            source_chat_graph,
-            state_values,
-            RunnableConfig(
-                configurable={"thread_id": session_id, "model_id": model_override}
-            ),
-            user_message,
-        )
-
-        # Stream this turn's AI response. result["messages"] is the full
-        # checkpointed history, so only the last message is new.
-        if result.get("messages"):
-            msg = result["messages"][-1]
-            if getattr(msg, "type", None) == "ai":
-                ai_event = {
-                    "type": "ai_message",
-                    "content": msg.content if hasattr(msg, "content") else str(msg),
-                    "timestamp": None,
-                }
-                yield f"data: {json.dumps(ai_event)}\n\n"
-
-        # Stream context indicators
-        if "context_indicators" in result:
-            context_event = {
-                "type": "context_indicators",
-                "data": result["context_indicators"],
+        final: dict = {}
+        async for mode, chunk in graph.astream(  # type: ignore[call-overload]
+            state, config, stream_mode=["custom", "values"]
+        ):
+            if mode == "custom":
+                yield f"data: {json.dumps(chunk, default=str)}\n\n"
+            else:
+                final = chunk
+        messages = final.get("messages") or []
+        if messages and getattr(messages[-1], "type", None) == "ai":
+            answered = True
+            ai_event = {
+                "type": "ai_message",
+                "content": messages[-1].content,
+                "timestamp": None,
             }
-            yield f"data: {json.dumps(context_event)}\n\n"
-
-        # Send completion signal
-        completion_event = {"type": "complete"}
-        yield f"data: {json.dumps(completion_event)}\n\n"
+            yield f"data: {json.dumps(ai_event)}\n\n"
+        yield f"data: {json.dumps({'type': 'complete'})}\n\n"
 
     except Exception as e:
         from open_notebook.utils.error_classifier import classify_error
@@ -427,6 +383,9 @@ async def stream_source_chat_response(
         logger.error(f"Error in source chat streaming: {str(e)}")
         error_event = {"type": "error", "message": error_message}
         yield f"data: {json.dumps(error_event)}\n\n"
+    finally:
+        if not answered:
+            await discard_unanswered(session_id, user_message)
 
 
 @router.post("/sources/{source_id}/chat/sessions/{session_id}/messages")

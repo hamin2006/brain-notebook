@@ -291,7 +291,7 @@ async def test_send_message_missing_relation_returns_404(
 
 
 @pytest.mark.asyncio
-@patch("api.routers.source_chat.source_chat_graph")
+@patch("api.routers.source_chat.thread_messages", new_callable=AsyncMock)
 @patch("api.routers._chat_shared.repo_query", new_callable=AsyncMock)
 @patch("api.routers._chat_shared.ChatSession.get", new_callable=AsyncMock)
 @patch("api.routers._chat_shared.Source.get", new_callable=AsyncMock)
@@ -301,12 +301,7 @@ async def test_get_source_chat_session_happy_path_shapes(
     mock_source_get.return_value = _source()
     mock_session_get.return_value = _session()
     mock_repo.return_value = [{"in": "chat_session:abc", "out": "source:xyz"}]
-    mock_graph.get_state.return_value = _graph_state(
-        {
-            "messages": [_Msg("m1", "human", "hello"), _Bare()],
-            "context_indicators": {"sources": ["source:xyz"], "insights": []},
-        }
-    )
+    mock_graph.return_value = [_Msg("m1", "human", "hello"), _Bare()]
 
     resp = client.get("/api/sources/xyz/chat/sessions/abc")
 
@@ -329,11 +324,8 @@ async def test_get_source_chat_session_happy_path_shapes(
         "timestamp": None,
         "trace": None,
     }
-    assert body["context_indicators"] == {
-        "sources": ["source:xyz"],
-        "insights": [],
-        "notes": [],
-    }
+    # Source chat runs the agent: nothing is pasted, so no context indicators.
+    assert body["context_indicators"] is None
 
 
 # --- source_chat.py: streaming ------------------------------------------------
@@ -350,39 +342,51 @@ async def _collect_events(gen):
 
 
 @pytest.mark.asyncio
-@patch("api.routers.source_chat.source_chat_graph")
-async def test_stream_emits_only_the_new_ai_message(mock_graph):
+async def test_stream_emits_only_the_new_ai_message():
     """The graph result carries the whole checkpointed history; the stream must
     send only this turn's answer, not every previous AI message (#1393)."""
+    from langchain_core.messages import AIMessage
+    from langgraph.checkpoint.memory import InMemorySaver
+    from langgraph.config import get_stream_writer
+    from langgraph.graph import END, START, StateGraph
+
     from api.routers.source_chat import stream_source_chat_response
+    from open_notebook.agent.graph import AgentState
 
-    mock_graph.get_state.return_value = _graph_state(
-        {
-            "messages": [
-                _Msg("m1", "human", "first question"),
-                _Msg("m2", "ai", "first answer"),
-            ]
-        }
-    )
-    mock_graph.invoke.return_value = {
-        "messages": [
-            _Msg("m1", "human", "first question"),
-            _Msg("m2", "ai", "first answer"),
-            _Msg("m3", "human", "second question"),
-            _Msg("m4", "ai", "second answer"),
-        ],
-        "context_indicators": {"sources": ["source:xyz"], "insights": [], "notes": []},
-    }
+    answers = iter(["first answer", "second answer"])
+    seen = {}
 
-    events = await _collect_events(
-        stream_source_chat_response("chat_session:abc", "source:xyz", "second question")
-    )
+    async def node(state):
+        seen.update(state)
+        get_stream_writer()({"type": "step", "step": 1, "tool": "read", "args": {}})
+        return {"messages": AIMessage(content=next(answers))}
+
+    builder = StateGraph(AgentState)
+    builder.add_node("agent", node)
+    builder.add_edge(START, "agent")
+    builder.add_edge("agent", END)
+    graph = builder.compile(checkpointer=InMemorySaver())
+
+    with patch(
+        "api.routers.source_chat.get_agent_graph", new=AsyncMock(return_value=graph)
+    ):
+        await _collect_events(
+            stream_source_chat_response(
+                "chat_session:abc", "source:xyz", "first question"
+            )
+        )
+        events = await _collect_events(
+            stream_source_chat_response(
+                "chat_session:abc", "source:xyz", "second question"
+            )
+        )
 
     ai_events = [e for e in events if e["type"] == "ai_message"]
     assert [e["content"] for e in ai_events] == ["second answer"]
     assert [e["type"] for e in events] == [
         "user_message",
+        "step",
         "ai_message",
-        "context_indicators",
         "complete",
     ]
+    assert seen["source_ids"] == ["source:xyz"]  # scoped to this source
