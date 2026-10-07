@@ -1,6 +1,6 @@
 # Transformations - Generating Insights from Sources
 
-A **transformation** is a saved prompt that runs on one source. Its output is saved as an **insight** on that source, titled with the transformation's title. Insights show on the source's **Insights** tab, can be sent to Chat on their own (the *Insights only* context level), are used by the *Summary* option in podcasts, and are searchable. See [Notebooks, Sources, Insights, and Notes](../2-CORE-CONCEPTS/notebooks-sources-notes.md#insights).
+A **transformation** is a saved prompt that runs on one source. Its output is saved as an **insight** on that source, titled with the transformation's title. Insights show on the source's **Insights** tab, are embedded and searchable (the research agent finds them), and are used by the *Summary* option in podcasts. PDFs also get a *Document Summary* insight automatically from document analysis. See [Notebooks, Sources, Insights, and Notes](../2-CORE-CONCEPTS/notebooks-sources-notes.md#insights).
 
 ---
 

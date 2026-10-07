@@ -61,7 +61,7 @@ Use `/docs` for request and response shapes. This map shows where things are:
 
 ## Async operations
 
-Source processing, embedding and podcast generation run on the background worker (see [architecture.md](architecture.md#background-jobs)). The endpoint that starts them returns right away with a record and/or a job id:
+Source processing, embedding and podcast generation run on the background worker (see [architecture.md](architecture.md#ingestion-worker)). The endpoint that starts them returns right away with a record and/or a job id:
 
 - Creating a source with `async_processing=true` (the UI does this) saves it, submits a `process_source` job and returns at once; poll `GET /api/sources/{id}/status` until it is `completed` or `failed`. Without it (the default), the request waits until processing finishes.
 - `POST /api/podcasts/generate` returns a job id; poll `GET /api/podcasts/jobs/{job_id}` or list `GET /api/podcasts/episodes`.

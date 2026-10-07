@@ -244,7 +244,7 @@ docker compose logs -f open_notebook    # app logs (API, worker, frontend)
 docker compose logs -f surrealdb        # database logs
 docker compose restart open_notebook    # restart without changing configuration
 docker compose down                     # stop (data in ./notebook_data and ./surreal_data stays)
-docker compose pull && docker compose up -d   # update to the latest image (back up first)
+git pull && docker compose up -d --build   # update (back up first)
 docker stats                            # CPU and memory per container
 ```
 

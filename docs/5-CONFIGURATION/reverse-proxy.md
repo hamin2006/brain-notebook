@@ -83,7 +83,8 @@ Add an `nginx` service next to the `surrealdb` and `open_notebook` services of t
 ```yaml
 services:
   open_notebook:
-    image: lfnovo/open_notebook:v1-latest
+    build: .
+    image: brain-notebook:local
     environment:
       - API_URL=https://notebook.example.com
       - OPEN_NOTEBOOK_ENCRYPTION_KEY=<generated-key>
@@ -135,7 +136,8 @@ Caddy obtains and renews certificates automatically.
 ```yaml
 services:
   open_notebook:
-    image: lfnovo/open_notebook:v1-latest
+    build: .
+    image: brain-notebook:local
     environment:
       - API_URL=https://notebook.example.com
       # plus the variables from the shipped docker-compose.yml

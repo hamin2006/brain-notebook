@@ -117,7 +117,7 @@ The published image has its Python dependencies installed. Downloads at startup 
 
 ## Resetting
 
-- **Update:** `docker compose pull && docker compose up -d`. Back up first ([Advanced → Backup & Restore](../5-CONFIGURATION/advanced.md#backup--restore)).
+- **Update:** `git pull && docker compose up -d --build` (or `bash scripts/brain/deploy_pc.sh` for a systemd install). Back up first ([Advanced → Backup & Restore](../5-CONFIGURATION/advanced.md#backup--restore)).
 - **Start from scratch:** `docker compose down`, then delete `./notebook_data` and `./surreal_data`. `docker compose down -v` does not delete them: they are bind mounts, not volumes.
 
 ---

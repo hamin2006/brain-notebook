@@ -4,7 +4,7 @@ Run Brain Notebook directly on a machine, without the app container. Two ways to
 
 - **As services (Linux, systemd)**: the API, worker and a production build of the UI run as user services that start
   on boot and restart on failure. This is how the reference deployment runs (a Linux desktop reached over Tailscale).
-- **For development**: each process in its own terminal, with hot reload. See [Development](#development-mode).
+- **For development**: each process in its own terminal, with hot reload. See [Development](#5b-development-mode).
 
 Both need the same preparation (steps 1–4).
 

@@ -148,7 +148,7 @@ services:
 ### Test shows "Cannot connect to Ollama. Check if Ollama server is running."
 
 1. Is Ollama running? `curl http://localhost:11434/api/tags` on the Ollama machine.
-2. Is it listening beyond localhost? See [step 2](#2-let-open-notebook-reach-ollama) (and its exposure warning).
+2. Is it listening beyond localhost? See [step 2](#2-let-brain-notebook-reach-ollama) (and its exposure warning).
 3. Can the container reach it?
    ```bash
    docker compose exec open_notebook curl -s http://host.docker.internal:11434/api/tags

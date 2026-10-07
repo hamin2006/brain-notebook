@@ -12,7 +12,7 @@ git clone https://github.com/hamin2006/brain-notebook.git && cd brain-notebook
 docker build --target single -t brain-notebook:single .
 ```
 
-(Upstream's `lfnovo/open_notebook:v1-latest-single` is Brain Notebook without the research agent.)
+(Upstream's `lfnovo/open_notebook:v1-latest-single` is upstream Open Notebook, without the research agent.)
 
 ## What the container needs
 

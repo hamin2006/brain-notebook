@@ -196,7 +196,7 @@ services:
           memory: 4G
 ```
 
-- Keep the image current: `docker compose pull && docker compose up -d`.
+- Keep it current: `git pull && docker compose up -d --build` (Docker) or `scripts/brain/deploy_pc.sh` (systemd).
 - Back up `./notebook_data` and `./surreal_data`, and encrypt the backups if your sources are sensitive.
 
 ---
