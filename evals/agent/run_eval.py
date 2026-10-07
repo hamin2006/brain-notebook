@@ -21,6 +21,7 @@ import argparse
 import json
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 
@@ -145,7 +146,7 @@ def grade(
     }
 
 
-def run_chat(client, notebook_id, corpus, q, effort=None):
+def run_chat(client, notebook_id, corpus, q, effort=None, agent=False):
     session = (
         client.post(
             "/chat/sessions",
@@ -161,9 +162,13 @@ def run_chat(client, notebook_id, corpus, q, effort=None):
         },
         "notes": {},
     }
+    # The agent searches the notebook itself; only the old chat needs pasted context.
     context = (
-        client.post(
-            "/chat/context", json={"notebook_id": notebook_id, "context_config": config}
+        {}
+        if agent
+        else client.post(
+            "/chat/context",
+            json={"notebook_id": notebook_id, "context_config": config},
         )
         .raise_for_status()
         .json()["context"]
@@ -212,6 +217,9 @@ def main():
     )
     ap.add_argument("--effort", help="agent effort level (agent mode)")
     ap.add_argument(
+        "--concurrency", type=int, default=1, help="questions run in parallel"
+    )
+    ap.add_argument(
         "--key-file", help="dotenv with OPENROUTER_API_KEY, to report spend"
     )
     args = ap.parse_args()
@@ -239,19 +247,26 @@ def main():
         flush=True,
     )
 
-    rows = []
-    for i, q in enumerate(questions, 1):
+    def run_one(i: int, q: dict) -> dict:
+        local = httpx.Client(base_url=API, timeout=900)  # one client per thread
         notes_before = (
-            client.get("/notes", params={"notebook_id": notebook["id"]}).json()
+            local.get("/notes", params={"notebook_id": notebook["id"]}).json()
             if q.get("expects_note")
             else []
         )
         start = time.time()
         try:
             if args.mode == "ask":
-                answer = run_ask(client, notebook["id"], chat_model, q)
+                answer = run_ask(local, notebook["id"], chat_model, q)
             else:
-                answer = run_chat(client, notebook["id"], corpus, q, effort=args.effort)
+                answer = run_chat(
+                    local,
+                    notebook["id"],
+                    corpus,
+                    q,
+                    effort=args.effort,
+                    agent=args.mode == "agent",
+                )
             error = None
         except httpx.HTTPStatusError as e:
             answer, error = (
@@ -262,7 +277,7 @@ def main():
             answer, error = "", f"{type(e).__name__}: {e}"
         seconds = time.time() - start
         notes_after = (
-            client.get("/notes", params={"notebook_id": notebook["id"]}).json()
+            local.get("/notes", params={"notebook_id": notebook["id"]}).json()
             if q.get("expects_note")
             else []
         )
@@ -275,7 +290,6 @@ def main():
             **result,
             "answer": answer,
         }
-        rows.append(row)
         (outdir / f"{q['id']}.json").write_text(json.dumps(row, indent=2))
         failed = [k for k, v in result["checks"].items() if not v]
         status = (
@@ -287,6 +301,17 @@ def main():
             f"[{i:2d}/{len(questions)}] {q['task']:3s} {q['id']:24s} {seconds:5.1f}s page={result['page_ok']}  {status}",
             flush=True,
         )
+        return row
+
+    # Note-saving questions compare notes before/after, so they run alone.
+    parallel = [(i, q) for i, q in enumerate(questions, 1) if not q.get("expects_note")]
+    serial = [(i, q) for i, q in enumerate(questions, 1) if q.get("expects_note")]
+    with ThreadPoolExecutor(max_workers=max(1, args.concurrency)) as pool:
+        by_id = {
+            row["id"]: row for row in pool.map(lambda item: run_one(*item), parallel)
+        }
+    by_id.update({row["id"]: row for row in (run_one(i, q) for i, q in serial)})
+    rows = [by_id[q["id"]] for q in questions]
 
     spend_after = openrouter_usage(args.key_file)
     by_task: dict = {}
