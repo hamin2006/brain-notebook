@@ -17,6 +17,7 @@ import {
 } from '@/lib/types/api'
 import type { AgentActivity } from '@/lib/hooks/use-notebook-chat'
 import { AgentActivityView, EffortSelect, ResearchSteps, localizedLocator } from './AgentActivity'
+import { PagePreviewDialog, PageTarget, parsePageLocator } from './PagePreviewDialog'
 import { ModelSelector } from './ModelSelector'
 import { ContextIndicator } from '@/components/common/ContextIndicator'
 import { SessionManager } from '@/components/sources/SessionManager'
@@ -89,11 +90,18 @@ export function ChatPanel({
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { openModal } = useModalManager()
+  const [pageTarget, setPageTarget] = useState<PageTarget | null>(null)
 
   // Stable reference-click handler so memoized messages don't re-render on
   // composer keystrokes (which no longer re-render this component at all, since
   // the input state lives in the ChatComposer child).
-  const handleReferenceClick = useCallback((type: string, id: string) => {
+  const handleReferenceClick = useCallback((type: string, id: string, locator?: string) => {
+    // A page citation shows the page itself; anything else opens the item.
+    const pages = type === 'source' ? parsePageLocator(locator) : null
+    if (pages) {
+      setPageTarget({ sourceId: id, ...pages })
+      return
+    }
     const modalType = type === 'source_insight' ? 'insight' : type as 'source' | 'note' | 'insight'
 
     try {
@@ -242,7 +250,14 @@ export function ChatPanel({
         />
       </CardContent>
     </Card>
-
+    <PagePreviewDialog
+      target={pageTarget}
+      onClose={() => setPageTarget(null)}
+      onOpenSource={(sourceId) => {
+        setPageTarget(null)
+        openModal('source', sourceId.replace(/^source:/, ''))
+      }}
+    />
     </>
   )
 }
@@ -347,7 +362,7 @@ function ChatComposer({
 interface ChatMessageProps {
   message: SourceChatMessage
   notebookId?: string
-  onReferenceClick: (type: string, id: string) => void
+  onReferenceClick: (type: string, id: string, locator?: string) => void
 }
 
 const ChatMessage = memo(function ChatMessage({
@@ -412,7 +427,7 @@ function AIMessageContent({
   onReferenceClick
 }: {
   content: string
-  onReferenceClick: (type: string, id: string) => void
+  onReferenceClick: (type: string, id: string, locator?: string) => void
 }) {
   const { t } = useTranslation()
   // Convert references to compact markdown with numbered citations

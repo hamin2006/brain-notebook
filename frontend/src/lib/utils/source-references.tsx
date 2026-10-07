@@ -37,6 +37,12 @@ export interface ReferenceData {
 /** Human label for an address locator, e.g. "#p12-18" -> "pp. 12-18". */
 export type LocatorFormatter = (locator: string) => string
 
+/** "#ref-source-abc" plus "@p12-18" when the reference points at a location. */
+export function referenceHref(type: ReferenceType, id: string, locator?: string): string {
+  const where = locator ? `@${locator.replace(/^[#/]/, '')}` : ''
+  return `#ref-${type}-${id}${where}`
+}
+
 export const defaultLocatorFormatter: LocatorFormatter = (locator) => {
   const pages = /^#p(\d+)(?:-(\d+))?$/.exec(locator)
   if (pages) return pages[2] && pages[2] !== pages[1] ? `pp. ${pages[1]}–${pages[2]}` : `p. ${pages[1]}`
@@ -423,8 +429,9 @@ export function convertReferencesToCompactMarkdown(
       replaceEnd = refEnd + 1
     }
 
-    // Build the numbered citation with full reference in href
-    const citationLink = `[${number}](#ref-${reference.type}-${reference.id})`
+    // Build the numbered citation with full reference in href; the location
+    // (page, section...) rides along after "@" so a click can open it.
+    const citationLink = `[${number}](${referenceHref(reference.type, reference.id, reference.locator)})`
 
     // Replace in the result string
     result = result.substring(0, replaceStart) + citationLink + result.substring(replaceEnd)
@@ -436,7 +443,7 @@ export function convertReferencesToCompactMarkdown(
   // Iterate through reference map in insertion order (Map preserves order)
   for (const [, refData] of referenceMap) {
     const where = refData.locator ? ` · ${formatLocator(refData.locator)}` : ''
-    const refListItem = `[${refData.number}] - [${refData.type}:${refData.id}${where}](#ref-${refData.type}-${refData.id})`
+    const refListItem = `[${refData.number}] - [${refData.type}:${refData.id}${where}](${referenceHref(refData.type, refData.id, refData.locator)})`
     refListLines.push(refListItem)
   }
 
@@ -464,7 +471,7 @@ export function convertReferencesToCompactMarkdown(
  * <ReactMarkdown components={{ a: LinkComponent }}>...</ReactMarkdown>
  */
 export function createCompactReferenceLinkComponent(
-  onReferenceClick: (type: ReferenceType, id: string) => void
+  onReferenceClick: (type: ReferenceType, id: string, locator?: string) => void
 ) {
   const CompactReferenceLinkComponent = ({
     href,
@@ -476,8 +483,9 @@ export function createCompactReferenceLinkComponent(
   }) => {
     // Check if this is a reference link (starts with #ref-)
     if (href?.startsWith('#ref-')) {
-      // Parse: #ref-source-abc123 → type=source, id=abc123
-      const parts = href.substring(5).split('-') // Remove '#ref-'
+      // Parse: #ref-source-abc123@p12-18 → type=source, id=abc123, locator=p12-18
+      const [target, locator] = href.substring(5).split('@') // Remove '#ref-'
+      const parts = target.split('-')
       const type = parts[0] as ReferenceType
       const id = parts.slice(1).join('-') // Rejoin in case ID has dashes
 
@@ -486,7 +494,7 @@ export function createCompactReferenceLinkComponent(
           onClick={(e) => {
             e.preventDefault()
             e.stopPropagation()
-            onReferenceClick(type, id)
+            onReferenceClick(type, id, locator)
           }}
           className="text-primary hover:underline cursor-pointer inline font-medium"
           type="button"

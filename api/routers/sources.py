@@ -1159,3 +1159,51 @@ async def create_source_insight(source_id: str, request: CreateSourceInsightRequ
     except Exception as e:
         logger.error(f"Error starting insight generation for source {source_id}: {e}")
         raise HTTPException(status_code=500, detail="Error starting insight generation")
+
+
+@router.get("/sources/{source_id}/pages/{page}/image")
+async def get_source_page_image(
+    source_id: str,
+    page: int,
+    max_side: int = Query(1400, ge=200, le=2400, description="Longest side in pixels"),
+):
+    """A PDF source's page (1-based) rendered as PNG; image sources return the image.
+
+    Lets the UI show the exact page a citation points to.
+    """
+    from open_notebook.utils.pdf_pages import render_page_png
+
+    full_id = source_id if source_id.startswith("source:") else f"source:{source_id}"
+    try:
+        source = await Source.get(full_id)
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Source not found")
+    path = source.asset.file_path if source and source.asset else None
+    if not path or not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail="The original file is not stored")
+    suffix = Path(path).suffix.lower()
+    try:
+        if suffix == ".pdf":
+            png = await asyncio.to_thread(render_page_png, path, page, max_side)
+        elif suffix in {
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".webp",
+            ".gif",
+            ".tif",
+            ".tiff",
+            ".bmp",
+        }:
+            from open_notebook.agent.tools import _image_png
+
+            png = await asyncio.to_thread(_image_png, path, max_side)
+        else:
+            raise HTTPException(status_code=415, detail="This source has no pages")
+    except ValueError as e:  # page out of range
+        raise HTTPException(status_code=404, detail=str(e))
+    return Response(
+        content=png,
+        media_type="image/png",
+        headers={"Cache-Control": "private, max-age=3600"},
+    )

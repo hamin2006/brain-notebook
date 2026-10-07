@@ -24,8 +24,8 @@ describe('parseSourceReferences', () => {
 describe('convertReferencesToCompactMarkdown', () => {
   it('consumes the brackets around page citations', () => {
     const out = convertReferencesToCompactMarkdown('Adam combines momentum and RMSProp [source:l4#p94].')
-    expect(out.startsWith('Adam combines momentum and RMSProp [1](#ref-source-l4).')).toBe(true)
-    expect(out).toContain('[1] - [source:l4 · p. 94](#ref-source-l4)')
+    expect(out.startsWith('Adam combines momentum and RMSProp [1](#ref-source-l4@p94).')).toBe(true)
+    expect(out).toContain('[1] - [source:l4 · p. 94](#ref-source-l4@p94)')
     expect(out).not.toContain('#p94]')
   })
 
@@ -35,7 +35,7 @@ describe('convertReferencesToCompactMarkdown', () => {
       'References',
       locator => `PAGE ${locator}`
     )
-    expect(out).toContain('A [1](#ref-source-l4). B [2](#ref-source-l4). C [2](#ref-source-l4).')
+    expect(out).toContain('A [1](#ref-source-l4@p86-94). B [2](#ref-source-l4@p94). C [2](#ref-source-l4@p94).')
     expect(out).toContain('[1] - [source:l4 · PAGE #p86-94]')
     expect(out).toContain('[2] - [source:l4 · PAGE #p94]')
   })

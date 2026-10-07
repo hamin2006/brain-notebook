@@ -465,6 +465,11 @@ export const enUS = {
     citeSection: "section {{index}}",
     citeSummary: "summary",
     citeOutline: "outline",
+    pagePreviewTitle: "Page {{page}}",
+    pageImageUnavailable: "This page can't be shown (the original file isn't stored).",
+    previousPage: "Previous page",
+    nextPage: "Next page",
+    openSource: "Open source",
   },
   searchPage: {
     askAndSearch: "Ask and Search",
