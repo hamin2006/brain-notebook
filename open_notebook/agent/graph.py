@@ -60,6 +60,9 @@ MAX_ANSWER_TOKENS = 8192
 # Thinking budget per research step: tool choice needs little deliberation, and
 # uncapped Qwen3.7 steps spent up to ~35 s reasoning.
 RESEARCH_REASONING_TOKENS = 2048
+# The writer's thinking budget leaves most of MAX_ANSWER_TOKENS for the answer:
+# uncapped, GLM-5.3 sometimes reasoned through all of it and returned nothing.
+WRITER_REASONING_TOKENS = 3072
 
 
 class AgentState(TypedDict):
@@ -548,8 +551,11 @@ async def agent_node(state: AgentState, config: RunnableConfig) -> dict:
         model_id = config.get("configurable", {}).get("model_id") or state.get(
             "model_override"
         )
-        answer_model = await provision_langchain_model(
-            answer_system, model_id, "chat", max_tokens=MAX_ANSWER_TOKENS
+        answer_model = limit_reasoning(
+            await provision_langchain_model(
+                answer_system, model_id, "chat", max_tokens=MAX_ANSWER_TOKENS
+            ),
+            WRITER_REASONING_TOKENS,
         )
 
         tool_list = tool_list + [make_delegate_tool(model, scope, writer)]

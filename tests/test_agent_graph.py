@@ -239,8 +239,12 @@ async def test_empty_writer_reply_is_retried_once():
     ) as limit:
         _, final = await _run(model, [], writer=writer)
     assert final["messages"][-1].content == "Answer."
-    # The research model gets its step budget; the writer is capped only on retry.
-    assert [c.args for c in limit.call_args_list] == [(model, 2048), (writer, 1024)]
+    # Research steps and the writer have budgets; a retry thinks less again.
+    assert [c.args for c in limit.call_args_list] == [
+        (model, 2048),
+        (writer, 3072),
+        (writer, 1024),
+    ]
     assert len(writer.calls) == 2
 
 
