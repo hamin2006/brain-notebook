@@ -69,7 +69,15 @@ def _writer(text="The answer [source:l4#p94]."):
     return ScriptedModel([{"text": text}])
 
 
-async def _run(model, tools, scope=None, effort="standard", writer=None, notebook=None):
+async def _run(
+    model,
+    tools,
+    scope=None,
+    effort="standard",
+    writer=None,
+    notebook=None,
+    history=None,
+):
     """Run the graph with `model` as the research ("tools") model and `writer`
     as the answer ("chat") model."""
     scope = scope or AgentScope(
@@ -97,7 +105,7 @@ async def _run(model, tools, scope=None, effort="standard", writer=None, noteboo
         ),
     ):
         async for mode, chunk in graph.astream(  # type: ignore[call-overload]
-            {"messages": [HumanMessage(content="What does Adam combine?")], "notebook_id": "notebook:x",
+            {"messages": (history or []) + [HumanMessage(content="What does Adam combine?")], "notebook_id": "notebook:x",
              "source_ids": ["source:l4"], "note_ids": [], "effort": effort},
             {"configurable": {"thread_id": "t1"}},
             stream_mode=["custom", "values"],
@@ -433,3 +441,47 @@ async def test_notebook_grounding_sets_the_answer_rules(grounding, rule, instruc
     written = writer.calls[0]
     assert rule in written[0].content
     assert instruction in written[-1].content
+
+
+def _turns(n):
+    from langchain_core.messages import AIMessage
+
+    out: List[Any] = []
+    for i in range(n):
+        out += [HumanMessage(content=f"question {i}"), AIMessage(content=f"answer {i}")]
+    return out
+
+
+@pytest.mark.asyncio
+async def test_old_turns_are_compacted_into_a_summary():
+    # 11 earlier turns + the question = 23 messages; 3 fall out of the window.
+    model = ScriptedModel([{"text": "- findings"}], reviews=["They asked about Adam."])
+    writer = _writer()
+    _, final = await _run(model, [], writer=writer, history=_turns(11))
+
+    assert final["summary"] == "They asked about Adam."
+    assert final["summarized"] == 3
+    written = writer.calls[0]
+    assert (
+        "# Earlier in this conversation\nThey asked about Adam." in written[0].content
+    )
+    # The full history stays in the checkpoint for the UI.
+    assert len(final["messages"]) == 24
+
+
+@pytest.mark.asyncio
+async def test_short_conversations_are_not_compacted():
+    model = ScriptedModel([{"text": "- findings"}])  # no summary reply scripted
+    _, final = await _run(model, [], history=_turns(3))
+    assert final.get("summary") is None
+
+
+@pytest.mark.asyncio
+async def test_failed_compaction_keeps_the_previous_summary():
+    from open_notebook.agent.graph import compact_history
+
+    class Broken:
+        async def ainvoke(self, prompt):
+            raise RuntimeError("provider down")
+
+    assert await compact_history(Broken(), "old", _turns(1)) == "old"

@@ -65,6 +65,10 @@ class AgentState(TypedDict):
     note_ids: Optional[List[str]]
     model_override: Optional[str]
     effort: Optional[str]
+    # Conversation compaction: messages before index `summarized` are folded
+    # into `summary`; the model sees the summary plus the recent window.
+    summary: Optional[str]
+    summarized: Optional[int]
 
 
 async def notebook_members(notebook_id: str) -> tuple[List[str], List[str]]:
@@ -355,6 +359,44 @@ def make_answer_writer(
     return write
 
 
+COMPACT_MESSAGE_CHARS = 2000
+
+
+async def compact_history(
+    model, summary: Optional[str], messages: List[BaseMessage]
+) -> Optional[str]:
+    """Fold messages into the running conversation summary. On failure the old
+    summary is kept: losing a compaction must not lose the turn."""
+    rows = [
+        {
+            "role": "user" if isinstance(m, HumanMessage) else "assistant",
+            "content": _snippet_text(extract_text_content(m.content)),
+        }
+        for m in messages
+        if isinstance(m, (HumanMessage, AIMessage))
+    ]
+    if not rows:
+        return summary
+    prompt = Prompter(prompt_template="agent/compact").render(
+        data={"summary": summary, "messages": rows}
+    )
+    try:
+        reply = await model.ainvoke(prompt)
+        text = clean_thinking_content(extract_text_content(reply.content)).strip()
+    except Exception as e:
+        logger.warning(f"Conversation compaction failed: {e}")
+        return summary
+    return text or summary
+
+
+def _snippet_text(text: str) -> str:
+    return (
+        text
+        if len(text) <= COMPACT_MESSAGE_CHARS
+        else text[:COMPACT_MESSAGE_CHARS] + "…"
+    )
+
+
 async def review_answer(model, question: str, draft: str) -> List[str]:
     """Gaps a reviewer finds in a draft; [] when sufficient or when the review is unreadable.
 
@@ -442,6 +484,16 @@ async def agent_node(state: AgentState, config: RunnableConfig) -> dict:
         effort = state.get("effort") or DEFAULT_EFFORT
         max_steps = EFFORT_STEPS.get(effort, EFFORT_STEPS[DEFAULT_EFFORT])
         info = await _notebook_info(notebook_id)
+        model = await provision_langchain_model(
+            "", None, "tools", max_tokens=MAX_ANSWER_TOKENS
+        )
+        history = list(state["messages"])
+        summary = state.get("summary")
+        summarized = state.get("summarized") or 0
+        cut = len(history) - HISTORY_MESSAGES
+        if cut > summarized:
+            summary = await compact_history(model, summary, history[summarized:cut])
+            summarized = cut
         strict = info.get("grounding") != "general"
         prompt_data: Dict[str, Any] = {
             "notebook_name": info.get("name"),
@@ -451,6 +503,7 @@ async def agent_node(state: AgentState, config: RunnableConfig) -> dict:
             "today": date.today().isoformat(),
             "max_steps": max_steps,
             "strict": strict,
+            "conversation_summary": summary,
         }
         prompter = Prompter(prompt_template="agent/system")
         system = prompter.render(data={**prompt_data, "researcher": True})
@@ -462,9 +515,6 @@ async def agent_node(state: AgentState, config: RunnableConfig) -> dict:
         )
         answer_model = await provision_langchain_model(
             answer_system, model_id, "chat", max_tokens=MAX_ANSWER_TOKENS
-        )
-        model = await provision_langchain_model(
-            system, None, "tools", max_tokens=MAX_ANSWER_TOKENS
         )
 
         tool_list = tool_list + [make_delegate_tool(model, scope, writer)]
@@ -500,7 +550,9 @@ async def agent_node(state: AgentState, config: RunnableConfig) -> dict:
         return {
             "messages": [
                 AIMessage(content=answer, additional_kwargs={"agent_trace": trace})
-            ]
+            ],
+            "summary": summary,
+            "summarized": summarized,
         }
     except OpenNotebookError:
         raise

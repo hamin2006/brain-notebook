@@ -1,0 +1,11 @@
+You keep a running summary of a conversation between a user and a research assistant that answers from the user's notebook.
+
+{% if summary %}Summary so far:
+{{ summary }}
+
+{% endif %}Messages to fold in:
+{% for m in messages %}
+[{{ m.role }}] {{ m.content }}
+{% endfor %}
+
+Write the updated summary in at most 250 words: what the user asked and wants, the answers and conclusions reached (keep document addresses such as source:abc#p12 that later questions may refer back to), decisions and preferences the user stated, and open questions. Plain text, no preamble.
