@@ -56,14 +56,13 @@ export function ChatColumn({ notebookId, contextSelections, sources, sourcesLoad
       }
     })
 
+    // No token count: the agent searches the selection instead of pasting it.
     return {
       sourcesInsights,
       sourcesFull,
-      notesCount,
-      tokenCount: chat.tokenCount,
-      charCount: chat.charCount
+      notesCount
     }
-  }, [sources, notes, contextSelections, chat.tokenCount, chat.charCount])
+  }, [sources, notes, contextSelections])
 
   // Show loading state while sources/notes are being fetched
   if (sourcesLoading || notesLoading) {
@@ -110,6 +109,9 @@ export function ChatColumn({ notebookId, contextSelections, sources, sourcesLoad
       loadingSessions={chat.loadingSessions}
       notebookContextStats={contextStats}
       notebookId={notebookId}
+      agentActivity={chat.activity}
+      effort={chat.effort}
+      onEffortChange={chat.setEffort}
     />
   )
 }

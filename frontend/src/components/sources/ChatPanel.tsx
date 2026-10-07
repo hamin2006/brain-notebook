@@ -12,8 +12,11 @@ import { MarkdownRenderer } from '@/components/ui/markdown-renderer'
 import {
   SourceChatMessage,
   SourceChatContextIndicator,
-  BaseChatSession
+  BaseChatSession,
+  ChatEffort
 } from '@/lib/types/api'
+import type { AgentActivity } from '@/lib/hooks/use-notebook-chat'
+import { AgentActivityView, EffortSelect, ResearchSteps, localizedLocator } from './AgentActivity'
 import { ModelSelector } from './ModelSelector'
 import { ContextIndicator } from '@/components/common/ContextIndicator'
 import { SessionManager } from '@/components/sources/SessionManager'
@@ -53,6 +56,10 @@ interface ChatPanelProps {
   notebookContextStats?: NotebookContextStats
   // Notebook ID for saving notes
   notebookId?: string
+  // Research agent (notebook chat): live steps and effort level
+  agentActivity?: AgentActivity | null
+  effort?: ChatEffort
+  onEffortChange?: (effort: ChatEffort) => void
 }
 
 export function ChatPanel({
@@ -72,7 +79,10 @@ export function ChatPanel({
   title,
   contextType = 'source',
   notebookContextStats,
-  notebookId
+  notebookId,
+  agentActivity,
+  effort,
+  onEffortChange
 }: ChatPanelProps) {
   const { t } = useTranslation()
   const [sessionManagerOpen, setSessionManagerOpen] = useState(false)
@@ -96,10 +106,10 @@ export function ChatPanel({
     }
   }, [openModal, t])
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to bottom when new messages or research steps arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, agentActivity?.steps.length])
 
   return (
     <>
@@ -169,9 +179,15 @@ export function ChatPanel({
                     <Bot className="h-4 w-4 text-teal" />
                   </div>
                 </div>
-                <div className="rounded-lg px-4 py-2 bg-card border">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                </div>
+                {agentActivity ? (
+                  <div className="max-w-[80%] min-w-0">
+                    <AgentActivityView activity={agentActivity} />
+                  </div>
+                ) : (
+                  <div className="rounded-lg px-4 py-2 bg-card border">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  </div>
+                )}
               </div>
             )}
             <div ref={messagesEndRef} />
@@ -221,6 +237,8 @@ export function ChatPanel({
           isStreaming={isStreaming}
           modelOverride={modelOverride}
           onModelChange={onModelChange}
+          effort={effort}
+          onEffortChange={onEffortChange}
         />
       </CardContent>
     </Card>
@@ -236,13 +254,17 @@ interface ChatComposerProps {
   isStreaming: boolean
   modelOverride?: string
   onModelChange?: (model?: string) => void
+  effort?: ChatEffort
+  onEffortChange?: (effort: ChatEffort) => void
 }
 
 function ChatComposer({
   onSendMessage,
   isStreaming,
   modelOverride,
-  onModelChange
+  onModelChange,
+  effort,
+  onEffortChange
 }: ChatComposerProps) {
   const { t } = useTranslation()
   const chatInputId = useId()
@@ -281,6 +303,12 @@ function ChatComposer({
             onModelChange={onModelChange}
             disabled={isStreaming}
           />
+        </div>
+      )}
+      {onEffortChange && effort && (
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">{t('chat.effort')}</span>
+          <EffortSelect value={effort} onChange={onEffortChange} disabled={isStreaming} />
         </div>
       )}
 
@@ -357,6 +385,9 @@ const ChatMessage = memo(function ChatMessage({
             <p className="text-sm break-all">{message.content}</p>
           )}
         </div>
+        {message.type === 'ai' && message.trace && message.trace.length > 0 && (
+          <ResearchSteps trace={message.trace} />
+        )}
         {message.type === 'ai' && (
           <MessageActions
             content={message.content}
@@ -385,7 +416,11 @@ function AIMessageContent({
 }) {
   const { t } = useTranslation()
   // Convert references to compact markdown with numbered citations
-  const markdownWithCompactRefs = convertReferencesToCompactMarkdown(content, t('common.references'))
+  const markdownWithCompactRefs = convertReferencesToCompactMarkdown(
+    content,
+    t('common.references'),
+    localizedLocator(t)
+  )
 
   // Create custom link component for compact references
   const LinkComponent = createCompactReferenceLinkComponent(onReferenceClick)

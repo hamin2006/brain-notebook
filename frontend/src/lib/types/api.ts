@@ -158,7 +158,27 @@ export interface SourceChatMessage {
   type: 'human' | 'ai'
   content: string
   timestamp?: string
+  // Agent tool steps behind an answer (notebook chat)
+  trace?: AgentStep[] | null
 }
+
+/** One tool call the research agent made while answering. */
+export interface AgentStep {
+  tool: string
+  args: Record<string, unknown>
+  result?: string
+}
+
+export type ChatEffort = 'quick' | 'standard' | 'deep'
+
+/** Events from POST /api/chat/execute/stream. */
+export type AgentStreamEvent =
+  | { type: 'step'; step: number; tool: string; args: Record<string, unknown> }
+  | { type: 'step_result'; step: number; tool: string; summary: string }
+  | { type: 'text_delta'; step: number; text: string }
+  | { type: 'ai_message'; message: NotebookChatMessage }
+  | { type: 'complete' }
+  | { type: 'error'; message: string }
 
 export interface SourceChatContextIndicator {
   sources: string[]
@@ -205,6 +225,7 @@ export interface NotebookChatMessage {
   type: 'human' | 'ai'
   content: string
   timestamp?: string
+  trace?: AgentStep[] | null
 }
 
 export interface NotebookChatSessionWithMessages extends NotebookChatSession {
@@ -225,11 +246,16 @@ export interface UpdateNotebookChatSessionRequest {
 export interface SendNotebookChatMessageRequest {
   session_id: string
   message: string
-  context: {
+  // Legacy pasted context; the agent only reads the ids in it
+  context?: {
     sources: Array<Record<string, unknown>>
     notes: Array<Record<string, unknown>>
   }
   model_override?: string
+  effort?: ChatEffort
+  // What the agent may search (omit for the whole notebook)
+  source_ids?: string[]
+  note_ids?: string[]
 }
 
 export interface BuildContextRequest {

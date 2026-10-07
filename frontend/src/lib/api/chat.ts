@@ -1,4 +1,5 @@
 import apiClient from './client'
+import { getAuthToken } from '@/lib/auth-token'
 import {
   NotebookChatSession,
   NotebookChatSessionWithMessages,
@@ -45,6 +46,25 @@ export const chatApi = {
 
   deleteSession: async (sessionId: string) => {
     await apiClient.delete(`/chat/sessions/${sessionId}`)
+  },
+
+  // Messaging, streamed: the agent's steps and answer as server-sent events.
+  // Returns the response body stream (consumed by useNotebookChat).
+  streamMessage: (data: SendNotebookChatMessageRequest) => {
+    const token = getAuthToken()
+    return fetch('/api/chat/execute/stream', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+      body: JSON.stringify(data),
+    }).then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      return response.body
+    })
   },
 
   // Messaging (synchronous, no streaming)

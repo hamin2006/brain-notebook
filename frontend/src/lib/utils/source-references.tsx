@@ -6,6 +6,8 @@ export type ReferenceType = 'source' | 'note' | 'source_insight'
 export interface ParsedReference {
   type: ReferenceType
   id: string
+  // Agent address suffix: "#p12", "#p12-18", "#s3", "#c5", "/summary", "/outline"
+  locator?: string
   originalText: string
   startIndex: number
   endIndex: number
@@ -29,6 +31,20 @@ export interface ReferenceData {
   number: number
   type: ReferenceType
   id: string
+  locator?: string
+}
+
+/** Human label for an address locator, e.g. "#p12-18" -> "pp. 12-18". */
+export type LocatorFormatter = (locator: string) => string
+
+export const defaultLocatorFormatter: LocatorFormatter = (locator) => {
+  const pages = /^#p(\d+)(?:-(\d+))?$/.exec(locator)
+  if (pages) return pages[2] && pages[2] !== pages[1] ? `pp. ${pages[1]}–${pages[2]}` : `p. ${pages[1]}`
+  const section = /^#s(\d+)$/.exec(locator)
+  if (section) return `§${section[1]}`
+  const chunk = /^#c(\d+)$/.exec(locator)
+  if (chunk) return `#${chunk[1]}`
+  return locator.replace(/^\//, '')
 }
 
 /**
@@ -50,7 +66,9 @@ export function parseSourceReferences(text: string): ParsedReference[] {
   // short form — and normalized below so all downstream rendering (icon, link,
   // click handler) treats it identically. Keep `source_insight` first in the
   // alternation so it wins over the `insight` alias.
-  const pattern = /(source_insight|insight|note|source):([a-zA-Z0-9_]+)/g
+  // An optional agent address suffix (#p12-18, #s3, #c5, /summary, /outline) is
+  // part of the reference, so surrounding brackets are recognized and consumed.
+  const pattern = /(source_insight|insight|note|source):([a-zA-Z0-9_]+)(#p\d+(?:-\d+)?|#s\d+|#c\d+|\/summary|\/outline)?/g
   const matches: ParsedReference[] = []
 
   let match
@@ -62,6 +80,7 @@ export function parseSourceReferences(text: string): ParsedReference[] {
     matches.push({
       type,
       id,
+      locator: match[3] || undefined,
       originalText: match[0],
       startIndex: match.index,
       endIndex: pattern.lastIndex
@@ -345,7 +364,11 @@ export function createReferenceLinkComponent(
  * Input: "See [source:abc] and [note:xyz]. Also [source:abc] again."
  * Output: "See [1] and [2]. Also [1] again.\n\nReferences:\n[1] - [source:abc]\n[2] - [note:xyz]"
  */
-export function convertReferencesToCompactMarkdown(text: string, referencesLabel: string = 'References'): string {
+export function convertReferencesToCompactMarkdown(
+  text: string,
+  referencesLabel: string = 'References',
+  formatLocator: LocatorFormatter = defaultLocatorFormatter
+): string {
   // Step 1: Parse all references using existing function
   const references = parseSourceReferences(text)
 
@@ -358,13 +381,15 @@ export function convertReferencesToCompactMarkdown(text: string, referencesLabel
   const referenceMap = new Map<string, ReferenceData>()
   let nextNumber = 1
 
+  // Each document + location gets its own number ([1] p. 12, [2] p. 94)
   for (const reference of references) {
-    const key = `${reference.type}:${reference.id}`
+    const key = `${reference.type}:${reference.id}${reference.locator ?? ''}`
     if (!referenceMap.has(key)) {
       referenceMap.set(key, {
         number: nextNumber++,
         type: reference.type,
-        id: reference.id
+        id: reference.id,
+        locator: reference.locator
       })
     }
   }
@@ -373,7 +398,7 @@ export function convertReferencesToCompactMarkdown(text: string, referencesLabel
   let result = text
   for (let i = references.length - 1; i >= 0; i--) {
     const reference = references[i]
-    const key = `${reference.type}:${reference.id}`
+    const key = `${reference.type}:${reference.id}${reference.locator ?? ''}`
     const refData = referenceMap.get(key)!
     const number = refData.number
 
@@ -410,7 +435,8 @@ export function convertReferencesToCompactMarkdown(text: string, referencesLabel
 
   // Iterate through reference map in insertion order (Map preserves order)
   for (const [, refData] of referenceMap) {
-    const refListItem = `[${refData.number}] - [${refData.type}:${refData.id}](#ref-${refData.type}-${refData.id})`
+    const where = refData.locator ? ` · ${formatLocator(refData.locator)}` : ''
+    const refListItem = `[${refData.number}] - [${refData.type}:${refData.id}${where}](#ref-${refData.type}-${refData.id})`
     refListLines.push(refListItem)
   }
 

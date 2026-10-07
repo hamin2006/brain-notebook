@@ -65,7 +65,7 @@ class Corpus:
 
     def __init__(self, client: httpx.Client, notebook_id: str):
         self.sources = (
-            client.get("/sources", params={"notebook_id": notebook_id, "limit": 200})
+            client.get("/sources", params={"notebook_id": notebook_id, "limit": 100})
             .raise_for_status()
             .json()
         )
