@@ -1,10 +1,18 @@
-# Single Container Installation (Deprecated)
+# Single Container Installation
 
-> **Deprecated:** the single-container image (`v1-latest-single`) will be removed in v2. It still receives updates until then, but new features and documentation target [Docker Compose](docker-compose.md). Use Docker Compose for new installs.
+> **Not tested by this fork.** The Dockerfile's `single` target (inherited from upstream Open Notebook) bundles
+> SurrealDB, the API, the background worker and the web UI in one container. Brain Notebook's tested routes are
+> [Docker Compose](docker-compose.md) and [from source](from-source.md); prefer them.
 
-The single image bundles SurrealDB, the API, the background worker and the web UI in one container. It is mostly useful on hosting platforms that run exactly one container per app.
+It is mostly useful on hosting platforms that run exactly one container per app. There is no published image for
+Brain Notebook; build it from a checkout:
 
-> **Images:** `lfnovo/open_notebook:v1-latest-single` on Docker Hub, `ghcr.io/lfnovo/open-notebook:v1-latest-single` on GitHub Container Registry.
+```bash
+git clone https://github.com/hamin2006/brain-notebook.git && cd brain-notebook
+docker build --target single -t brain-notebook:single .
+```
+
+(Upstream's `lfnovo/open_notebook:v1-latest-single` is Brain Notebook without the research agent.)
 
 ## What the container needs
 
@@ -28,8 +36,7 @@ The embedded database always starts with user `root` and password `root`, so set
 # docker-compose.yml
 services:
   open_notebook:
-    image: lfnovo/open_notebook:v1-latest-single
-    pull_policy: always
+    image: brain-notebook:single   # built with --target single (above)
     ports:
       - "8502:8502"  # Web UI
       - "5055:5055"  # API
@@ -49,27 +56,23 @@ services:
 Replace the encryption key with a long random secret you generate yourself (see [Set your encryption key](docker-compose.md#step-2-set-your-encryption-key)). If other devices can reach this machine, also add `- OPEN_NOTEBOOK_PASSWORD=...` or bind the ports to `127.0.0.1`. Then:
 
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
-Open **http://localhost:8502** and follow [Connect a provider](../4-AI-PROVIDERS/index.md#connect-a-provider). Chat works once the default models are set.
+Open **http://localhost:8502** and set up the models: [Models for the research agent](../4-AI-PROVIDERS/index.md#models-for-the-research-agent). Chat works once the default models are set.
 
 Settings go in the `environment:` block and are applied with `docker compose up -d` (not `restart`). Logs: `docker compose logs -f open_notebook`.
 
 ## Hosting platforms
 
-Use the table above to fill in your platform's form: the image, port `8502`, persistent storage for **both** `/app/data` and `/mydata`, and the environment variables. Platforms that can't give you persistent storage at both paths will lose data on redeploy; use a platform or VPS that runs Docker Compose instead.
+Push your built image to a registry your platform can pull from, then use the table above to fill in its form: the image, port `8502`, persistent storage for **both** `/app/data` and `/mydata`, and the environment variables. Platforms that can't give you persistent storage at both paths will lose data on redeploy; use a platform or VPS that runs Docker Compose instead.
 
-After deploying, open the app's URL and follow [Connect a provider](../4-AI-PROVIDERS/index.md#connect-a-provider).
+After deploying, open the app's URL and set up the models: [Models for the research agent](../4-AI-PROVIDERS/index.md#models-for-the-research-agent).
 
 ### EasyPanel
 
-Open Notebook ships an EasyPanel template in [`examples/easypanel/`](https://github.com/lfnovo/open-notebook/tree/main/examples/easypanel). Unlike the single image, the template provisions **two services** (the Open Notebook app and a separate SurrealDB) and generates the database password, encryption key and, optionally, the app password for you.
-
-- **One-click:** once the template is published to the official [EasyPanel template gallery](https://github.com/easypanel-io/templates), create a new service from "Open Notebook", set an app password (or leave it blank to auto-generate one), and deploy.
-- **Manual:** copy `examples/easypanel/` into `templates/open-notebook` in a checkout of [`easypanel-io/templates`](https://github.com/easypanel-io/templates), run the templates playground (`npm run dev`), and create the template from the generated JSON in your EasyPanel instance.
-
-See [`examples/easypanel/README.md`](https://github.com/lfnovo/open-notebook/blob/main/examples/easypanel/README.md) for details.
+Upstream's EasyPanel template in `examples/easypanel/` deploys upstream Open Notebook images; it would need adapting
+to a Brain Notebook image you publish yourself.
 
 ## Moving to Docker Compose
 
@@ -89,4 +92,3 @@ The single image's database uses `root:root`, which matches the compose default.
 
 ---
 
-**Need help?** [Discord](https://discord.gg/37XJPXfz2w) · [GitHub Issues](https://github.com/lfnovo/open-notebook/issues)

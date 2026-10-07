@@ -1,6 +1,6 @@
 # Windows Native Installation (No Docker)
 
-This guide runs [Open Notebook](https://github.com/lfnovo/open-notebook) on Windows **natively, without Docker or WSL**. It is community-maintained; the officially supported route is [Docker Compose](docker-compose.md).
+This guide runs Brain Notebook on Windows **natively, without Docker or WSL**. It comes from upstream Open Notebook and is **not tested by this fork**; the tested routes are [Docker Compose](docker-compose.md) and [from source on Linux](from-source.md). Everything Brain Notebook adds is Python and Node code, so it should run the same way; optional web search needs SearXNG, which in practice means Docker.
 
 ## Who Is This For?
 
@@ -25,8 +25,8 @@ This guide runs [Open Notebook](https://github.com/lfnovo/open-notebook) on Wind
 
    ```batch
    cd %USERPROFILE%\Projects
-   git clone https://github.com/lfnovo/open-notebook.git
-   cd open-notebook
+   git clone https://github.com/hamin2006/brain-notebook.git
+   cd brain-notebook
    uv sync
    cd frontend && npm install && cd ..
    ```
@@ -46,13 +46,13 @@ This guide runs [Open Notebook](https://github.com/lfnovo/open-notebook) on Wind
 
    Use `127.0.0.1`, not `localhost` and not `surrealdb` (see [Issue 2](#issue-2-database-health-check-timeout)). You add AI provider keys in the UI later, not in `.env`.
 
-3. **Start the four services**, each in its own terminal, from the `open-notebook` folder.
+3. **Start the four services**, each in its own terminal, from the `brain-notebook` folder.
 
-   > Open Notebook does not ship a launcher script. Start the services manually as below, or wrap them in your own `.bat` (see [Optional: one-click launcher](#optional-one-click-launcher)).
+   > Brain Notebook does not ship a launcher script. Start the services manually as below, or wrap them in your own `.bat` (see [Optional: one-click launcher](#optional-one-click-launcher)).
 
    ```batch
    REM Terminal 1 — SurrealDB (database files go in the folder you name here)
-   surreal start --user root --pass root --bind 127.0.0.1:8000 "rocksdb:%USERPROFILE%\Projects\open-notebook-data\surrealdb"
+   surreal start --user root --pass root --bind 127.0.0.1:8000 "rocksdb:%USERPROFILE%\Projects\brain-notebook-data\surrealdb"
 
    REM Terminal 2 — API
    uv run --env-file .env run_api.py
@@ -67,24 +67,24 @@ This guide runs [Open Notebook](https://github.com/lfnovo/open-notebook) on Wind
 
 4. **Open the app** at http://127.0.0.1:3000.
 
-5. **Connect a provider:** follow [Connect a provider](../4-AI-PROVIDERS/index.md#connect-a-provider). It ends with a test chat; chat won't work until the default models are set. A local Ollama is at `http://127.0.0.1:11434`.
+5. **Set up the models:** with the API running, `python scripts\brain\provision_models.py` (asks for your OpenRouter key), or by hand: [Models for the research agent](../4-AI-PROVIDERS/index.md#models-for-the-research-agent). Chat won't work until the default models are set. A local Ollama is at `http://127.0.0.1:11434`.
 
 ## Where your data lives
 
-- **Database:** the folder you pass to `surreal start` (above: `%USERPROFILE%\Projects\open-notebook-data\surrealdb`). Keeping it outside the code folder protects it when you reinstall.
-- **Uploads and chat checkpoints:** always in the `data\` folder inside `open-notebook\`. The path is fixed in `open_notebook/config.py` and can't be changed with an environment variable. Back it up together with the database.
+- **Database:** the folder you pass to `surreal start` (above: `%USERPROFILE%\Projects\brain-notebook-data\surrealdb`). Keeping it outside the code folder protects it when you reinstall.
+- **Uploads and chat checkpoints:** always in the `data\` folder inside `brain-notebook\`. The path is fixed in `open_notebook/config.py` and can't be changed with an environment variable. Back it up together with the database.
 
 ## Optional: one-click launcher
 
-Open Notebook does not ship a launcher, but you can save the following as
-`start-open-notebook.bat` (anywhere you like) to start all four services with a
+Brain Notebook does not ship a launcher, but you can save the following as
+`start-brain-notebook.bat` (anywhere you like) to start all four services with a
 double-click. Adjust `ROOT` and `DB_DIR` to match your setup.
 
 ```batch
 @echo off
 REM --- adjust these two paths ---
-set ROOT=%USERPROFILE%\Projects\open-notebook
-set DB_DIR=%USERPROFILE%\Projects\open-notebook-data\surrealdb
+set ROOT=%USERPROFILE%\Projects\brain-notebook
+set DB_DIR=%USERPROFILE%\Projects\brain-notebook-data\surrealdb
 
 set PYTHONPATH=%ROOT%
 cd /d %ROOT%
@@ -189,7 +189,7 @@ uv run --env-file .env python -m surreal_commands.cli.worker --import-modules co
 When a new version is released:
 
 ```batch
-cd open-notebook
+cd brain-notebook
 git pull
 uv sync
 cd frontend && npm install && cd ..
@@ -199,7 +199,7 @@ Then restart all services. Your `.env` and data are preserved.
 
 ## Migrating from a Docker Install
 
-If you already run Open Notebook with the stock `docker-compose.yml`, you can
+If you already run Brain Notebook with the stock `docker-compose.yml`, you can
 move to a native install **without re-importing anything**: the compose file
 bind-mounts `./surreal_data` and `./notebook_data`, so the database and uploads
 already live on your Windows disk.
@@ -228,7 +228,7 @@ Run the `docker compose` commands below from the folder that contains your
    uses `restart: always`, so Docker Desktop would start them again on its next
    launch and they would fight the native services over ports 8000 and 5055.
    `down` removes the containers but keeps the bind-mounted `surreal_data` and
-   `notebook_data` folders (do **not** add `-v`); `docker compose up -d` brings
+   `notebook_data` folders (do **not** add `-v`); `docker compose up -d --build` brings
    the Docker setup back if you need to roll back:
 
    ```batch
@@ -287,7 +287,7 @@ will not find it for those older sources. New uploads are fine.
 ### Worker not processing commands
 
 - Check the Worker window for errors
-- Verify `PYTHONPATH` is set to the `open-notebook` folder in that terminal
+- Verify `PYTHONPATH` is set to the `brain-notebook` folder in that terminal
 
 ## Contributing
 
@@ -295,6 +295,6 @@ Found another Windows-specific issue? Please share your solution!
 
 ---
 
-*Tested on Windows 11 ARM64 with Open Notebook v1.6.0*
-*Docker migration and production frontend build tested on Windows 11 x64 with Open Notebook v1.14.0 and SurrealDB 2.6.5*
+*Tested on Windows 11 ARM64 with Brain Notebook v1.6.0*
+*Docker migration and production frontend build tested on Windows 11 x64 with Brain Notebook v1.14.0 and SurrealDB 2.6.5*
 *Created: January 2026*

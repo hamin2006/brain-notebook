@@ -1,15 +1,16 @@
 # Docker Compose Installation (Recommended)
 
-This is the standard way to run Open Notebook. It uses the [`docker-compose.yml`](../../docker-compose.yml) in the root of the repository, which starts two services:
+This is the standard way to run Brain Notebook. It uses the [`docker-compose.yml`](../../docker-compose.yml) in the root of the repository, which **builds the app image from your checkout** and starts:
 
 | Service | What it runs | Ports | Data folder |
 |---|---|---|---|
 | `surrealdb` | The database | `8000` (bound to `127.0.0.1` only) | `./surreal_data` |
-| `open_notebook` | Web UI, REST API and the background worker | `8502` (UI), `5055` (API) | `./notebook_data` |
+| `open_notebook` | Web UI, REST API (incl. `/mcp`) and the background worker | `8502` (UI), `5055` (API) | `./notebook_data` |
+| `searxng` (optional, profile `web`) | Self-hosted metasearch for the agent's web search | none (internal) | none |
 
-The background worker runs inside the `open_notebook` container, so source processing, embeddings and podcasts work without extra services.
+The background worker runs inside the `open_notebook` container, so ingestion (page extraction, captions, analysis, embeddings, concept graph) works without extra services.
 
-> **Alternative registry:** images are published to Docker Hub (`lfnovo/open_notebook`) and GitHub Container Registry (`ghcr.io/lfnovo/open-notebook`). Swap the `image:` line if Docker Hub is blocked for you.
+> **Don't swap in upstream images.** `lfnovo/open_notebook` / `ghcr.io/lfnovo/open-notebook` are upstream Open Notebook, without the research agent; the database migrations also differ.
 
 ## Prerequisites
 
@@ -19,17 +20,14 @@ The background worker runs inside the `open_notebook` container, so source proce
 
 ---
 
-## Step 1: Download the compose file
-
-Create a folder for Open Notebook and download the compose file into it:
+## Step 1: Get the code
 
 ```bash
-mkdir open-notebook
-cd open-notebook
-curl -o docker-compose.yml https://raw.githubusercontent.com/lfnovo/open-notebook/main/docker-compose.yml
+git clone https://github.com/hamin2006/brain-notebook.git
+cd brain-notebook
 ```
 
-On Windows PowerShell, type `curl.exe` instead of `curl`. You can also open the [file on GitHub](https://github.com/lfnovo/open-notebook/blob/main/docker-compose.yml) and save it as `docker-compose.yml`.
+The image is built from this folder, so keep the whole checkout (not just the compose file).
 
 ## Step 2: Set your encryption key
 
@@ -49,7 +47,7 @@ openssl rand -hex 32                                   # macOS, Linux
 [guid]::NewGuid().ToString("N") + [guid]::NewGuid().ToString("N")   # Windows PowerShell
 ```
 
-Open Notebook uses this key to encrypt the provider API keys it stores.
+Brain Notebook uses this key to encrypt the provider API keys it stores.
 
 > **Keep this key.** If it changes later, the keys you saved can no longer be decrypted and you have to enter them again.
 
@@ -62,36 +60,40 @@ The shipped file publishes ports `8502` (UI) and `5055` (API) on **all network i
 
 See [Access from another machine](#access-from-another-machine) if you do want to use it from other devices.
 
-## Step 4: Start Open Notebook
+## Step 4: Build and start
 
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
-Check that both services are running:
+The first build takes a few minutes (frontend build, Python dependencies). Check that both services are running:
 
 ```bash
 docker compose ps
 ```
 
-The API runs database migrations when it starts. After 20–30 seconds it should answer:
+The API runs database migrations when it starts (`docker compose logs open_notebook | grep version` should end at *version 29*). After 20–30 seconds it should answer:
 
 ```bash
 curl http://localhost:5055/health
 # {"status":"healthy"}
 ```
 
-## Step 5: Open the UI and connect a provider
+## Step 5: Open the UI and set up the models
 
-Open **http://localhost:8502**.
+Open **http://localhost:8502**. Then, from the checkout folder:
 
-Then follow [Connect a provider](../4-AI-PROVIDERS/index.md#connect-a-provider): add a configuration, test it, add models and set the default models. It ends with a test chat. Chat won't work until the default models are set.
+```bash
+OPENROUTER_API_KEY=sk-or-... python3 scripts/brain/provision_models.py
+```
+
+This connects OpenRouter and sets the recommended defaults (answer model, research model, embeddings). To use another provider or pick models yourself, see [Models for the research agent](../4-AI-PROVIDERS/index.md#models-for-the-research-agent). Chat won't work until the default models are set.
 
 ---
 
 ## Changing settings
 
-Every Open Notebook setting is an environment variable on the **`open_notebook`** service. Add it to that service's `environment:` block and apply it with:
+Every Brain Notebook setting is an environment variable on the **`open_notebook`** service. Add it to that service's `environment:` block and apply it with:
 
 ```bash
 docker compose up -d
@@ -113,13 +115,24 @@ A few things to know:
 - **`.env` is not loaded into the container.** The shipped compose file has no `env_file:`. A `.env` file next to `docker-compose.yml` only fills the `${...}` placeholders in the file (the shipped file uses it for `SURREAL_USER` and `SURREAL_PASSWORD`). Anything else you put in `.env` is ignored.
 - **Database credentials** default to `root:root`, and the database port is only reachable from the same machine. To use other credentials, put `SURREAL_USER=...` and `SURREAL_PASSWORD=...` in a `.env` file before the first start; both services read them. See [`.env.example`](../../.env.example).
 - **Optional extraction engines** (Docling, Crawl4AI) are commented out in the compose file. When enabled they are installed on the next start, which then takes several minutes. See the [Environment Reference](../5-CONFIGURATION/environment-reference.md).
-- **Keep your changes in an override file (optional).** Docker Compose automatically merges a `docker-compose.override.yml` in the same folder. Putting your additions there leaves `docker-compose.yml` untouched, so you can download a newer one later. The variants below use this file.
+- **Keep your changes in an override file (optional).** Docker Compose automatically merges a `docker-compose.override.yml` in the same folder. Putting your additions there leaves `docker-compose.yml` untouched, so `git pull` updates cleanly. The variants below use this file.
 
 The full list of settings is in the [Environment Reference](../5-CONFIGURATION/environment-reference.md).
 
 ---
 
 ## Variants
+
+### Web search (SearXNG)
+
+The research agent can search the web through a self-hosted SearXNG (no API key, no per-search cost). Put a secret in a `.env` file next to `docker-compose.yml` and start the `web` profile:
+
+```bash
+echo "SEARXNG_SECRET=$(openssl rand -hex 32)" >> .env
+docker compose --profile web up -d
+```
+
+The app already points at it (`SEARXNG_URL=http://searxng:8080`). Turn it on in **Settings → Research agent → Web search**; it's used only in notebooks whose answers may add general knowledge. See [Web search](../5-CONFIGURATION/research-agent.md#web-search). Later `docker compose` commands need `--profile web` to include it.
 
 ### Ollama in Docker (local models)
 
@@ -142,11 +155,11 @@ docker compose exec ollama ollama pull qwen3
 docker compose exec ollama ollama pull nomic-embed-text
 ```
 
-When you [connect a provider](../4-AI-PROVIDERS/index.md#connect-a-provider), pick **Ollama** and set **Base URL** to `http://ollama:11434`. GPU setup, model choices and timeouts are in the [Ollama guide](../5-CONFIGURATION/ollama.md).
+When you [connect a provider](../4-AI-PROVIDERS/index.md#connect-a-provider), pick **Ollama** and set **Base URL** to `http://ollama:11434`. The research agent's **Tools Model** must support tool calling (`qwen3` does), and slide captions need a vision model; see the notes in the [Local Quick Start](../0-START-HERE/quick-start-local.md). GPU setup, model choices and timeouts are in the [Ollama guide](../5-CONFIGURATION/ollama.md).
 
 ### Ollama installed on the host
 
-Open Notebook runs in a container, so `localhost` there is the container, not your computer. Use `host.docker.internal` instead.
+Brain Notebook runs in a container, so `localhost` there is the container, not your computer. Use `host.docker.internal` instead.
 
 1. Create `docker-compose.override.yml` so that name resolves on every platform (Docker Desktop already provides it; Docker Engine on Linux needs this line):
 
@@ -176,7 +189,7 @@ Open Notebook runs in a container, so `localhost` there is the container, not yo
 
 ### Single container
 
-An all-in-one image also exists but is deprecated. See [Single Container](single-container.md).
+The Dockerfile can also build an all-in-one image with the database inside (`--target single`). See [Single Container](single-container.md).
 
 ---
 
@@ -186,6 +199,8 @@ By default the browser loads the UI from port `8502` and then calls the API dire
 
 - make **both** ports `8502` and `5055` reachable, or
 - set `API_URL` to the address you open the UI with (for example `- API_URL=http://192.168.1.50:8502`). The browser then sends API calls through the UI server, and only port `8502` needs to be reachable.
+
+**MCP clients** (Claude Code on another machine) connect to `http://<host>:8502/mcp`; add `- OPEN_NOTEBOOK_MCP_ALLOWED_HOSTS=<host>:*` to the `environment:` block, otherwise requests that arrive with another host name are refused. See [MCP](../5-CONFIGURATION/mcp-integration.md).
 
 Authentication is off unless you set `OPEN_NOTEBOOK_PASSWORD`, so set it whenever the ports are reachable from other machines (see [Step 3](#step-3-decide-who-can-reach-it)). For HTTPS and domains, see [Reverse Proxy](../5-CONFIGURATION/reverse-proxy.md) and [Security](../5-CONFIGURATION/security.md).
 
@@ -213,7 +228,7 @@ Your data lives in the `surreal_data/` and `notebook_data/` folders. Stop the se
 
 ```bash
 docker compose down
-tar czf open-notebook-backup.tgz surreal_data notebook_data
+tar czf brain-notebook-backup.tgz surreal_data notebook_data
 docker compose up -d
 ```
 
@@ -224,11 +239,11 @@ On Linux the folders are owned by root (the database runs as root for the bind m
 Back up first, then:
 
 ```bash
-docker compose pull
-docker compose up -d
+git pull
+docker compose up -d --build
 ```
 
-Since v1.15.0, API keys saved (or migrated) by Open Notebook use an encryption format that older versions can't read. If you need to roll back after updating, restore the backup you made before the update.
+The API applies new database migrations when it starts. Migrations only move forward in normal use; to roll back, restore the backup you made before the update.
 
 ### Delete everything
 
@@ -259,11 +274,10 @@ More: [Quick Fixes](../6-TROUBLESHOOTING/quick-fixes.md) · [Connection Issues](
 
 ## Other examples
 
-The [`examples/`](../../examples/) folder has complete compose files for other setups, including Ollama, a fully local stack and a speech server. They are maintained separately from this guide; compare them with the root `docker-compose.yml` before using one.
+The [`examples/`](../../examples/) folder has compose files from upstream Brain Notebook for other setups (Ollama, a fully local stack, a speech server). They reference upstream images: replace the `open_notebook` service's `image:` with `build: .` / `image: brain-notebook:local` as in the root `docker-compose.yml` before using one.
 
 ## Next steps
 
 - [User Guide](../3-USER-GUIDE/index.md)
 - [Security](../5-CONFIGURATION/security.md) and [Reverse Proxy](../5-CONFIGURATION/reverse-proxy.md) before exposing it to a network
 
-**Need help?** [Discord](https://discord.gg/37XJPXfz2w) · [GitHub Issues](https://github.com/lfnovo/open-notebook/issues)

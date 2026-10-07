@@ -1,52 +1,48 @@
-# Open Notebook - Start Here
+# Brain Notebook - Start Here
 
-**Open Notebook** is a self-hosted, privacy-focused AI research assistant. Add documents, web pages, audio and video, chat with an AI about them with citations, take notes, and turn your research into podcasts, using the AI providers you choose.
+**Brain Notebook** is a self-hosted research notebook. Add PDFs (lecture slides, papers, books), web pages, audio,
+video and notes; then ask questions. A research agent investigates your documents the way you would: it finds the
+right document, searches and greps it, reads the relevant pages, looks at slides whose meaning is in a diagram, and
+answers with citations to the exact pages. Click a citation to see the page.
 
 ## Choose your path
 
-Each quick start installs Open Notebook with Docker Compose and ends with a working chat.
+### Recommended: OpenRouter + Docker
+One API key gives you every model the agent uses (chat, research, embeddings, rerank, page-image embeddings).
 
-### I have an API key for a cloud AI provider
-OpenAI, Anthropic, Google, Mistral, Groq, OpenRouter and more.
+→ [Quick Start](quick-start-cloud.md) (about 10 minutes, mostly the first image build)
 
-→ [Cloud Providers Quick Start](quick-start-cloud.md) (about 5 minutes)
+### Other cloud providers (OpenAI, Anthropic, Google, …)
+Same quick start; pick your provider when connecting models. Reranking and visual page search need an OpenRouter key
+(they can be turned off).
 
-### I want to run everything locally
-Ollama in Docker next to Open Notebook. No API keys; nothing leaves your machine.
+### Local models with Ollama
+Possible, with caveats: the research model must support tool calling, and page captions need a vision model.
+→ [Local Quick Start](quick-start-local.md) · [Ollama already installed](quick-start-external-ollama.md)
 
-→ [Local Quick Start](quick-start-local.md) (about 10 minutes, plus model downloads)
-
-**Already have Ollama installed on your computer?** → [External Ollama Quick Start](quick-start-external-ollama.md)
-
-### Something else
-Running from source, Windows without Docker, or a hosting platform → [Installation Guide](../1-INSTALLATION/index.md)
+### A Linux machine you'll keep running (home server, desktop)
+→ [From source with systemd services](../1-INSTALLATION/from-source.md), the setup the reference deployment uses.
 
 ---
 
 ## What you can do
 
-- **Add content**: PDFs, Office and OpenDocument files, web pages, YouTube, audio, video, plain text
-- **Chat**: ask questions about the sources in a notebook, with citations, and choose what each source shares with the AI
-- **Ask and search**: full-text and semantic search across everything
-- **Transform**: run summaries and extraction prompts on sources to produce insights
-- **Take notes**: write your own or save AI answers as notes
-- **Create podcasts**: 1 to 4 speakers with configurable profiles
-
-## Open Notebook and Google Notebook LM
-
-| | Open Notebook | Google Notebook LM |
-|---|---|---|
-| **Where it runs** | Your machine or server | Google's cloud |
-| **AI models** | 20+ providers, cloud or local | Google's models |
-| **Podcast speakers** | 1–4, configurable profiles | Google's formats |
-| **Cost** | Free software; you pay your AI provider (nothing with local models) | Free tier and subscriptions |
-| **Offline** | Yes, with local models | No |
+- **Ask research questions** about a notebook: "From lecture 4, what are Adam's default hyperparameters?",
+  "Summarize lecture 6 and find related lectures", "Which lectures discuss dropout, and how do they differ?"
+- **Get page citations** for every claim, and preview the cited page in the app
+- **Ask about images**: paste a screenshot of a slide or a homework problem into chat
+- **Choose the effort** per question (quick, standard, deep) and the **grounding** per notebook (notebook only, or
+  notebook plus general knowledge and web search)
+- **Search** by meaning, by exact words, or by what a page *looks like*
+- **Keep notes**, run **transformations**, generate **podcasts** (inherited from Open Notebook)
+- **Use it from Claude Code** or other MCP clients
 
 ## Prerequisites
 
-- **Docker** for the quick starts. [From source](../1-INSTALLATION/from-source.md) and [Windows native](../1-INSTALLATION/windows-native.md) installs don't need Docker for the app itself.
-- **An AI provider**: a cloud API key, or a local model server such as Ollama.
+- **Docker** (Compose v2), or for a source install: Python 3.11–3.12 with [uv](https://docs.astral.sh/uv/), Node.js 22, and SurrealDB v2 (Docker is the easy way to run it)
+- **An AI provider key**; OpenRouter is recommended
+- About 2.5 GB of RAM for the app and database with a few hundred pages ingested
 
 ---
 
-**Need help?** Join our [Discord community](https://discord.gg/37XJPXfz2w) or see the [full documentation](../index.md).
+**Need help?** See the [full documentation](../index.md) or [troubleshooting](../6-TROUBLESHOOTING/index.md).

@@ -1,87 +1,104 @@
-# Quick Start - Cloud AI Providers (5 minutes)
+# Quick Start - Docker + OpenRouter (10 minutes)
 
-Run Open Notebook with a cloud AI provider such as **OpenAI, Anthropic, Google, Mistral, Groq or OpenRouter**. You need Docker and an API key.
+Run Brain Notebook with Docker and the recommended OpenRouter models, then get a cited answer from one of your own
+PDFs. Other cloud providers work the same way; see the note in Step 3.
 
 ## Prerequisites
 
-1. **Docker with Compose v2**: [Docker Desktop](https://www.docker.com/products/docker-desktop/) on macOS and Windows; Docker Engine with the Compose plugin on Linux.
-2. **An API key** from your provider, for example:
-   - [OpenAI](https://platform.openai.com/api-keys)
-   - [Anthropic](https://console.anthropic.com/settings/keys)
-   - [Google AI Studio](https://aistudio.google.com/app/apikey)
-   - [Mistral](https://console.mistral.ai/api-keys/)
-   - [Groq](https://console.groq.com/keys)
-   - [OpenRouter](https://openrouter.ai/keys)
+1. **Docker with Compose v2**: [Docker Desktop](https://www.docker.com/products/docker-desktop/) on macOS and Windows,
+   Docker Engine with the Compose plugin on Linux.
+2. **git**.
+3. **An [OpenRouter API key](https://openrouter.ai/keys)** with a few dollars of credit. A typical question costs
+   about $0.003; ingesting a 100-slide deck a few cents (captions, analysis, embeddings, concept graph).
 
-   Other providers are listed in [AI Providers](../4-AI-PROVIDERS/index.md#supported-providers).
-
-> **Pick a provider that does embeddings, or add a second one.** Open Notebook needs a language model for chat **and** an embedding model for search. OpenAI, Google AI, Mistral AI and OpenRouter offer both. Anthropic, DeepSeek and Groq offer no embedding models, so pair them with one that does (for example OpenAI, Google AI, Mistral AI or Voyage AI).
-
-## Step 1: Download and configure (1 min)
+## Step 1: Get the code and set the encryption key (1 min)
 
 ```bash
-mkdir open-notebook
-cd open-notebook
-curl -o docker-compose.yml https://raw.githubusercontent.com/lfnovo/open-notebook/main/docker-compose.yml
+git clone https://github.com/hamin2006/brain-notebook.git
+cd brain-notebook
 ```
 
-(On Windows PowerShell, use `curl.exe`.)
+Open `docker-compose.yml` and replace `change-me-to-a-secret-string` in the `OPEN_NOTEBOOK_ENCRYPTION_KEY` line with
+a long random secret, for example the output of `openssl rand -hex 32`. It encrypts the API keys you store in the app;
+keep it, or saved keys can't be decrypted.
 
-Open `docker-compose.yml` and replace `change-me-to-a-secret-string` in the `OPEN_NOTEBOOK_ENCRYPTION_KEY` line with a long random secret you generate yourself, for example with `openssl rand -hex 32` (Windows: see [Set your encryption key](../1-INSTALLATION/docker-compose.md#step-2-set-your-encryption-key)). Don't reuse an example value. Keep it: if it changes, saved API keys can't be decrypted.
+> **Shared network?** The UI (`8502`) and API (`5055`) are published on all interfaces with no password. If other
+> devices can reach this machine, change the two `open_notebook` port lines to `"127.0.0.1:8502:8502"` and
+> `"127.0.0.1:5055:5055"`, or add `- OPEN_NOTEBOOK_PASSWORD=your-password` to its `environment:` block.
 
-> **Shared network or server?** The shipped file publishes the UI (`8502`) and API (`5055`) on all network interfaces, and there is no password by default. If other devices can reach this machine, do one of these before starting: change the two `open_notebook` port lines to `"127.0.0.1:8502:8502"` and `"127.0.0.1:5055:5055"`, or add `- OPEN_NOTEBOOK_PASSWORD=your-password` to its `environment:` block.
-
-## Step 2: Start (1 min)
+## Step 2: Build and start (5 min the first time)
 
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
-Wait about 30 seconds, then open **http://localhost:8502**.
+This builds the app image from the repository (the upstream `lfnovo/open_notebook` images don't contain the research
+agent), starts SurrealDB, and runs the database migrations. When `docker compose logs open_notebook | grep "version 29"`
+shows *Database is now at version 29*, open **http://localhost:8502**.
 
-## Step 3: Connect your provider and chat (3 min)
+## Step 3: Connect the models (2 min)
 
-Follow **[Connect a provider](../4-AI-PROVIDERS/index.md#connect-a-provider)** with these values:
+From the `brain-notebook` folder:
 
-| Field | Value |
-|---|---|
-| Provider | The one you have a key for (for example **OpenAI**) |
-| API Key | Your key |
-| Base URL | Leave empty |
-| Models to add | At least one **Language** model and one **Embedding** model (from this provider or a second one) |
-| Defaults | Click **Auto-assign Defaults** |
+```bash
+OPENROUTER_API_KEY=sk-or-... python3 scripts/brain/provision_models.py
+```
 
-The last step of that page creates a notebook, adds a text source and sends a chat message. When you get an answer, you're set up.
+(Without the variable it asks for the key; the script only needs Python 3, no packages.) It stores your key in the app
+(encrypted), adds three models and sets them as defaults:
+
+| Default | Model | Role |
+|---|---|---|
+| Chat, Transformation, Large Context | `z-ai/glm-5.3-flash` | Writes answers; captions slides; analyzes documents |
+| Tools | `qwen/qwen3.7-flash` | The research agent's tool calls (cheap, fast, can see images) |
+| Embedding | `qwen/qwen3-embedding-8b` | Passage, section and document search |
+
+Each model is tested; you should see three `ok` lines. Reranking (`voyageai/rerank-3-lite`) and page-image embeddings
+(`google/gemini-embedding-2`) use the same key automatically.
+
+**Another provider instead?** Connect it under **Manage → Models** and set the defaults yourself:
+[Models for the research agent](../4-AI-PROVIDERS/index.md#models-for-the-research-agent). Without an OpenRouter key,
+turn off reranking and visual page search in **Settings → Research agent**.
+
+## Step 4: Ask your first question (2 min)
+
+1. **Notebooks → New Notebook**, give it a name.
+2. **Add Source → Add Source → Upload File**, pick a PDF (slides or a paper), and finish the dialog.
+3. Wait until the source shows as processed. A 100-page deck takes a few minutes: pages are extracted, visual pages
+   captioned, then the document is analyzed (outline, summaries, metadata) and its pages are embedded.
+4. In the chat panel ask something specific, e.g. *"What does the slide on page 12 say about X?"* or *"Summarize this
+   document section by section"*, and send it with **Ctrl+Enter** (**⌘+Enter** on macOS).
+
+You'll see the agent's research steps live ("Searching for…", "Reading…"), then the answer with citations like
+`[1]` that show the page range. Click one to preview the page.
 
 ## Verification checklist
 
 - [ ] `docker compose ps` shows `surrealdb` and `open_notebook` running
 - [ ] http://localhost:8502 opens
-- [ ] **Test** on your provider configuration shows a green check
-- [ ] **Default Model Assignments** has a Chat Model and an Embedding Model
-- [ ] A chat message gets an answer
+- [ ] `provision_models.py` printed three `ok` lines
+- [ ] The uploaded PDF finished processing (its status no longer shows as processing)
+- [ ] A question gets an answer with page citations
 
-## Optional: podcasts and audio
+## Optional
 
-- **Podcasts** need a **Text-to-Speech Model**. Add a TTS model (OpenAI, Google AI, Mistral AI, xAI, MiniMax, ElevenLabs and others offer them) and pick it under **Default Model Assignments**. Auto-assign doesn't set it.
-- **Audio and video sources** need a **Speech-to-Text Model** (OpenAI, Google AI, Groq, Mistral AI, ElevenLabs, Deepgram and others).
+- **Web search** (free, self-hosted): add `SEARXNG_SECRET=$(openssl rand -hex 32)` to a `.env` file next to
+  `docker-compose.yml`, run `docker compose --profile web up -d`, then turn on **Settings → Research agent → Web search**.
+  The agent uses the web only in notebooks set to *Notebook + general knowledge*. See [Web search](../5-CONFIGURATION/research-agent.md#web-search).
+- **Claude Code**: `claude mcp add --transport http brain http://localhost:8502/mcp`. See [MCP](../5-CONFIGURATION/mcp-integration.md).
+- **Podcasts / audio sources**: add a text-to-speech or speech-to-text model under **Manage → Models**.
 
 ## Troubleshooting
 
-**Test shows a red cross.** Check the key on the provider's website and that the account has credit. Edit the configuration to fix the key.
-
-**A model you want isn't in the list.** Type its exact name in the search box of the **Discover Models** dialog and add it as a custom model.
-
-**Chat fails with "No model configured…".** A default model is empty; see [Set default models](../4-AI-PROVIDERS/index.md#4-set-default-models).
-
-**Port 8502 is in use.** In `docker-compose.yml` change `"8502:8502"` to `"8503:8502"`, run `docker compose up -d` and open http://localhost:8503.
-
-**Anything else.** `docker compose logs -f open_notebook` shows the UI, API and worker logs. See [Quick Fixes](../6-TROUBLESHOOTING/quick-fixes.md).
+- **`provision_models.py` can't connect**: the API isn't up yet (wait for the migrations) or isn't on `127.0.0.1:5055`;
+  pass `--api http://host:5055/api`.
+- **A model test fails**: check the key and your OpenRouter credit.
+- **The source never finishes**: `docker compose logs -f open_notebook` shows the worker; see [Processing issues](../6-TROUBLESHOOTING/processing-issues.md).
+- **Port 8502 is in use**: change `"8502:8502"` to e.g. `"8503:8502"` and run `docker compose up -d`.
+- More: [Quick Fixes](../6-TROUBLESHOOTING/quick-fixes.md).
 
 ## Next steps
 
-- [Docker Compose guide](../1-INSTALLATION/docker-compose.md): changing settings, backups, updates, access from other machines
-- [User Guide](../3-USER-GUIDE/index.md): sources, chat, notes, podcasts
-- Before exposing Open Notebook to a network, set a password: [Security](../5-CONFIGURATION/security.md)
-
-**Need help?** Join our [Discord community](https://discord.gg/37XJPXfz2w).
+- [Chatting with the agent](../3-USER-GUIDE/chat-effectively.md): effort, grounding, images, follow-ups
+- [How the research agent works](../2-CORE-CONCEPTS/research-agent.md)
+- [Docker Compose guide](../1-INSTALLATION/docker-compose.md): settings, backups, updates, remote access

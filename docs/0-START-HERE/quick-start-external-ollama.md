@@ -1,8 +1,16 @@
 # Quick Start - External Ollama
 
-Run Open Notebook in Docker and connect it to an **Ollama you installed directly on your computer** (not in Docker). Useful when you already use Ollama, or want its native GPU support without Docker GPU passthrough.
+Run Brain Notebook in Docker and connect it to an **Ollama you installed directly on your computer** (not in Docker). Useful when you already use Ollama, or want its native GPU support without Docker GPU passthrough.
 
 If you don't have Ollama yet and want everything in Docker, use the [Local Quick Start](quick-start-local.md).
+
+> **What the research agent needs from local models.** Brain Notebook's reference setup uses OpenRouter; local
+> models are supported but not part of its tested configuration.
+> - The **Tools** model (the research loop) must support **tool calling** (`qwen3` does; many small models don't).
+> - Page **captions** use the **Transformation** model and need a **vision** model (e.g. `qwen2.5vl`); without one,
+>   ingestion still works but image-only slides stay unreadable to search (the agent can't `view` them either).
+> - **Reranking** and **visual page search** call OpenRouter. With no OpenRouter key, clear both models in
+>   **Settings → Research agent** (search then uses the fused vector + keyword order).
 
 ## Prerequisites
 
@@ -11,7 +19,7 @@ If you don't have Ollama yet and want everything in Docker, use the [Local Quick
 
 ## Step 1: Download models (2-5 min)
 
-Open Notebook needs a chat model and an embedding model:
+Brain Notebook needs a chat model and an embedding model:
 
 ```bash
 ollama pull qwen3
@@ -22,7 +30,7 @@ On a smaller machine, use `llama3.2` or `gemma3:1b` instead of `qwen3`.
 
 ## Step 2: Let containers reach Ollama
 
-Open Notebook runs in a container, where `localhost` means the container itself. It reaches your computer's Ollama through the name `host.docker.internal`.
+Brain Notebook runs in a container, where `localhost` means the container itself. It reaches your computer's Ollama through the name `host.docker.internal`.
 
 **macOS and Windows (Docker Desktop):** Docker Desktop forwards `host.docker.internal` to your computer, so Ollama's default setup usually works as is; try it first. If the connection test in Step 5 fails, make Ollama listen on all interfaces: on macOS run `launchctl setenv OLLAMA_HOST "0.0.0.0:11434"`, then quit and reopen the Ollama app (this setting is lost when you log out or reboot, so run it again after each login, or follow Ollama's FAQ for a permanent setup); on Windows add a user environment variable `OLLAMA_HOST` = `0.0.0.0:11434`, then quit and restart Ollama. See Ollama's [documentation](https://github.com/ollama/ollama/tree/main/docs) (FAQ, "How do I configure Ollama server?").
 
@@ -47,15 +55,12 @@ If you run Ollama by hand, start it with `OLLAMA_HOST=0.0.0.0:11434 ollama serve
 
 **On any platform,** `OLLAMA_HOST=0.0.0.0` exposes Ollama's API, which has no authentication, on every network interface. Allow port 11434 only from this computer and its Docker networks (for example with your firewall), never from untrusted networks.
 
-## Step 3: Download and configure Open Notebook (1 min)
+## Step 3: Download and configure Brain Notebook (1 min)
 
 ```bash
-mkdir open-notebook
-cd open-notebook
-curl -o docker-compose.yml https://raw.githubusercontent.com/lfnovo/open-notebook/main/docker-compose.yml
+git clone https://github.com/hamin2006/brain-notebook.git
+cd brain-notebook
 ```
-
-(On Windows PowerShell, use `curl.exe`.)
 
 Open `docker-compose.yml` and replace `change-me-to-a-secret-string` in the `OPEN_NOTEBOOK_ENCRYPTION_KEY` line with a long random secret you generate yourself, for example with `openssl rand -hex 32` (Windows: see [Set your encryption key](../1-INSTALLATION/docker-compose.md#step-2-set-your-encryption-key)). Don't reuse an example value.
 
@@ -73,7 +78,7 @@ services:
 ## Step 4: Start (1 min)
 
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
 ## Step 5: Connect Ollama and chat (3 min)
@@ -86,7 +91,7 @@ Open **http://localhost:8502** and follow **[Connect a provider](../4-AI-PROVIDE
 | API Key | Leave empty |
 | Base URL | `http://host.docker.internal:11434` |
 | Models to add | Your chat model as **Language** (listed as `qwen3:latest`), then `nomic-embed-text:latest` as **Embedding** |
-| Defaults | Click **Auto-assign Defaults** |
+| Defaults | Click **Auto-assign Defaults**, then set **Tools Model** to `qwen3:latest` (and **Transformation Model** to a vision model such as `qwen2.5vl` if you pulled one) |
 
 The last step of that page creates a notebook, adds a text source and sends a chat message.
 
@@ -128,4 +133,3 @@ docker compose exec open_notebook curl -s http://host.docker.internal:11434/api/
 - [Docker Compose guide](../1-INSTALLATION/docker-compose.md): settings, backups, updates
 - [User Guide](../3-USER-GUIDE/index.md)
 
-**Need help?** Join our [Discord community](https://discord.gg/37XJPXfz2w).

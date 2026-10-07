@@ -1,20 +1,25 @@
-"""Configure the Brain deployment's models through the Open Notebook API.
+"""Configure Brain Notebook's recommended OpenRouter models through its API.
 
-Creates (or reuses) an OpenRouter credential for chat and embeddings,
-registers the models, and sets them as defaults. Safe to re-run. The OpenRouter key is read from a dotenv file on this machine and only
-ever sent to the local API.
+Creates (or reuses) an OpenRouter credential, registers the chat, research and
+embedding models, and sets them as defaults. Safe to re-run. The key is only
+ever sent to the Brain Notebook API (where it is stored encrypted).
 
-Usage (on the PC, next to the running API):
-  python3 scripts/brain/provision_models.py --key-file ~/workplace/TradingAgents/.env
+Usage (on the machine running the API; stdlib only, no venv needed):
+  OPENROUTER_API_KEY=sk-or-... python3 scripts/brain/provision_models.py
+  python3 scripts/brain/provision_models.py --key-file path/to/.env   # a line OPENROUTER_API_KEY=...
+  python3 scripts/brain/provision_models.py --api http://127.0.0.1:5055/api
+If neither is given, the key is asked for interactively.
 """
 
 import argparse
+import getpass
 import json
+import os
 import urllib.error
 import urllib.request
 from pathlib import Path
 
-API = "http://127.0.0.1:5055/api"
+API = os.environ.get("BRAIN_API_URL", "http://127.0.0.1:5055/api")
 CHAT_MODEL = "z-ai/glm-5.3-flash"
 # The agent's research loop makes many calls over a growing transcript, so it runs
 # on a model 5x cheaper than the chat model, which only writes the final answer.
@@ -80,15 +85,26 @@ def ensure_model(name: str, provider: str, type_: str, credential: str) -> str:
 
 
 def main():
+    global API
     ap = argparse.ArgumentParser()
-    ap.add_argument("--key-file", required=True)
+    ap.add_argument("--key-file", help="dotenv file with OPENROUTER_API_KEY=...")
+    ap.add_argument("--api", default=API, help="Brain Notebook API base URL")
     args = ap.parse_args()
+    API = args.api.rstrip("/")
+    if args.key_file:
+        key = read_key(args.key_file)
+    else:
+        key = os.environ.get("OPENROUTER_API_KEY") or getpass.getpass(
+            "OpenRouter API key: "
+        )
+    if not key.strip():
+        raise SystemExit("No OpenRouter API key given.")
 
     openrouter = ensure_credential(
         "openrouter",
         "brain-openrouter",
         ["language", "embedding"],
-        api_key=read_key(args.key_file),
+        api_key=key.strip(),
     )
 
     chat = ensure_model(CHAT_MODEL, "openrouter", "language", openrouter)

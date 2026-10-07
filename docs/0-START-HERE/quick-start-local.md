@@ -1,8 +1,16 @@
 # Quick Start - Local & Private (10 minutes)
 
-Run Open Notebook and **Ollama** together in Docker. No cloud API keys: your content is processed by models on your machine, not sent to an AI provider. To keep the app itself private, make sure other devices can't reach it (see the note in Step 1).
+Run Brain Notebook and **Ollama** together in Docker. No cloud API keys: your content is processed by models on your machine, not sent to an AI provider. To keep the app itself private, make sure other devices can't reach it (see the note in Step 1).
 
 **Already have Ollama installed on this computer?** Use the [External Ollama guide](quick-start-external-ollama.md) instead.
+
+> **What the research agent needs from local models.** Brain Notebook's reference setup uses OpenRouter; local
+> models are supported but not part of its tested configuration.
+> - The **Tools** model (the research loop) must support **tool calling** (`qwen3` does; many small models don't).
+> - Page **captions** use the **Transformation** model and need a **vision** model (e.g. `qwen2.5vl`); without one,
+>   ingestion still works but image-only slides stay unreadable to search (the agent can't `view` them either).
+> - **Reranking** and **visual page search** call OpenRouter. With no OpenRouter key, clear both models in
+>   **Settings → Research agent** (search then uses the fused vector + keyword order).
 
 ## Prerequisites
 
@@ -13,12 +21,9 @@ Run Open Notebook and **Ollama** together in Docker. No cloud API keys: your con
 ## Step 1: Download and configure (1 min)
 
 ```bash
-mkdir open-notebook
-cd open-notebook
-curl -o docker-compose.yml https://raw.githubusercontent.com/lfnovo/open-notebook/main/docker-compose.yml
+git clone https://github.com/hamin2006/brain-notebook.git
+cd brain-notebook
 ```
-
-(On Windows PowerShell, use `curl.exe`.)
 
 Open `docker-compose.yml` and replace `change-me-to-a-secret-string` in the `OPEN_NOTEBOOK_ENCRYPTION_KEY` line with a long random secret you generate yourself, for example with `openssl rand -hex 32` (Windows: see [Set your encryption key](../1-INSTALLATION/docker-compose.md#step-2-set-your-encryption-key)). Don't reuse an example value.
 
@@ -42,19 +47,21 @@ For NVIDIA GPU access, see [GPU acceleration](../5-CONFIGURATION/ollama.md#gpu-a
 ## Step 3: Start (1 min)
 
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
 ## Step 4: Download models (2-5 min)
 
-Open Notebook needs a **chat model** and an **embedding model**. Nothing downloads them automatically:
+Brain Notebook needs a **chat model** and an **embedding model**. Nothing downloads them automatically:
 
 ```bash
 docker compose exec ollama ollama pull qwen3
 docker compose exec ollama ollama pull nomic-embed-text
 ```
 
-`qwen3` is a capable general model of about 5 GB. On a smaller machine, try `llama3.2` (about 2 GB) or `gemma3:1b` instead. Browse more at [ollama.com/library](https://ollama.com/library).
+Optionally pull a vision model for slide captions: `docker compose exec ollama ollama pull qwen2.5vl`.
+
+`qwen3` is a capable general model of about 5 GB that supports tool calling. On a smaller machine, try `llama3.2` (about 2 GB) or `gemma3:1b` instead. Browse more at [ollama.com/library](https://ollama.com/library).
 
 Check what's installed with `docker compose exec ollama ollama list`.
 
@@ -68,7 +75,7 @@ Open **http://localhost:8502** and follow **[Connect a provider](../4-AI-PROVIDE
 | API Key | Leave empty |
 | Base URL | `http://ollama:11434` |
 | Models to add | Your chat model as **Language** (Ollama lists it as `qwen3:latest`), then `nomic-embed-text:latest` as **Embedding** |
-| Defaults | Click **Auto-assign Defaults** |
+| Defaults | Click **Auto-assign Defaults**, then set **Tools Model** to `qwen3:latest` (and **Transformation Model** to your vision model if you pulled one) |
 
 The last step of that page creates a notebook, adds a text source and sends a chat message. The first answer can take a while as Ollama loads the model.
 
@@ -82,7 +89,7 @@ The last step of that page creates a notebook, adds a text source and sends a ch
 
 ## Troubleshooting
 
-**Test shows a red cross.** The base URL must be `http://ollama:11434` (the service name), not `localhost`: inside the Open Notebook container, `localhost` is the container itself. Also check that you pulled at least one model; the test uses one.
+**Test shows a red cross.** The base URL must be `http://ollama:11434` (the service name), not `localhost`: inside the Brain Notebook container, `localhost` is the container itself. Also check that you pulled at least one model; the test uses one.
 
 **Responses are very slow or time out.** Small models on CPU are slow. Try a smaller model, enable GPU access, or set `OPEN_NOTEBOOK_WORKER_MAX_TASKS=1` so background jobs don't compete with chat. Timeouts are covered in the [Ollama guide](../5-CONFIGURATION/ollama.md).
 
@@ -118,4 +125,3 @@ More in [OpenAI-Compatible Providers](../5-CONFIGURATION/openai-compatible.md).
 - [Docker Compose guide](../1-INSTALLATION/docker-compose.md): settings, backups, updates
 - [User Guide](../3-USER-GUIDE/index.md)
 
-**Need help?** Join our [Discord community](https://discord.gg/37XJPXfz2w).
