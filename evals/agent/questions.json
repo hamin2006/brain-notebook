@@ -122,7 +122,7 @@
      "lectures": [], "pages": {}, "facts": [], "not_found": true},
     {"id": "attention-only-listed", "task": "T15", "question": "How do transformers use self-attention, according to these lectures?",
      "lectures": [0], "pages": {"0": [[22, 27]]},
-     "facts": [["not (cover|explain|discuss|describ)", "only (mention|list)", "objective", "doesn't (cover|explain)", "does not (cover|explain)"]]},
+     "facts": [["not (cover|explain|discuss|describ)", "only (mention|list)", "objective", "doesn't (cover|explain)", "don't (cover|explain)", "do not (cover|explain)", "does not (cover|explain)"]]},
 
     {"id": "followup-next-lecture", "task": "T16", "turns": ["What is lecture 5 about?", "What about the lecture after that one?"],
      "lectures": [6], "pages": {},
