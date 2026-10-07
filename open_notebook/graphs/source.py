@@ -11,6 +11,7 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Send
 from loguru import logger
+from surreal_commands import submit_command
 from typing_extensions import Annotated, TypedDict
 
 from open_notebook.ai.models import Model, ModelManager
@@ -29,6 +30,7 @@ from open_notebook.utils.pdf_pages import (
     PdfPage,
     extract_pdf_pages,
     has_page_text,
+    pages_needing_captions,
     pages_to_full_text,
 )
 from open_notebook.utils.runtime_capabilities import engine_runtime_missing
@@ -368,7 +370,15 @@ async def save_source(state: SourceState) -> dict:
     # NOTE: Notebook associations are created by the API immediately for UI responsiveness
     # No need to create them here to avoid duplicate edges
 
-    if state["embed"]:
+    if state.get("pages") and pages_needing_captions(state["pages"]):
+        # Caption visual pages first; the caption job embeds the source when
+        # done (a second embed job now would race it and delete its chunks).
+        submit_command(
+            "open_notebook",
+            "caption_pages",
+            {"source_id": str(source.id), "embed": bool(state["embed"])},
+        )
+    elif state["embed"]:
         if source.full_text and source.full_text.strip():
             logger.debug("Embedding content for vector search")
             await source.vectorize()

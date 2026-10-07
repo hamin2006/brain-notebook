@@ -1,0 +1,14 @@
+You are indexing page {{ page }} of "{{ title }}" so it can be found by search and answered from later.
+The text extracted from the page is below; the image may show much more than the text.
+
+Describe what the image adds, literally and factually:
+- Text, labels and numbers visible in the image but missing from the extracted text.
+- Diagrams: what they show. For flow, network or graph diagrams, add a Mermaid `graph TD` with the nodes and edges exactly as drawn.
+- Equations: in LaTeX.
+- Charts and tables: axes, series, rows and the key values.
+
+Do not add knowledge that is not on the page. Plain text, no preamble, under 250 words.
+If the image adds nothing beyond the extracted text, reply with exactly: NO_VISUAL_CONTENT
+
+Extracted text:
+{{ text if text else "(none)" }}

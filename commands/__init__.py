@@ -14,10 +14,13 @@ from .embedding_commands import (
     embed_source_command,
     rebuild_embeddings_command,
 )
+from .page_commands import caption_pages_command
 from .podcast_commands import generate_podcast_command
 from .source_commands import process_source_command
 
 __all__ = [
+    # Page commands
+    "caption_pages_command",
     # Embedding commands
     "embed_note_command",
     "embed_insight_command",

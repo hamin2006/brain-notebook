@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Page-aware PDF sources (Brain fork).** PDFs with a text layer are extracted page by page: each page is stored (`source_page`), the source text carries `--- Page N ---` markers, and chunks record the page range they came from, with a `Title — pp. N–M` header. Animation-build slides are embedded once as a group. Scanned PDFs still go through content-core (OCR)
 - **LaTeXiT equations become LaTeX.** Keynote/LaTeXiT decks hide each equation's source as invisible, 4x-repeated text; it used to make up ~70% of the extracted text of such decks (one 96-page lecture extracted to 618k characters, ~25k of real text). It is now decoded and kept as `$...$`
+- **Vision captions for visual PDF pages.** Pages that are mostly image (diagrams, slides exported as pictures) are rendered and described by the default model: missing text, equations in LaTeX, and Mermaid graphs for network/flow diagrams. Captions are stored per page and embedded with the page text, so image-only slides become searchable. Animation builds are captioned once
 
 ### Changed
 - Uploaded files are kept by default (`auto_delete_files` defaults to `no`), so pages can be shown and viewed later
