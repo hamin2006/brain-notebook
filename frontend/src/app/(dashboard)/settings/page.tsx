@@ -2,6 +2,7 @@
 
 import { AppShell } from '@/components/layout/AppShell'
 import { SettingsForm } from './components/SettingsForm'
+import { AgentSettingsCard } from './components/AgentSettingsCard'
 import { useSettings } from '@/lib/hooks/use-settings'
 import { Button } from '@/components/ui/button'
 import { RefreshCw } from 'lucide-react'
@@ -23,7 +24,10 @@ export default function SettingsPage() {
               </Button>
             </div>
 
-            <SettingsForm />
+            <div className="space-y-6">
+              <SettingsForm />
+              <AgentSettingsCard />
+            </div>
           </div>
         </div>
       </div>

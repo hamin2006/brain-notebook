@@ -290,3 +290,23 @@ export interface RecentlyViewedResponse {
   title: string
   last_viewed_at: string
 }
+
+/** Switches for the research agent's extensions (empty model = off). */
+export interface AgentSettings {
+  rerank_model: string
+  page_embedding_model: string
+  knowledge_graph: boolean
+  memory: boolean
+}
+
+export interface AgentMemory {
+  id: string
+  content: string
+  notebook_id: string | null
+  created: string
+}
+
+export interface RebuildAgentDataResponse {
+  submitted: number
+  command_ids: string[]
+}

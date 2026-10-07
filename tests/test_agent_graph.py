@@ -2,6 +2,7 @@
 and the research model / answer writer split."""
 
 import json
+from types import SimpleNamespace
 from typing import Any, List, Optional
 from unittest.mock import AsyncMock, patch
 
@@ -78,6 +79,8 @@ async def _run(
     notebook=None,
     history=None,
     attachments=None,
+    settings=None,
+    memories=None,
 ):
     """Run the graph with `model` as the research ("tools") model and `writer`
     as the answer ("chat") model."""
@@ -100,6 +103,14 @@ async def _run(
             "open_notebook.agent.graph.load_scope", new=AsyncMock(return_value=scope)
         ),
         patch("open_notebook.agent.graph.build_tools", return_value=tools),
+        patch(
+            "open_notebook.agent.graph._agent_settings",
+            new=AsyncMock(return_value=settings or SimpleNamespace(memory=False)),
+        ),
+        patch(
+            "open_notebook.agent.memory.recall",
+            new=AsyncMock(return_value=memories or []),
+        ),
         patch(
             "open_notebook.agent.graph._notebook_info",
             new=AsyncMock(return_value=notebook or {"name": "AI 360"}),
@@ -507,3 +518,54 @@ async def test_attached_images_reach_the_models_but_not_the_checkpoint():
     assert any(isinstance(m.content, list) for m in writer.calls[0])
     # Stored history keeps the plain question.
     assert final["messages"][0].content == "What does Adam combine?"
+
+
+@pytest.mark.asyncio
+async def test_memories_are_shown_and_memory_tools_offered():
+    model = ScriptedModel([{"text": "- findings"}])
+    writer = _writer()
+    memories = [
+        {
+            "id": "memory:a",
+            "content": "Final exam is on Dec 10",
+            "notebook": "notebook:x",
+        },
+        {"id": "memory:b", "content": "Prefers short answers", "notebook": None},
+    ]
+    seen_tools = []
+    original = ScriptedModel.bind_tools
+
+    def capture(self, tools, tool_choice=None):
+        seen_tools.extend(t.name for t in tools)
+        return original(self, tools, tool_choice)
+
+    with patch.object(ScriptedModel, "bind_tools", capture):
+        await _run(
+            model,
+            [],
+            writer=writer,
+            settings=SimpleNamespace(memory=True),
+            memories=memories,
+        )
+    system = writer.calls[0][0].content
+    assert "# What you remember about the user" in system
+    assert "- [memory:a] Final exam is on Dec 10\n" in system
+    assert "- [memory:b] Prefers short answers (everywhere)" in system
+    assert {"remember", "forget"} <= set(seen_tools)
+
+
+@pytest.mark.asyncio
+async def test_memory_off_hides_memories_and_tools():
+    model = ScriptedModel([{"text": "- findings"}])
+    writer = _writer()
+    seen_tools = []
+    original = ScriptedModel.bind_tools
+
+    def capture(self, tools, tool_choice=None):
+        seen_tools.extend(t.name for t in tools)
+        return original(self, tools, tool_choice)
+
+    with patch.object(ScriptedModel, "bind_tools", capture):
+        await _run(model, [], writer=writer)
+    assert "remember about the user" not in writer.calls[0][0].content
+    assert "remember" not in seen_tools

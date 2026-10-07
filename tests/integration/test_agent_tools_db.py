@@ -331,3 +331,53 @@ async def test_notebook_grounding_is_read_by_the_agent(corpus):
         {"nb": ensure_record_id(corpus["notebook"])},
     )
     assert (await _notebook_info(corpus["notebook"]))["grounding"] == "general"
+
+
+@pytest.mark.asyncio
+async def test_memory_save_recall_forget(corpus):
+    from open_notebook.agent import memory
+    from open_notebook.agent.scope import AgentScope
+
+    with patch(
+        "open_notebook.utils.embedding.generate_embedding",
+        new=AsyncMock(return_value=[0.1, 0.2, 0.3]),
+    ):
+        scope = AgentScope(sources={}, notes={}, notebook_id=corpus["notebook"])
+        remember, forget = memory.memory_tools(scope)
+        local = await remember.ainvoke({"content": "Final exam is on Dec 10"})
+        everywhere = await remember.ainvoke(
+            {"content": "Prefers short answers", "everywhere": True}
+        )
+        assert "(in this notebook)" in local and "(everywhere)" in everywhere
+
+        in_notebook = await memory.recall(corpus["notebook"], "when is the exam?")
+        assert [m["content"] for m in in_notebook] == [
+            "Final exam is on Dec 10",
+            "Prefers short answers",
+        ]
+        elsewhere = await memory.recall(None, "anything")
+        assert [m["content"] for m in elsewhere] == ["Prefers short answers"]
+
+        memory_id = local.split()[2]
+        assert (await forget.ainvoke({"memory_id": memory_id})).startswith("Forgot")
+        assert "Error" in await forget.ainvoke({"memory_id": memory_id})
+        remaining = await memory.recall(corpus["notebook"], "x")
+        assert [m["content"] for m in remaining] == ["Prefers short answers"]
+
+
+@pytest.mark.asyncio
+async def test_agent_settings_round_trip(corpus):
+    from open_notebook.domain.agent_settings import AgentSettings
+
+    AgentSettings._instances.pop(AgentSettings.record_id, None)
+    settings = await AgentSettings.load()
+    assert settings.rerank_model == "voyageai/rerank-3-lite"  # nothing stored yet
+    settings.rerank_model = ""
+    settings.memory = False
+    await settings.update()
+
+    AgentSettings._instances.pop(AgentSettings.record_id, None)
+    fresh = await AgentSettings.load()
+    assert fresh.rerank_model == "" and fresh.memory is False
+    assert fresh.page_embedding_model == "google/gemini-embedding-2"
+    AgentSettings._instances.pop(AgentSettings.record_id, None)

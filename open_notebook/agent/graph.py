@@ -15,6 +15,7 @@ streaming chat endpoint.
 import asyncio
 import json
 from datetime import date
+from types import SimpleNamespace
 from typing import Annotated, Any, Awaitable, Callable, Dict, List, Optional, Tuple
 
 from ai_prompter import Prompter
@@ -36,6 +37,7 @@ from loguru import logger
 from pydantic import BaseModel, Field
 from typing_extensions import TypedDict
 
+from open_notebook.agent import memory as agent_memory
 from open_notebook.agent.addresses import AddressError, parse_address
 from open_notebook.agent.scope import AgentScope, ToolError, load_scope
 from open_notebook.agent.tools import AddressList, build_tools
@@ -514,6 +516,11 @@ async def agent_node(state: AgentState, config: RunnableConfig) -> dict:
         if cut > summarized:
             summary = await compact_history(model, summary, history[summarized:cut])
             summarized = cut
+        question = extract_text_content(state["messages"][-1].content)
+        settings = await _agent_settings()
+        memories = (
+            await agent_memory.recall(notebook_id, question) if settings.memory else []
+        )
         strict = info.get("grounding") != "general"
         prompt_data: Dict[str, Any] = {
             "notebook_name": info.get("name"),
@@ -524,6 +531,8 @@ async def agent_node(state: AgentState, config: RunnableConfig) -> dict:
             "max_steps": max_steps,
             "strict": strict,
             "conversation_summary": summary,
+            "memory_enabled": bool(settings.memory),
+            "memories": agent_memory.format_memories(memories),
         }
         prompter = Prompter(prompt_template="agent/system")
         system = prompter.render(data={**prompt_data, "researcher": True})
@@ -538,12 +547,13 @@ async def agent_node(state: AgentState, config: RunnableConfig) -> dict:
         )
 
         tool_list = tool_list + [make_delegate_tool(model, scope, writer)]
+        if settings.memory:
+            tool_list += agent_memory.memory_tools(scope)
         working: List[BaseMessage] = [SystemMessage(content=system)] + list(
             state["messages"][-HISTORY_MESSAGES:]
         )
         if scope.attachments:
             working[-1] = _with_attachments(working[-1], scope.attachments)
-        question = extract_text_content(state["messages"][-1].content)
         reviewer = (
             (lambda draft: review_answer(model, question, draft))
             if REVIEW_ROUNDS.get(effort)
@@ -581,6 +591,19 @@ async def agent_node(state: AgentState, config: RunnableConfig) -> dict:
     except Exception as e:
         error_class, user_message = classify_error(e)
         raise error_class(user_message) from e
+
+
+async def _agent_settings():
+    """Agent settings, or the defaults when they can't be read."""
+    from open_notebook.domain.agent_settings import AgentSettings
+
+    try:
+        return await AgentSettings.load()
+    except Exception as e:
+        logger.warning(f"Could not read agent settings, using defaults: {e}")
+        return SimpleNamespace(
+            **{name: f.default for name, f in AgentSettings.model_fields.items()}
+        )
 
 
 def build_graph() -> StateGraph:
