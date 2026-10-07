@@ -220,6 +220,21 @@ rewrite (resolve follow-ups using history; skip on first turn)
 
 Of the 6 misses, 2 were grader bugs (LaTeX `\times` / `10^{-8}` not matched; note bodies missing from the notes list), 2 were empty writer replies, 1 an uncited calculation and 1 the note check. Results: `evals/agent/results/agent-20261006-234240` on the PC.
 
+## 7b. Phase 5 as built (2026-10-07)
+
+| Extension | How | Setting / cost |
+|---|---|---|
+| Grounding policy | `notebook.grounding` strict / general; sets researcher and writer rules | Per notebook, chat selector |
+| Conversation compaction | Messages leaving the 20-message window fold into a running summary (research model); full history stays in the checkpoint | Always on |
+| Rerank | Passage/section candidates (≥24) reordered by an OpenRouter rerank model | `voyageai/rerank-3-lite`, ~$0.00006/search |
+| Visual page search | `embed_pages` after analysis: one render per animation build, `source_page.image_embedding`; `search(level="page")` by description, `like=<page>` or `image=attachment:N` | `google/gemini-embedding-2`, ~$0.0001/page (whole course ≈ $0.08) |
+| Image questions | Notebook chat accepts up to 4 pasted/attached images, passed in the run config (never checkpointed) | — |
+| Concept graph | `extract_concepts` after analysis: per-section concepts + stated relations (research model, reasoning capped); names merged through `concept_alias` ("Full name (ABBR)"); `graph` tool | On by default, ~$0.01/lecture |
+| Memory | `memory` table (notebook or global); recalled into the prompt each turn; `remember` / `forget` tools | On by default |
+| MCP | `/mcp` (FastMCP, streamable HTTP, JSON) on the API, proxied by the frontend: `ask` + the primitives + `view` returning page images | `OPEN_NOTEBOOK_MCP_ALLOWED_HOSTS` |
+
+Findings: Qwen3.7 Flash ignores `reasoning.effort` and GLM-5.3 can't disable reasoning; `reasoning.max_tokens` works for both (`limit_reasoning`). Concept JSON carried LaTeX (invalid escapes); `parse_extraction` repairs it. Not done from the original Phase 5 list: local Qwen3-VL embeddings (OpenRouter's multimodal embeddings made them unnecessary).
+
 ## 8. Decisions
 
 | # | Decision | Made |
@@ -228,4 +243,5 @@ Of the 6 misses, 2 were grader bugs (LaTeX `\times` / `10^{-8}` not matched; not
 | 2 | **Personal fork.** Upstream conventions are kept where they protect quality (tests, CI, typed errors, ADRs), but provider-specific features are allowed (e.g. OpenRouter routing/fallbacks), and new UI strings may ship English-only in non-en-US locales (still required by the locale parity check). | 2026-10-06 |
 | 3 | **Classic chat is removed, with no fallback.** No mode pastes whole files into the prompt, including "pinned" sources. The sidebar selection only sets the agent's search scope; whole-document questions go through stored summaries (§3.4), never full-text loading. | 2026-10-06 |
 | 4 | **OpenRouter credits** topped up. A capped, project-specific key is still recommended. | 2026-10-06 |
+| 6 | **Phase 5 extensions run on OpenRouter**, each behind a setting (Settings → Research agent): rerank `voyageai/rerank-3-lite`, page embeddings `google/gemini-embedding-2`, concept graph and memory on; MCP served at `/mcp`. | 2026-10-07 |
 | 5 | **Two models per turn.** The research loop (tool calls, sub-agents, reviewer) re-sends a growing transcript every step, so it runs on the default *tools* model, `qwen/qwen3.7-flash` ($0.03/$0.13 per M, tool calling and vision). The chat model, `z-ai/glm-5.3-flash` ($0.15/$0.50), writes only the final answer, once, from the flattened evidence. | 2026-10-06 |
