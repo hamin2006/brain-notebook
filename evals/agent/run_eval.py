@@ -110,16 +110,25 @@ def named_pages(answer: str):
     return pages
 
 
+def normalize_math(text: str) -> str:
+    """LaTeX to plain text for fact matching: $32 \\times 32$ -> 32 × 32, 10^{-8} -> 10^-8."""
+    text = re.sub(r"\\(times|cdot)", "×", text)
+    return re.sub(r"[{}$]|\\[,;! ]", "", text)
+
+
 def grade(
     q: dict, answer: str, corpus: Corpus, notes_before: list, notes_after: list
 ) -> dict:
     checks = {}
+    plain = normalize_math(answer)
     cited_lec, cited_pages = corpus.cited(answer)
     mentioned = cited_lec | named_lectures(answer)
     for lec in q.get("lectures", []):
         checks[f"lecture {lec}"] = lec in mentioned
     for i, group in enumerate(q.get("facts", [])):
-        checks[f"fact {i + 1}"] = any(re.search(rx, answer, re.I) for rx in group)
+        checks[f"fact {i + 1}"] = any(
+            re.search(rx, text, re.I) for rx in group for text in (answer, plain)
+        )
     if q.get("not_found"):
         checks["says not found"] = bool(NOT_FOUND.search(answer))
     if q.get("expects_note"):
@@ -285,6 +294,12 @@ def main():
             if q.get("expects_note")
             else []
         )
+        # The list omits note bodies; fetch the new notes in full.
+        known = {n["id"] for n in notes_before}
+        notes_after = [
+            local.get(f"/notes/{n['id']}").json() if n["id"] not in known else n
+            for n in notes_after
+        ]
         result = grade(q, answer, corpus, notes_before, notes_after)
         row = {
             "id": q["id"],
