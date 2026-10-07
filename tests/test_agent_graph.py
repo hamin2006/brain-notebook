@@ -77,6 +77,7 @@ async def _run(
     writer=None,
     notebook=None,
     history=None,
+    attachments=None,
 ):
     """Run the graph with `model` as the research ("tools") model and `writer`
     as the answer ("chat") model."""
@@ -107,7 +108,7 @@ async def _run(
         async for mode, chunk in graph.astream(  # type: ignore[call-overload]
             {"messages": (history or []) + [HumanMessage(content="What does Adam combine?")], "notebook_id": "notebook:x",
              "source_ids": ["source:l4"], "note_ids": [], "effort": effort},
-            {"configurable": {"thread_id": "t1"}},
+            {"configurable": {"thread_id": "t1", "attachments": attachments or []}},
             stream_mode=["custom", "values"],
         ):  # fmt: skip
             if mode == "custom":
@@ -485,3 +486,24 @@ async def test_failed_compaction_keeps_the_previous_summary():
             raise RuntimeError("provider down")
 
     assert await compact_history(Broken(), "old", _turns(1)) == "old"
+
+
+@pytest.mark.asyncio
+async def test_attached_images_reach_the_models_but_not_the_checkpoint():
+    model = ScriptedModel([{"text": "- looks like p48"}])
+    writer = _writer()
+    scope = AgentScope(sources={}, notes={})
+    _, final = await _run(
+        model,
+        [],
+        scope=scope,
+        writer=writer,
+        attachments=["data:image/png;base64,AAAA"],
+    )
+    question = model.calls[0][-1]
+    assert question.content[1]["image_url"]["url"] == "data:image/png;base64,AAAA"
+    assert "attachment:1" in question.content[0]["text"]
+    assert scope.attachments == ["data:image/png;base64,AAAA"]
+    assert any(isinstance(m.content, list) for m in writer.calls[0])
+    # Stored history keeps the plain question.
+    assert final["messages"][0].content == "What does Adam combine?"

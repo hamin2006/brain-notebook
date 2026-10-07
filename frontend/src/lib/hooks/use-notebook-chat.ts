@@ -181,7 +181,7 @@ export function useNotebookChat({ notebookId, sources, notes, contextSelections 
   }), [sources, notes, contextSelections])
 
   // Send a message: the agent's steps and answer stream in as server-sent events
-  const sendMessage = useCallback(async (message: string, modelOverride?: string) => {
+  const sendMessage = useCallback(async (message: string, modelOverride?: string, images?: string[]) => {
     let sessionId = currentSessionId
 
     // Auto-create session if none exists
@@ -215,7 +215,8 @@ export function useNotebookChat({ notebookId, sources, notes, contextSelections 
       id: `temp-${Date.now()}`,
       type: 'human',
       content: message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      ...(images?.length ? { images } : {}),
     }
     setMessages(prev => [...prev, userMessage])
     setIsSending(true)
@@ -228,6 +229,7 @@ export function useNotebookChat({ notebookId, sources, notes, contextSelections 
         model_override: modelOverride ?? (currentSession?.model_override ?? undefined),
         effort,
         ...scope(),
+        ...(images?.length ? { images } : {}),
       })
       if (!body) {
         throw new Error('No response body')

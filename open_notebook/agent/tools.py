@@ -2,7 +2,8 @@
 
     list     the catalog of documents (filter, sort)         ~ ls
     grep     exhaustive exact/regex matches with pages        ~ grep
-    search   meaning-based search at passage, section or document level; like=<address>
+    search   meaning-based search at passage, section or document level, or visual
+             search over rendered pages (level=page); like=<address>
     outline  a document's sections with page ranges
     read     read an address (pages, section, chunk, summary, note), capped
     view     look at a page or image as a picture
@@ -214,13 +215,18 @@ async def tool_search(
     addresses: Optional[List[str]] = None,
     like: Optional[str] = None,
     limit: int = 8,
+    image: Optional[str] = None,
 ) -> str:
-    if not query.strip() and not like:
+    if image:
+        level = "page"  # an image can only be compared with page images
+    if not query.strip() and not like and not image:
         raise ToolError("Give a query, or like=<address> to find similar material.")
-    if level not in ("passage", "section", "document"):
-        raise ToolError("level must be passage, section or document.")
+    if level not in ("passage", "section", "document", "page"):
+        raise ToolError("level must be passage, section, document or page.")
     limit = max(1, min(limit, 15))
     only = [parse_address(a).record_id for a in addresses] if addresses else None
+    if level == "page":
+        return await _page_search(scope, query, like, limit, only, image)
 
     embed: Optional[List[float]] = None
     like_address: Optional[Address] = None
@@ -305,6 +311,67 @@ async def tool_search(
             lines.append(
                 f'- {h["id"]} (note "{h.get("title") or ""}"): {_snippet(h["content"])}'
             )
+    return "\n".join(lines)
+
+
+async def _page_search(
+    scope: AgentScope,
+    query: str,
+    like: Optional[str],
+    limit: int,
+    only: Optional[List[str]],
+    image: Optional[str] = None,
+) -> str:
+    """Visual search: pages whose rendered image matches a description, looks
+    like another page, or looks like an image the user attached."""
+    model = await retrieval.page_embedding_model()
+    if not model:
+        raise ToolError(
+            "Visual page search is turned off (no page embedding model). Use level=passage."
+        )
+    like_address = parse_address(like) if like else None
+    if like_address:
+        embed = await retrieval.page_image_embedding(like_address)
+        if embed is None:
+            raise ToolError(
+                f"{like} has no page image embedding; give a page address like source:abc#p12, "
+                "or search with a description."
+            )
+    else:
+        from open_notebook.ai.openrouter import (
+            embed_multimodal,
+            image_input,
+            text_input,
+        )
+
+        item = image_input(scope.attachment(image)) if image else text_input(query)
+        try:
+            [embed] = await embed_multimodal(model, [item])
+        except Exception as e:
+            raise ToolError(f"Visual search failed ({e}); use level=passage.")
+    hits = await retrieval.page_hits(scope, embed, limit + 1, only=only)
+    if like_address:
+        hits = [
+            h
+            for h in hits
+            if not (
+                str(h["source"]) == like_address.record_id
+                and h["page_start"] <= (like_address.page_start or 0) <= h["page_end"]
+            )
+        ]
+    hits = hits[:limit]
+    if not hits:
+        return "No page images are indexed in scope yet; use level=passage."
+    target = like or image
+    lines = [f"Pages{' like ' + target if target else ''} (by appearance, best first):"]
+    for h in hits:
+        sid = str(h["source"])
+        label = scope.sources[sid].label if sid in scope.sources else sid
+        what = h.get("caption") or h.get("text") or ""
+        lines.append(
+            f'- {pages(sid, h["page_start"], h["page_end"])} "{label}": {_snippet(what, 160)}'
+        )
+    lines.append("View a page to see it.")
     return "\n".join(lines)
 
 
@@ -616,7 +683,10 @@ class GrepArgs(BaseModel):
 
 class SearchArgs(BaseModel):
     query: str = Field("", description="What to look for, in words")
-    level: str = Field("passage", description="passage, section or document")
+    level: str = Field(
+        "passage",
+        description="passage, section, document, or page (visual search over page images)",
+    )
     addresses: Optional[AddressList] = Field(
         None, description="Limit to these documents"
     )
@@ -624,6 +694,10 @@ class SearchArgs(BaseModel):
         None, description="Find material similar to this address instead of a query"
     )
     limit: int = Field(8, description="1-15 results")
+    image: Optional[str] = Field(
+        None,
+        description="attachment:N, an image the user attached: finds pages that look like it",
+    )
 
 
 class OutlineArgs(BaseModel):
@@ -672,7 +746,9 @@ TOOL_SPECS = [
         tool_search,
         SearchArgs,
         "Meaning-based search. level=passage for evidence, section or document for topics and related material; "
-        "like=<address> finds material similar to a page, section or document.",
+        "level=page searches page images by appearance (diagrams, charts, figures, slide layouts: describe what "
+        "it looks like). like=<address> finds material similar to a page, section or document "
+        "(with level=page: pages that look like that page).",
     ),
     (
         "outline",

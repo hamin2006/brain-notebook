@@ -13,6 +13,12 @@ vi.mock('@/components/sources/MessageActions', () => ({
   MessageActions: () => null,
 }))
 
+// jsdom has no canvas: attached images become a fixed data URL.
+vi.mock('./ImageAttachments', async importOriginal => ({
+  ...(await importOriginal<typeof import('./ImageAttachments')>()),
+  readImageFile: vi.fn(async () => 'data:image/jpeg;base64,IMG'),
+}))
+
 describe('ChatPanel composer', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -40,7 +46,7 @@ describe('ChatPanel composer', () => {
     fireEvent.click(sendButton)
 
     expect(onSendMessage).toHaveBeenCalledTimes(1)
-    expect(onSendMessage).toHaveBeenCalledWith('hello world', undefined)
+    expect(onSendMessage).toHaveBeenCalledWith('hello world', undefined, undefined)
     expect(textarea.value).toBe('')
   })
 
@@ -62,7 +68,7 @@ describe('ChatPanel composer', () => {
     fireEvent.change(textarea, { target: { value: 'via cmd' } })
     fireEvent.keyDown(textarea, { key: 'Enter', metaKey: true, ctrlKey: false })
 
-    expect(onSendMessage).toHaveBeenCalledWith('via cmd', undefined)
+    expect(onSendMessage).toHaveBeenCalledWith('via cmd', undefined, undefined)
     expect(textarea.value).toBe('')
     uaSpy.mockRestore()
   })
@@ -85,7 +91,7 @@ describe('ChatPanel composer', () => {
     fireEvent.change(textarea, { target: { value: 'via ctrl' } })
     fireEvent.keyDown(textarea, { key: 'Enter', ctrlKey: true, metaKey: false })
 
-    expect(onSendMessage).toHaveBeenCalledWith('via ctrl', undefined)
+    expect(onSendMessage).toHaveBeenCalledWith('via ctrl', undefined, undefined)
     expect(textarea.value).toBe('')
     uaSpy.mockRestore()
   })
@@ -106,5 +112,40 @@ describe('ChatPanel composer', () => {
     fireEvent.keyDown(textarea, { key: 'Enter', ctrlKey: true })
 
     expect(onSendMessage).not.toHaveBeenCalled()
+  })
+
+  it('sends pasted images with the message when images are allowed', async () => {
+    const onSendMessage = vi.fn()
+    render(
+      <ChatPanel
+        messages={[]}
+        isStreaming={false}
+        contextIndicators={null}
+        onSendMessage={onSendMessage}
+        allowImages
+      />
+    )
+    const textarea = getTextarea()
+    const file = new File(['x'], 'shot.png', { type: 'image/png' })
+    fireEvent.paste(textarea, { clipboardData: { files: [file] } })
+    expect(await screen.findByAltText('chat.attachedImage')).toBeTruthy()
+
+    fireEvent.change(textarea, { target: { value: 'which lecture has this?' } })
+    fireEvent.click(screen.getByLabelText('chat.attachImage').parentElement!.querySelectorAll('button')[1])
+
+    expect(onSendMessage).toHaveBeenCalledWith('which lecture has this?', undefined, [
+      'data:image/jpeg;base64,IMG',
+    ])
+    expect(screen.queryByAltText('chat.attachedImage')).toBeNull()
+  })
+
+  it('ignores pasted images when images are not allowed', () => {
+    render(
+      <ChatPanel messages={[]} isStreaming={false} contextIndicators={null} onSendMessage={vi.fn()} />
+    )
+    const file = new File(['x'], 'shot.png', { type: 'image/png' })
+    fireEvent.paste(getTextarea(), { clipboardData: { files: [file] } })
+    expect(screen.queryByLabelText('chat.attachImage')).toBeNull()
+    expect(screen.queryByAltText('chat.attachedImage')).toBeNull()
   })
 })

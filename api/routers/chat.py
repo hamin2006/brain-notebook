@@ -9,7 +9,7 @@ from fastapi.responses import StreamingResponse
 from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from api.routers._chat_shared import (
     ChatMessage,
@@ -67,7 +67,12 @@ async def _prepare_turn(request: "ExecuteChatRequest"):
     )
     source_ids, note_ids = _scope_from_request(request)
     # Explicit id so a failed turn can remove it from the checkpoint.
-    user_message = HumanMessage(content=request.message, id=str(uuid4()))
+    images = request.images or []
+    user_message = HumanMessage(
+        content=request.message,
+        id=str(uuid4()),
+        additional_kwargs={"attachments": len(images)} if images else {},
+    )
     state = {
         "messages": [user_message],
         "notebook_id": notebook_id,
@@ -77,7 +82,11 @@ async def _prepare_turn(request: "ExecuteChatRequest"):
         "effort": request.effort,
     }
     config = RunnableConfig(
-        configurable={"thread_id": full_session_id, "model_id": model_override}
+        configurable={
+            "thread_id": full_session_id,
+            "model_id": model_override,
+            "attachments": images,
+        }
     )
     return full_session_id, session, user_message, state, config
 
@@ -118,6 +127,10 @@ class ChatSessionWithMessagesResponse(ChatSessionResponse):
     )
 
 
+MAX_ATTACHMENTS = 4
+MAX_ATTACHMENT_CHARS = 8_000_000  # base64 of a ~6 MB image
+
+
 class ExecuteChatRequest(BaseModel):
     session_id: str = Field(..., description="Chat session ID")
     message: str = Field(..., description="User message content")
@@ -137,6 +150,21 @@ class ExecuteChatRequest(BaseModel):
     note_ids: Optional[List[str]] = Field(
         None, description="Notes the agent may search; same defaults as source_ids"
     )
+    images: Optional[List[str]] = Field(
+        None,
+        max_length=MAX_ATTACHMENTS,
+        description="Images attached to this message, as data:image/... URLs. Used for this turn only, not stored",
+    )
+
+    @field_validator("images")
+    @classmethod
+    def _images_are_data_urls(cls, value: Optional[List[str]]):
+        for url in value or []:
+            if not url.startswith("data:image/"):
+                raise ValueError("images must be data:image/... URLs")
+            if len(url) > MAX_ATTACHMENT_CHARS:
+                raise ValueError("an attached image is too large (max ~6 MB)")
+        return value
 
 
 class ExecuteChatResponse(BaseModel):

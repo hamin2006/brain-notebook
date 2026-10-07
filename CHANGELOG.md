@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Visual page search.** After analysis, every page of a PDF source is rendered and embedded with a multimodal embedding model (`google/gemini-embedding-2` on OpenRouter by default, about $0.0001 per page; an animation build is embedded once). The agent can search pages by appearance (`search(level="page")` with a description, or `like=<page>` for pages that look like another)
+- **Ask about an image.** Notebook chat accepts pasted or attached images (up to 4 per message). The agent sees them and can find notebook pages that look like one (`search(image="attachment:1")`). Images are used for that turn only and are not stored in the chat history
 - **Search results are reranked.** The agent's passage and section searches gather a wider candidate set and reorder it with a rerank model (`voyageai/rerank-3-lite` on OpenRouter by default, about $0.00006 per search); if reranking is off or fails, the fused order is used
 - **Long chats keep their context.** Once a conversation outgrows the 20 messages the agent sees, the older turns are folded into a running summary (by the research model) that the agent reads with the recent messages. The full history stays visible in the chat
 - **Grounding setting per notebook.** Notebook chat has an "Answers from" choice: *Notebook only* (the default; says so when the notebook lacks the answer) or *Notebook + general knowledge* (may add general knowledge, marked as not from the notebook). Stored on the notebook (`grounding`, migration 28)

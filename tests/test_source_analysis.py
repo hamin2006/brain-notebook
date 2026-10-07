@@ -59,6 +59,13 @@ def _source():
     return source
 
 
+@pytest.fixture(autouse=True)
+def submitted():
+    """Jobs analyze_source submits (page embeddings), instead of a real queue."""
+    with patch("commands.analyze_commands.submit_command") as submit:
+        yield submit
+
+
 PAGE_ROWS = [
     {"page": 1, "text": "AI 360 Lecture 4: Losses, Optimizers", "caption": None},
     {"page": 2, "text": "Regularization", "caption": None},
@@ -67,7 +74,7 @@ PAGE_ROWS = [
 
 
 @pytest.mark.asyncio
-async def test_analyze_writes_sections_metadata_and_summary():
+async def test_analyze_writes_sections_metadata_and_summary(submitted):
     outline = {
         "metadata": {
             "doc_type": "lecture",
@@ -115,6 +122,9 @@ async def test_analyze_writes_sections_metadata_and_summary():
         result = await analyze_source_command(AnalyzeSourceInput(source_id="source:l4"))
 
     assert result.sections == 2
+    submitted.assert_called_once_with(
+        "open_notebook", "embed_pages", {"source_id": "source:l4"}
+    )
     assert [
         (r["title"], r["page_start"], r["page_end"], r["summary"]) for r in inserted
     ] == [

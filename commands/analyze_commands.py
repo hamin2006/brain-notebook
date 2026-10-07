@@ -20,7 +20,7 @@ from typing import Any, Dict, List, Optional
 from ai_prompter import Prompter
 from langchain_core.output_parsers.pydantic import PydanticOutputParser
 from loguru import logger
-from surreal_commands import CommandInput, CommandOutput, command
+from surreal_commands import CommandInput, CommandOutput, command, submit_command
 
 from open_notebook.ai.provision import limit_reasoning, provision_langchain_model
 from open_notebook.database.repository import ensure_record_id, repo_insert, repo_query
@@ -252,6 +252,8 @@ async def analyze_source_command(input_data: AnalyzeSourceInput) -> AnalyzeSourc
     logger.info(
         f"Analyzed {input_data.source_id}: {len(sections)} sections, metadata {metadata.model_dump()}"
     )
+    # Visual search over rendered pages (skipped when the setting is off).
+    submit_command("open_notebook", "embed_pages", {"source_id": input_data.source_id})
     return AnalyzeSourceOutput(
         success=True,
         source_id=input_data.source_id,

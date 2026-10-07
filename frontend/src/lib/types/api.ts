@@ -164,6 +164,8 @@ export interface SourceChatMessage {
   timestamp?: string
   // Agent tool steps behind an answer (notebook chat)
   trace?: AgentStep[] | null
+  // Images attached to a question (this browser session only; not stored)
+  images?: string[]
 }
 
 /** One tool call the research agent made while answering. */
@@ -230,6 +232,7 @@ export interface NotebookChatMessage {
   content: string
   timestamp?: string
   trace?: AgentStep[] | null
+  images?: string[]
 }
 
 export interface NotebookChatSessionWithMessages extends NotebookChatSession {
@@ -260,6 +263,8 @@ export interface SendNotebookChatMessageRequest {
   // What the agent may search (omit for the whole notebook)
   source_ids?: string[]
   note_ids?: string[]
+  // Images attached to this message, as data URLs (used for this turn only)
+  images?: string[]
 }
 
 export interface BuildContextRequest {

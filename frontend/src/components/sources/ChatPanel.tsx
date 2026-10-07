@@ -7,7 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
-import { Bot, User, Send, Loader2, FileText, Lightbulb, StickyNote, Clock } from 'lucide-react'
+import { Bot, User, Send, Loader2, FileText, Lightbulb, StickyNote, Clock, Paperclip } from 'lucide-react'
 import { MarkdownRenderer } from '@/components/ui/markdown-renderer'
 import {
   SourceChatMessage,
@@ -19,6 +19,7 @@ import {
 import type { AgentActivity } from '@/lib/hooks/use-notebook-chat'
 import { AgentActivityView, EffortSelect, GroundingSelect, ResearchSteps, localizedLocator } from './AgentActivity'
 import { PagePreviewDialog, PageTarget, parsePageLocator } from './PagePreviewDialog'
+import { AttachmentStrip, MAX_ATTACHMENTS, imageFiles, readImageFile } from './ImageAttachments'
 import { ModelSelector } from './ModelSelector'
 import { ContextIndicator } from '@/components/common/ContextIndicator'
 import { SessionManager } from '@/components/sources/SessionManager'
@@ -40,7 +41,7 @@ interface ChatPanelProps {
   messages: SourceChatMessage[]
   isStreaming: boolean
   contextIndicators: SourceChatContextIndicator | null
-  onSendMessage: (message: string, modelOverride?: string) => void
+  onSendMessage: (message: string, modelOverride?: string, images?: string[]) => void
   modelOverride?: string
   onModelChange?: (model?: string) => void
   // Session management props
@@ -65,6 +66,8 @@ interface ChatPanelProps {
   // Notebook setting: answer only from the notebook, or add general knowledge
   grounding?: Grounding
   onGroundingChange?: (grounding: Grounding) => void
+  // Let the user attach images to a message (notebook chat)
+  allowImages?: boolean
 }
 
 export function ChatPanel({
@@ -89,7 +92,8 @@ export function ChatPanel({
   effort,
   onEffortChange,
   grounding,
-  onGroundingChange
+  onGroundingChange,
+  allowImages = false
 }: ChatPanelProps) {
   const { t } = useTranslation()
   const [sessionManagerOpen, setSessionManagerOpen] = useState(false)
@@ -255,6 +259,7 @@ export function ChatPanel({
           onEffortChange={onEffortChange}
           grounding={grounding}
           onGroundingChange={onGroundingChange}
+          allowImages={allowImages}
         />
       </CardContent>
     </Card>
@@ -273,7 +278,7 @@ export function ChatPanel({
 // Composer owns the input state so keystrokes (including IME composition) only
 // re-render this small component instead of the whole message history.
 interface ChatComposerProps {
-  onSendMessage: (message: string, modelOverride?: string) => void
+  onSendMessage: (message: string, modelOverride?: string, images?: string[]) => void
   isStreaming: boolean
   modelOverride?: string
   onModelChange?: (model?: string) => void
@@ -282,6 +287,8 @@ interface ChatComposerProps {
   // Notebook setting: answer only from the notebook, or add general knowledge
   grounding?: Grounding
   onGroundingChange?: (grounding: Grounding) => void
+  // Let the user attach images to a message (notebook chat)
+  allowImages?: boolean
 }
 
 function ChatComposer({
@@ -292,16 +299,39 @@ function ChatComposer({
   effort,
   onEffortChange,
   grounding,
-  onGroundingChange
+  onGroundingChange,
+  allowImages = false
 }: ChatComposerProps) {
   const { t } = useTranslation()
   const chatInputId = useId()
   const [input, setInput] = useState('')
+  const [images, setImages] = useState<string[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const addImages = async (files: File[]) => {
+    const room = MAX_ATTACHMENTS - images.length
+    if (!allowImages || room <= 0 || !files.length) return
+    try {
+      const urls = await Promise.all(files.slice(0, room).map(file => readImageFile(file)))
+      setImages(prev => [...prev, ...urls].slice(0, MAX_ATTACHMENTS))
+    } catch {
+      toast.error(t('common.error'))
+    }
+  }
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const files = imageFiles(e.clipboardData?.files)
+    if (allowImages && files.length) {
+      e.preventDefault()
+      void addImages(files)
+    }
+  }
 
   const handleSend = () => {
     if (input.trim() && !isStreaming) {
-      onSendMessage(input.trim(), modelOverride)
+      onSendMessage(input.trim(), modelOverride, images.length ? images : undefined)
       setInput('')
+      setImages([])
     }
   }
 
@@ -346,7 +376,35 @@ function ChatComposer({
         </div>
       )}
 
+      <AttachmentStrip images={images} onRemove={index => setImages(prev => prev.filter((_, i) => i !== index))} />
       <div className="flex gap-2 items-end min-w-0">
+        {allowImages && (
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={e => {
+                void addImages(imageFiles(e.target.files))
+                e.target.value = ''
+              }}
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={t('chat.attachImage')}
+              title={t('chat.attachImage')}
+              disabled={isStreaming || images.length >= MAX_ATTACHMENTS}
+              onClick={() => fileInputRef.current?.click()}
+              className="h-[40px] w-[40px] flex-shrink-0"
+            >
+              <Paperclip className="h-4 w-4" />
+            </Button>
+          </>
+        )}
         <Textarea
           id={chatInputId}
           name="chat-message"
@@ -354,6 +412,7 @@ function ChatComposer({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           placeholder={`${t('chat.sendPlaceholder')} (${t('chat.pressToSend', { key: keyHint })})`}
           disabled={isStreaming}
           className="flex-1 min-h-[40px] max-h-[100px] resize-none py-2 px-3 min-w-0"
@@ -416,7 +475,10 @@ const ChatMessage = memo(function ChatMessage({
               onReferenceClick={onReferenceClick}
             />
           ) : (
-            <p className="text-sm break-all">{message.content}</p>
+            <div className="space-y-2">
+              {message.images?.length ? <AttachmentStrip images={message.images} /> : null}
+              <p className="text-sm break-all">{message.content}</p>
+            </div>
           )}
         </div>
         {message.type === 'ai' && message.trace && message.trace.length > 0 && (

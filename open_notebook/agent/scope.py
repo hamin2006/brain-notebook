@@ -5,6 +5,7 @@ user's selection. Also carries images queued by `view` for the next model call.
 """
 
 import asyncio
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -77,6 +78,23 @@ class AgentScope:
     notes: Dict[str, ScopedNote]
     pending_images: List[Dict[str, str]] = field(default_factory=list)
     notebook_id: Optional[str] = None  # where `note` saves
+    # Images the user attached to this turn (data URLs), addressed attachment:1..N.
+    attachments: List[str] = field(default_factory=list)
+
+    def attachment(self, ref: str) -> str:
+        match = re.fullmatch(r"attachment:(\d+)", ref.strip())
+        index = int(match.group(1)) if match else 0
+        if not 1 <= index <= len(self.attachments):
+            available = (
+                ", ".join(
+                    f"attachment:{i}" for i in range(1, len(self.attachments) + 1)
+                )
+                or "none"
+            )
+            raise ToolError(
+                f"No image {ref!r} in this message (attached: {available})."
+            )
+        return self.attachments[index - 1]
 
     def source(self, record_id: str) -> ScopedSource:
         found = self.sources.get(record_id)

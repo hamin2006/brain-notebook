@@ -7,6 +7,7 @@
   with titles, metadata and topics
 - `like`: the stored embedding of an address, for "more like this"
 - rerank: optionally reorders fused candidates with a rerank model
+- pages: visual search over rendered-page embeddings (multimodal model)
 
 Vector similarity is brute force over the scope, which is fine at notebook
 scale (thousands of chunks).
@@ -86,6 +87,64 @@ async def rerank(
         logger.warning(f"Rerank failed, keeping fused order: {e}")
         return hits[:limit]
     return [hits[i] for i, _ in ranked if 0 <= i < len(hits)][:limit]
+
+
+async def page_embedding_model() -> Optional[str]:
+    from open_notebook.domain.agent_settings import AgentSettings
+
+    try:
+        settings = await AgentSettings.load()
+    except Exception as e:
+        logger.warning(f"Could not read agent settings: {e}")
+        return None
+    return (settings.page_embedding_model or "").strip() or None
+
+
+async def page_hits(
+    scope: AgentScope,
+    embed: List[float],
+    k: int,
+    only: Optional[List[str]] = None,
+) -> List[Dict[str, Any]]:
+    """Pages whose rendered image is closest to `embed`, best first. Pages of one
+    animation build share a vector, so they come back as one hit (page_start..page_end)."""
+    sources, _ = _ids(scope, only)
+    if not sources:
+        return []
+    rows = await per_source(
+        """
+        SELECT source, page, text, caption,
+            vector::similarity::cosine(image_embedding, $embed) AS score
+        FROM source_page WHERE source = $s AND image_embedding != NONE
+        ORDER BY score DESC LIMIT $k
+        """,
+        sources,
+        embed=embed,
+        k=k * 3,
+    )
+    groups: Dict[tuple, Dict[str, Any]] = {}
+    for row in rows:
+        key = (str(row["source"]), round(float(row["score"]), 6))
+        hit = groups.get(key)
+        if hit is None:
+            groups[key] = {**row, "page_start": row["page"], "page_end": row["page"]}
+        else:  # same vector: another page of the same build; keep the fullest text
+            hit["page_start"] = min(hit["page_start"], row["page"])
+            hit["page_end"] = max(hit["page_end"], row["page"])
+            if len(row.get("text") or "") > len(hit.get("text") or ""):
+                hit["text"], hit["caption"] = row.get("text"), row.get("caption")
+    return sorted(groups.values(), key=lambda h: -float(h["score"]))[:k]
+
+
+async def page_image_embedding(address: Address) -> Optional[List[float]]:
+    """The image embedding of an address's (first) page, for like= page searches."""
+    if address.table != "source" or address.page_start is None:
+        return None
+    rows = await repo_query(
+        "SELECT VALUE image_embedding FROM source_page WHERE source = $s AND page = $p",
+        {"s": ensure_record_id(address.record_id), "p": address.page_start},
+    )
+    return _first_vector(rows)
 
 
 def keyword_rank(

@@ -158,6 +158,21 @@ async def _run_tools(
     return list(await asyncio.gather(*(run(c) for c in calls)))
 
 
+def _with_attachments(message: BaseMessage, images: List[str]) -> HumanMessage:
+    """The user's question with the images they attached, labelled so tools can
+    refer to them."""
+    labels = ", ".join(f"attachment:{i}" for i in range(1, len(images) + 1))
+    content: List[Any] = [
+        {
+            "type": "text",
+            "text": extract_text_content(message.content)
+            + f"\n\n(Attached images, in order: {labels}. search(image=...) finds pages that look like one.)",
+        }
+    ]
+    content += [{"type": "image_url", "image_url": {"url": url}} for url in images]
+    return HumanMessage(content=content, id=message.id)
+
+
 def _image_message(scope: AgentScope) -> Optional[HumanMessage]:
     if not scope.pending_images:
         return None
@@ -479,6 +494,11 @@ async def agent_node(state: AgentState, config: RunnableConfig) -> dict:
             source_ids = all_sources if source_ids is None else source_ids
             note_ids = all_notes if note_ids is None else note_ids
         scope = await load_scope(source_ids or [], note_ids or [], notebook_id)
+        # Images attached to this message travel in the config, not the state,
+        # so they are never checkpointed.
+        scope.attachments = list(
+            config.get("configurable", {}).get("attachments") or []
+        )
         tool_list = build_tools(scope)
 
         effort = state.get("effort") or DEFAULT_EFFORT
@@ -521,6 +541,8 @@ async def agent_node(state: AgentState, config: RunnableConfig) -> dict:
         working: List[BaseMessage] = [SystemMessage(content=system)] + list(
             state["messages"][-HISTORY_MESSAGES:]
         )
+        if scope.attachments:
+            working[-1] = _with_attachments(working[-1], scope.attachments)
         question = extract_text_content(state["messages"][-1].content)
         reviewer = (
             (lambda draft: review_answer(model, question, draft))
