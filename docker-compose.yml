@@ -24,7 +24,10 @@ services:
     pull_policy: always
 
   open_notebook:
-    image: lfnovo/open_notebook:v1-latest
+    # Built from this repository (Brain Notebook). The upstream
+    # lfnovo/open_notebook images do not contain the research agent.
+    build: .
+    image: brain-notebook:local
     ports:
       - "8502:8502"  # Web UI
       - "5055:5055"  # REST API
@@ -54,9 +57,30 @@ services:
       # (default 5). Set to 1 for sequential processing on single-GPU / local
       # LLM setups to avoid overloading the model with parallel requests.
       # - OPEN_NOTEBOOK_WORKER_MAX_TASKS=1
+
+      # OPTIONAL: web search for the research agent. Start SearXNG with
+      # `docker compose --profile web up -d` (needs SEARXNG_SECRET in .env),
+      # then turn on Settings > Research agent > Web search.
+      - SEARXNG_URL=http://searxng:8080
+
+      # OPTIONAL: MCP clients on other machines (the /mcp endpoint). List the
+      # host:port they use to reach this server, e.g. 192.168.1.20:*
+      # - OPEN_NOTEBOOK_MCP_ALLOWED_HOSTS=192.168.1.20:*
     volumes:
       - ./notebook_data:/app/data
     depends_on:
       - surrealdb
     restart: always
-    pull_policy: always
+
+  # Self-hosted metasearch for the agent's web_search tool (optional; profile "web").
+  searxng:
+    image: searxng/searxng:latest
+    profiles: ["web"]
+    volumes:
+      - ./scripts/brain/searxng/settings.yml:/etc/searxng/settings.yml
+    environment:
+      - SEARXNG_BASE_URL=http://searxng:8080/
+      # Internal-only (no published port); set SEARXNG_SECRET in .env to replace the default.
+      - SEARXNG_SECRET=${SEARXNG_SECRET:-change-me-searxng-secret}
+    mem_limit: 512m
+    restart: always

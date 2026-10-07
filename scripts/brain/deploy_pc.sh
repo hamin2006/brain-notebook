@@ -1,28 +1,28 @@
 #!/usr/bin/env bash
-# Deploy the agentic-rag branch on the PC: pull, sync dependencies, restart.
-# The API applies database migrations on startup. Run on the PC:
-#   bash ~/workplace/open-notebook/scripts/brain/deploy_pc.sh
+# Update an installed Brain Notebook (systemd services from install_services.sh):
+# pull, sync dependencies, rebuild the frontend when it changed, restart.
+# The API applies database migrations on startup.
+#   scripts/brain/deploy_pc.sh            # current branch
 set -euo pipefail
-
-cd "$HOME/workplace/open-notebook"
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$REPO"
 export GIT_PAGER=cat PAGER=cat
+UV="$(command -v uv || echo "$HOME/.local/bin/uv")"
 
+branch=$(git rev-parse --abbrev-ref HEAD)
 before=$(git rev-parse --short HEAD)
-git fetch -q origin agentic-rag
-git merge --ff-only -q origin/agentic-rag
+git fetch -q origin "$branch"
+git merge --ff-only -q "origin/$branch"
 after=$(git rev-parse --short HEAD)
-echo "code: $before -> $after"
+echo "code ($branch): $before -> $after"
 
-"$HOME/.local/bin/uv" sync --all-extras -q
-if ! git diff --quiet "$before" "$after" -- frontend/package.json frontend/package-lock.json; then
-  (cd frontend && npm install --no-audit --no-fund --loglevel=error)
+"$UV" sync --all-extras -q
+if [ ! -f frontend/.next/standalone/server.js ] || ! git diff --quiet "$before" "$after" -- frontend/; then
+  bash scripts/brain/build_frontend.sh >/dev/null
+  echo "frontend rebuilt"
 fi
 
-systemctl --user daemon-reload
-systemctl --user restart on-api on-worker
-systemctl --user enable -q --now on-frontend
-systemctl --user restart on-frontend
-
+systemctl --user restart brain-api brain-worker brain-frontend
 for _ in $(seq 1 60); do
   if curl -fs -o /dev/null http://127.0.0.1:5055/api/models; then
     echo "api up"
@@ -30,6 +30,6 @@ for _ in $(seq 1 60); do
   fi
   sleep 2
 done
-for unit in on-api on-worker on-frontend; do
+for unit in brain-api brain-worker brain-frontend; do
   echo "$unit: $(systemctl --user is-active "$unit")"
 done
