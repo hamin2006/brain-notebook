@@ -1,6 +1,7 @@
 """Concept graph extraction models and name normalization (agentic RAG plan, Phase 5)."""
 
 import hashlib
+import json
 import re
 from typing import List, Optional
 
@@ -44,3 +45,30 @@ def concept_key(name: str) -> str:
 def concept_id(key: str) -> str:
     """The concept record id for a normalized key (stable across jobs)."""
     return "concept:c" + hashlib.sha1(key.encode()).hexdigest()[:20]
+
+
+_BACKSLASH = re.compile(r"\\(\\|[A-Za-z]{2,}|.)", re.DOTALL)
+_JSON_ESCAPES = set('"\\/bfnrtu')
+
+
+def _escape_latex(text: str) -> str:
+    """Make LaTeX inside JSON strings parseable: "\\sum" and "\\hat{y}" are invalid
+    JSON escapes (and "\\frac" or "\\beta" would silently become control
+    characters), so a backslash before a word or an unknown escape is doubled."""
+
+    def fix(match: re.Match) -> str:
+        token = match.group(1)
+        if token == "\\" or (len(token) == 1 and token in _JSON_ESCAPES):
+            return match.group(0)
+        return "\\\\" + token
+
+    return _BACKSLASH.sub(fix, text)
+
+
+def parse_extraction(raw: str) -> ConceptExtraction:
+    """A model's concept JSON, tolerating code fences, surrounding prose and LaTeX."""
+    start, end = raw.find("{"), raw.rfind("}")
+    if start < 0 or end <= start:
+        raise ValueError("no JSON object in the reply")
+    data = json.loads(_escape_latex(raw[start : end + 1]), strict=False)
+    return ConceptExtraction.model_validate(data)

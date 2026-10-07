@@ -174,3 +174,21 @@ async def test_extract_concepts_off():
             cmd.ExtractConceptsInput(source_id="source:l3")
         )
     assert out.concepts == 0
+
+
+def test_parse_extraction_tolerates_fences_prose_and_latex():
+    from open_notebook.utils.concepts import parse_extraction
+
+    raw = (
+        "Here you go:\n```json\n"
+        '{"concepts": [{"name": "Cross-entropy", "page": 3, '
+        '"context": "Loss $-\\sum y \\log(\\hat{y})$ with \\frac{1}{2}, \\"quoted\\""}], '
+        '"relations": []}\n```'
+    )
+    out = parse_extraction(raw)
+    assert (
+        out.concepts[0].context
+        == 'Loss $-\\sum y \\log(\\hat{y})$ with \\frac{1}{2}, "quoted"'
+    )
+    with pytest.raises(ValueError):
+        parse_extraction("no json here")

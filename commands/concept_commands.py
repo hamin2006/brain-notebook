@@ -28,6 +28,7 @@ from open_notebook.utils.concepts import (
     ConceptExtraction,
     concept_id,
     concept_key,
+    parse_extraction,
 )
 from open_notebook.utils.embedding import generate_embeddings
 from open_notebook.utils.pdf_pages import PdfPage, group_builds
@@ -73,13 +74,17 @@ async def _extract(model, title: str, section: Section, text: str) -> ConceptExt
             "max_relations": MAX_RELATIONS_PER_SECTION,
         }
     )
-    try:
-        reply = await model.ainvoke(prompt)
-        raw = clean_thinking_content(extract_text_content(reply.content)).strip()
-        return parser.parse(raw)
-    except Exception as e:  # one unreadable section must not lose the others
-        logger.warning(f"Concept extraction failed for section {section.index}: {e}")
-        return ConceptExtraction()
+    error: Exception = ValueError("no attempt")
+    for _ in range(2):  # one retry: replies vary
+        try:
+            reply = await model.ainvoke(prompt)
+            raw = clean_thinking_content(extract_text_content(reply.content)).strip()
+            return parse_extraction(raw)
+        except Exception as e:
+            error = e
+    # One unreadable section must not lose the others.
+    logger.warning(f"Concept extraction failed for section {section.index}: {error}")
+    return ConceptExtraction()
 
 
 def _page_range(section: Section, page: Optional[int]) -> tuple[int, int]:
