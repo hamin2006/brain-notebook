@@ -21,7 +21,7 @@ from langchain_core.messages import HumanMessage
 from loguru import logger
 from surreal_commands import CommandInput, CommandOutput, command, submit_command
 
-from open_notebook.ai.provision import provision_langchain_model
+from open_notebook.ai.provision import limit_reasoning, provision_langchain_model
 from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.domain.notebook import Source
 from open_notebook.exceptions import ConfigurationError
@@ -102,8 +102,8 @@ async def caption_pages_command(input_data: CaptionPagesInput) -> CaptionPagesOu
 
     captioned = 0
     if targets:
-        model = await provision_langchain_model(
-            "", None, "transformation", max_tokens=2048
+        model = limit_reasoning(
+            await provision_langchain_model("", None, "transformation", max_tokens=2048)
         )
         by_number = {p.number: p for p in pages}
         semaphore = asyncio.Semaphore(MAX_CONCURRENT_PAGES)

@@ -22,7 +22,7 @@ from langchain_core.output_parsers.pydantic import PydanticOutputParser
 from loguru import logger
 from surreal_commands import CommandInput, CommandOutput, command
 
-from open_notebook.ai.provision import provision_langchain_model
+from open_notebook.ai.provision import limit_reasoning, provision_langchain_model
 from open_notebook.database.repository import ensure_record_id, repo_insert, repo_query
 from open_notebook.domain.notebook import Source
 from open_notebook.exceptions import ConfigurationError
@@ -67,7 +67,9 @@ async def _complete(prompt: str, max_tokens: int, json_mode: bool = False) -> st
     kwargs: Dict[str, Any] = {"max_tokens": max_tokens}
     if json_mode:
         kwargs["structured"] = dict(type="json")
-    model = await provision_langchain_model(prompt, None, "transformation", **kwargs)
+    model = limit_reasoning(
+        await provision_langchain_model(prompt, None, "transformation", **kwargs)
+    )
     reply = await model.ainvoke(prompt)
     return clean_thinking_content(extract_text_content(reply.content)).strip()
 
@@ -208,6 +210,9 @@ async def analyze_source_command(input_data: AnalyzeSourceInput) -> AnalyzeSourc
             }
         ),
         max_tokens=2500,
+    ) or "\n\n".join(
+        f"{s.title} (pp. {s.page_start}-{s.page_end}): {summary}"
+        for s, summary in zip(sections, summaries)
     )
     embeddings = await generate_embeddings(
         [f"{s.title}\n{summary}" for s, summary in zip(sections, summaries)]

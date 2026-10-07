@@ -59,3 +59,15 @@ async def provision_langchain_model(
         )
 
     return model.to_langchain()
+
+
+def limit_reasoning(model: BaseChatModel, effort: str = "low") -> BaseChatModel:
+    """Cap an OpenRouter reasoning model's thinking so it can't spend the whole
+    output budget before answering (it then returns an empty reply). Other
+    providers are left unchanged."""
+    base_url = str(getattr(model, "openai_api_base", "") or "")
+    if "openrouter.ai" in base_url:
+        extra = dict(getattr(model, "extra_body", None) or {})
+        extra["reasoning"] = {"effort": effort}
+        setattr(model, "extra_body", extra)
+    return model
