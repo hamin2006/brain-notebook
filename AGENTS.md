@@ -79,9 +79,13 @@ What we lack, roughly in priority order:
 7. **Proven robustness**: the eval covers one course (seven decks); papers, books and mixed libraries are untested.
 8. **Paper workflows**: table extraction across papers and systematic reviews (Elicit, SciSpace).
 
-Next bets: study outputs built on our strengths (quizzes and flashcards from the outline with page citations, a study
-guide that cites pages, "explain this slide" from the evidence panel); a faster first response (stream a quick draft
-while deeper research continues); PPTX and OCR ingestion; read-only shared answers. Competitor details move fast:
+**Strategy: build what nobody has; don't fill these gaps with NotebookLM.** Its commodity outputs (podcasts, video
+overviews, generic flashcards, mind maps, summaries) are free there, so we don't extend or lead with ours. Keep the
+table stakes good enough (latency, reliability, getting material in, phone use), and where students expect a
+category, build our own version of it (quizzes on diagrams that link to the slide). The audience (STEM students in
+slide-heavy courses), the ordered unique features (exam map, solving the course's way, prerequisite paths, formula
+sheet, diagram quizzes, a cross-course map) and how we validate them are in
+[VISION.md](VISION.md#focus-stem-students-in-slide-heavy-courses-decided-2026-10). Competitor details move fast:
 re-check before relying on them.
 
 ## Where to look

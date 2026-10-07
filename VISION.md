@@ -56,15 +56,52 @@ The research agent, page-aware ingestion and the Phase 5 extensions (rerank, vis
 memory, web search, MCP) are built and pass the 35-question course eval. The phase now is **use it on real coursework
 and fix what that reveals**, before adding surfaces.
 
+### Focus: STEM students in slide-heavy courses (decided 2026-10)
+
+The first audience is university students in technical courses taught from slide decks with diagrams and equations
+spread over many lectures. The proof that we're better is there (the course eval), we are the user, and classmates are
+the first users. Researchers are the second audience, later.
+
+**Build what nobody has; don't fill feature gaps with NotebookLM.** Its Studio outputs (audio and video overviews,
+generic flashcards, mind maps, summaries, slide decks) are commodities it gives away free; matching them wins no
+one. What exists from upstream (podcasts, transformations) stays, but isn't extended or led with. Two exceptions:
+
+- **Table stakes must be good enough**, because users leave over them even though they never choose us for them:
+  a fast first response (answers take 10–60 s today), reliability, getting material in easily (PPTX, scans, the
+  course site or Drive), and a usable phone experience.
+- **Where students expect a category, build our version of it**: quizzes on the diagrams that link to the slide,
+  not generic flashcards.
+
+**Unique features, in order:**
+
+1. **Exam map**: upload past exams, practice problems or the syllabus; every question is matched to the slides
+   that teach it, showing what's tested, what never is and how heavily each lecture counts, with a study plan
+   ordered by exam weight that links every item to a slide.
+2. **Solve it the course's way**: paste a homework problem (a screenshot works); the agent finds where the course
+   teaches the method and walks through it in the professor's notation with slide citations, flagging anything the
+   course hasn't covered. General AI solves with its own method and notation.
+3. **"I'm lost" prerequisite path**: from a concept, the graph traces what it builds on (chain rule → computational
+   graph → Jacobian) into 3–5 steps, each one slide and a check question.
+4. **Formula sheet**: every equation in the course, recovered as LaTeX and grouped by concept with slide references,
+   checked for completeness.
+5. **Diagram quizzes**: questions built from figures, with the slide as the answer key.
+6. **Your degree as one connected map**: the concept graph spans courses and semesters ("taught in MATH 221,
+   Lecture 8").
+
+For researchers, later: a citation checker for drafts (does each cited paper support the sentence, with page and
+figure), results tables read from figures and plots, and the MCP server for writing in Claude Code.
+
+**Validate before scaling**: build the exam map, test it on a real past exam, and give it to classmates before a
+midterm. Repeat use before the final decides the direction.
+
 ### Horizon
 
 Directions under consideration, not promises:
 
 - **More document types with structure**: slides from PPTX directly, books with chapters, scanned PDFs through OCR with pages.
-- **A source view that shows the structure**: outline with page links, metadata editing, the document summary.
 - **Cross-session recall**: summaries of past conversations the agent can search ("what did we conclude last week?").
-- **Study outputs**: quizzes and flashcards generated from the outline, with page citations.
-- **A larger eval** across other courses and paper collections, so improvements aren't tuned to one notebook.
+- **A larger eval** across other courses and paper collections, so improvements aren't tuned to one notebook, and a
+  head-to-head comparison with NotebookLM on the same decks.
 
 ---
 
