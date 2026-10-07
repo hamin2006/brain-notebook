@@ -233,6 +233,8 @@ Of the 6 misses, 2 were grader bugs (LaTeX `\times` / `10^{-8}` not matched; not
 | Memory | `memory` table (notebook or global); recalled into the prompt each turn; `remember` / `forget` tools | On by default |
 | MCP | `/mcp` (FastMCP, streamable HTTP, JSON) on the API, proxied by the frontend: `ask` + the primitives + `view` returning page images | `OPEN_NOTEBOOK_MCP_ALLOWED_HOSTS` |
 
+Eval after Phase 5 (same 35 questions, clean run): **35/35**, right page cited 30/30, right document 34/34, image-only 6/6, median 37 s, $0.096 for the run (old chat: 27/35, 1/30, 32/34, 2/6, 30 s, $0.34). Two earlier misses were grader patterns, one a type-filter bug in `list`.
+
 Findings: Qwen3.7 Flash ignores `reasoning.effort` and GLM-5.3 can't disable reasoning; `reasoning.max_tokens` works for both (`limit_reasoning`). Concept JSON carried LaTeX (invalid escapes); `parse_extraction` repairs it. Not done from the original Phase 5 list: local Qwen3-VL embeddings (OpenRouter's multimodal embeddings made them unnecessary).
 
 ## 8. Decisions
