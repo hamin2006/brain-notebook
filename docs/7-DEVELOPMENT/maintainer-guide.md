@@ -1,5 +1,9 @@
 # Maintainer Guide
 
+> **Upstream process.** This guide describes how upstream Open Notebook's maintainers triage Discussions, Issues and
+> PR batches. Brain Notebook is a personal fork without that process; it's kept for reference when contributing
+> upstream. The fork's workflow is in [contributing.md](contributing.md).
+
 This guide is for project maintainers to help manage contributions effectively while maintaining project quality and vision.
 
 ## Table of Contents

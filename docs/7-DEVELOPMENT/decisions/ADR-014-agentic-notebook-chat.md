@@ -30,4 +30,4 @@ Notebook chat pasted the full text or insights of every source ticked in the UI 
 
 - Answers depend on the model's tool-calling quality; the eval set (`evals/agent`) measures it per task type.
 - More model calls per turn (one per step). Effort levels bound cost and latency.
-- Source chat and Ask still use their original graphs until plan phase 4 moves them onto the agent.
+- Source chat, Ask and MCP `ask` were later moved onto the same graph (single-source scope; ephemeral graph), and Deep effort gained the sufficiency reviewer. The research loop and the answer were split across two models ([ADR-016](ADR-016-two-models-per-turn.md)).

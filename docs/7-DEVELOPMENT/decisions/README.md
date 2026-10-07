@@ -54,5 +54,10 @@ What this makes easier, what it makes harder, what to watch. (bullets)
 | [ADR-011](ADR-011-design-token-system.md) | Visual identity is a token contract in globals.css, reviewed through /dev/design | Accepted |
 | [ADR-012](ADR-012-provider-endpoint-overrides.md) | Provider endpoint overrides are declared in the registry | Accepted |
 | [ADR-013](ADR-013-objectmodel-get-error-contract.md) | ObjectModel.get raises NotFoundError only for a missing record | Accepted |
+| [ADR-014](ADR-014-agentic-notebook-chat.md) | Notebook chat is a tool-calling research agent | Accepted (Brain Notebook) |
+| [ADR-015](ADR-015-page-aware-ingestion.md) | PDFs are ingested page by page, with analysis layers | Accepted (Brain Notebook) |
+| [ADR-016](ADR-016-two-models-per-turn.md) | A cheap model researches, a stronger model answers | Accepted (Brain Notebook) |
+| [ADR-017](ADR-017-agent-extensions.md) | Agent extensions are optional, settings-driven and OpenRouter-backed | Accepted (Brain Notebook) |
 | [PDR-001](PDR-001-single-user-first.md) | Single-user first; don't preclude multi-user | Accepted |
 | [PDR-002](PDR-002-provider-agnostic-core.md) | Provider-agnostic core by default | Accepted |
+| [PDR-003](PDR-003-personal-fork.md) | Brain Notebook is a personal fork that keeps upstream's identifiers | Accepted |

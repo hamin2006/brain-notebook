@@ -138,6 +138,28 @@ Never pass user-provided file paths directly to file reading or content extracti
 
 ---
 
+## The Research Agent
+
+The agent is an LLM driving tools over user content, so treat **everything a tool returns as untrusted**:
+documents, captions, web pages and MCP inputs can all carry prompt-injection text.
+
+- **Tools are read-mostly and narrow.** They read the scoped notebook, save notes and memories, call the
+  calculator and (optionally) search/read the public web. No tool executes code, writes settings, or makes requests to
+  arbitrary hosts. Keep new tools that way: a tool that can change state or reach the network needs its own guard.
+- **Scope is enforced in code.** `AgentScope.source()` / `.note()` reject addresses outside the turn's scope;
+  addresses are parsed (`parse_address`) before any query, and queries are parameterized.
+- **The calculator is an AST evaluator**, not `eval`: numeric constants only, whitelisted functions, literal exponents
+  ≤ 1000, no attribute access (`agent/tools.py: evaluate`).
+- **Web fetching is SSRF-hardened** (`agent/web.py`): http(s) only; every address a host resolves to must be global
+  (`ipaddress.is_global`, so loopback, RFC 1918, link-local, CGNAT/Tailscale and metadata ranges are refused);
+  redirects are followed manually and re-checked per hop; the request is pinned to the vetted IP with Host/SNI kept
+  (no DNS rebinding); bodies are capped. Don't reuse `utils/url_validation.validate_url` for this: it deliberately
+  allows private addresses for self-hosted providers.
+- **Attachments** are validated as `data:image/...` URLs with a size cap, used for one turn, never stored.
+- **MCP** (`api/mcp_server.py`): DNS-rebinding protection with an explicit host allowlist
+  (`OPEN_NOTEBOOK_MCP_ALLOWED_HOSTS`); the password middleware covers `/mcp`.
+- **Model output parsing** (outline/concept JSON) never `eval`s; malformed output is dropped or falls back.
+
 ## Authentication and CORS
 
 ### Authentication
