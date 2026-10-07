@@ -138,10 +138,14 @@ def grade(
         }
         loose = {(lec, p) for lec in mentioned for p in named_pages(answer)}
         page_ok = bool(want & (cited_pages | loose))
+    # Grounding: did the answer cite (by id, not just name) a document holding the evidence?
+    required = set(q.get("lectures", []))
+    cited_ok = bool(required & cited_lec) if required else None
     return {
         "checks": checks,
         "passed": all(checks.values()) if checks else False,
         "page_ok": page_ok,
+        "cited_ok": cited_ok,
         "cited_lectures": sorted(cited_lec),
     }
 
@@ -325,6 +329,7 @@ def main():
         "passed": sum(r["passed"] for r in rows),
         "total": len(rows),
         "page_accuracy": f"{sum(paged)}/{len(paged)}",
+        "cites_right_document": f"{sum(1 for r in rows if r.get('cited_ok'))}/{sum(1 for r in rows if r.get('cited_ok') is not None)}",
         "image_only_passed": f"{sum(r['passed'] for r, q in zip(rows, questions) if q.get('image_only'))}/{sum(1 for q in questions if q.get('image_only'))}",
         "by_task": {
             k: f"{v[0]}/{v[1]}"
