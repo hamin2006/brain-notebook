@@ -100,3 +100,54 @@ def test_source_structure_missing(client):
         new=AsyncMock(return_value=AgentScope(sources={}, notes={})),
     ):
         assert client.get("/api/sources/zzz/structure").status_code == 404
+
+
+def test_graph_keeps_top_concepts_relations_and_co_mentions(client):
+    scope = AgentScope(
+        sources={
+            "source:a": ScopedSource(id="source:a", title="Lecture 1", metadata={"sequence": 1}),
+            "source:b": ScopedSource(id="source:b", title="Lecture 2", metadata={"sequence": 2}),
+        },
+        notes={},
+    )  # fmt: skip
+    mentions = [
+        {"concept": "concept:relu", "source": "source:a", "section": 0},
+        {"concept": "concept:sig", "source": "source:a", "section": 0},
+        {"concept": "concept:relu", "source": "source:b", "section": 3},
+        {"concept": "concept:adam", "source": "source:b", "section": 3},
+        {"concept": "concept:rare", "source": "source:b", "section": 4},
+    ]
+    relations = [
+        {
+            "from_concept": "concept:relu",
+            "to_concept": "concept:sig",
+            "relation": "replaces",
+        }
+    ]
+
+    async def per_source(sql, ids, **params):
+        return mentions if "concept_mention" in sql else relations
+
+    names = [
+        {"id": c, "name": c.split(":")[1]}
+        for c in ("concept:relu", "concept:sig", "concept:adam")
+    ]
+    with (
+        patch("api.routers.explore._notebook_scope", new=AsyncMock(return_value=scope)),
+        patch("api.routers.explore.per_source", new=per_source),
+        patch("api.routers.explore.repo_query", new=AsyncMock(return_value=names)),
+    ):  # fmt: skip
+        body = client.get("/api/notebooks/notebook:x/graph?limit=3").json()
+    assert body["total_concepts"] == 4
+    assert [d["id"] for d in body["documents"]] == ["source:a", "source:b"]
+    relu = next(n for n in body["nodes"] if n["id"] == "concept:relu")
+    assert relu["home"] == "source:a" and relu["documents"] == ["source:a", "source:b"]
+    assert relu["mentions"] == 2
+    assert "concept:rare" not in {n["id"] for n in body["nodes"]}
+    kinds = {(e["source"], e["target"], e["kind"]) for e in body["edges"]}
+    # the stated relation, and adam/relu share a section; relu/sig co-occur but already relate
+    assert ("concept:relu", "concept:sig", "relation") in kinds
+    assert ("concept:adam", "concept:relu", "co") in kinds
+    assert not any(
+        k == "co" and {s, t} == {"concept:relu", "concept:sig"} for s, t, k in kinds
+    )
