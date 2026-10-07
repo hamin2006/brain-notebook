@@ -191,6 +191,20 @@ rewrite (resolve follow-ups using history; skip on first turn)
 | 4. Deep mode | Tools `delegate`, `note`, `ask_user`, `python`; query rewrite, sufficiency review loop, conversation compaction, grounding setting; Source chat and Ask moved onto the agent | T6–T9, T11–T14, T16 pass; no task type regresses |
 | 5. Extensions | Rerank; optional vision captions; multimodal embeddings (Qwen3-VL-Embedding on the PC GPU); knowledge graph (entities/relations as SurrealDB edges); MCP tools; memory layer | Each behind a setting, measured by the eval harness |
 
+## 7a. Findings during implementation (2026-10-06)
+
+| Finding | Effect | Where handled |
+|---|---|---|
+| The 238k-vs-31k inflation is **LaTeXiT**: each equation's source is stored as invisible text, every character printed 4x (sometimes right-to-left); content-core (pdfplumber) extracts it. 70% of Lecture 4's text, 618k chars for Lecture 1 | Payload is qCompress'd binary plist; its `source` key is the LaTeX. All 477 equations decode | `utils/pdf_pages.py` |
+| Whole slide sections are **images with no text layer** (Lecture 4 optimizers pp. 85-94: SGD, momentum, RMSProp, AdaGrad, Adam) | Text-only RAG can't know the course covers RMSProp at all | Vision captions (`commands/page_commands.py`) |
+| **Animation builds**: 81 of 161 page transitions in Lecture 2 | Same text embedded dozens of times | `group_builds` (794 pages -> 334 groups) |
+| A failed transformation (Dense Summary hitting the output limit) **failed the whole import** | Lecture 2 never imported | Permanent generation errors are isolated in `graphs/source.py` |
+| esperanto's 60 s **embedding timeout** < one batch on a GTX 1660 (4B model: 81 s / 50 chunks) | Batches retried forever | Default 180 s in `config.py`; embeddings moved to OpenRouter |
+| Two embed jobs for one source **race** (each deletes the other's chunks) | Lectures showed 0 chunks after completing | Captions job embeds once at the end |
+| **PDFium is not thread-safe** | Heap corruption crash when captioning 4 pages at once | `PDFIUM_LOCK` |
+| SurrealDB v2: `WHERE source IN $ids` returns **no rows** on tables with a composite unique index on `(source, ...)` | grep/section search silently empty | Per-source equality queries (`agent/scope.py: per_source`) |
+| Reasoning models sometimes return an **empty** summary | Empty section summary | Retry with more room, then text extract |
+
 ## 8. Decisions
 
 | # | Decision | Made |
