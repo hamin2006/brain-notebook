@@ -415,6 +415,8 @@ class Source(ObjectModel):
     command: Optional[Union[str, RecordID]] = Field(
         default=None, description="Link to surreal-commands processing job"
     )
+    # Document metadata from analysis (doc_type, course, sequence, topics, ...).
+    metadata: Optional[Dict[str, Any]] = None
 
     @field_validator("command", mode="before")
     @classmethod

@@ -378,13 +378,19 @@ async def save_source(state: SourceState) -> dict:
             "caption_pages",
             {"source_id": str(source.id), "embed": bool(state["embed"])},
         )
-    elif state["embed"]:
-        if source.full_text and source.full_text.strip():
-            logger.debug("Embedding content for vector search")
-            await source.vectorize()
-        else:
-            logger.warning(
-                f"Source {source.id} has no text content to embed, skipping vectorization"
+    else:
+        if state["embed"]:
+            if source.full_text and source.full_text.strip():
+                logger.debug("Embedding content for vector search")
+                await source.vectorize()
+            else:
+                logger.warning(
+                    f"Source {source.id} has no text content to embed, skipping vectorization"
+                )
+        if state.get("pages"):
+            # Paged source without visual pages: outline and summaries now.
+            submit_command(
+                "open_notebook", "analyze_source", {"source_id": str(source.id)}
             )
 
     return {"source": source}

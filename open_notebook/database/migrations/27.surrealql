@@ -1,0 +1,20 @@
+-- Migration 27: document sections (agentic RAG plan §3.4).
+-- A section is a topic span of a paged source with an LLM summary; summaries
+-- are embedded so search can work at section level.
+
+DEFINE TABLE IF NOT EXISTS source_section SCHEMAFULL;
+DEFINE FIELD IF NOT EXISTS source ON TABLE source_section TYPE record<source>;
+DEFINE FIELD IF NOT EXISTS index ON TABLE source_section TYPE int;
+DEFINE FIELD IF NOT EXISTS title ON TABLE source_section TYPE string;
+DEFINE FIELD IF NOT EXISTS page_start ON TABLE source_section TYPE int;
+DEFINE FIELD IF NOT EXISTS page_end ON TABLE source_section TYPE int;
+DEFINE FIELD IF NOT EXISTS summary ON TABLE source_section TYPE string;
+DEFINE FIELD IF NOT EXISTS embedding ON TABLE source_section TYPE option<array<float>>;
+DEFINE INDEX IF NOT EXISTS idx_source_section_source_index ON TABLE source_section COLUMNS source, index UNIQUE;
+
+DEFINE EVENT OVERWRITE source_delete ON TABLE source WHEN ($after == NONE) THEN {
+    delete source_embedding where source == $before.id;
+    delete source_insight where source == $before.id;
+    delete source_page where source == $before.id;
+    delete source_section where source == $before.id;
+};

@@ -1,0 +1,16 @@
+You are cataloguing a document so a research assistant can find and navigate it.
+
+File name: {{ file_name }}
+Embedded PDF title: {{ pdf_title if pdf_title else "(none)" }}
+Pages: {{ page_count }}
+
+First page text:
+{{ first_page if first_page else "(none)" }}
+
+Page index (first line of each page or animation build):
+{{ page_index }}
+
+1. Fill in the document metadata. Use only what the file name, title and pages show; leave fields null or empty when unknown. "sequence" is the document's number within its series (e.g. 4 for "Lecture 4").
+2. Split the document into topic sections in page order: typically 4-12 for a 100-page deck, each a coherent topic with a short descriptive title. Sections must cover every page from 1 to {{ page_count }} without gaps or overlaps.
+
+{{ format_instructions }}

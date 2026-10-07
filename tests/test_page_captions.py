@@ -77,12 +77,16 @@ async def test_caption_job_captions_visual_pages_and_embeds_once(tmp_path):
         patch("commands.page_commands.repo_query", new=fake_query),
         patch("commands.page_commands.provision_langchain_model", new=AsyncMock()),
         patch("commands.page_commands._caption_page", new=fake_caption),
+        patch("commands.page_commands.submit_command") as submit,
     ):
         result = await caption_pages_command(CaptionPagesInput(source_id=SOURCE_ID))
 
     assert result.pages_captioned == 1
     assert [u["page"] for u in updates] == [1]
     source.vectorize.assert_awaited_once()
+    submit.assert_called_once_with(
+        "open_notebook", "analyze_source", {"source_id": SOURCE_ID}
+    )
 
 
 @pytest.mark.asyncio
@@ -105,6 +109,7 @@ async def test_caption_job_survives_a_failing_page(tmp_path):
         ),
         patch("commands.page_commands.provision_langchain_model", new=AsyncMock()),
         patch("commands.page_commands._caption_page", new=fake_caption),
+        patch("commands.page_commands.submit_command") as submit,
     ):
         result = await caption_pages_command(CaptionPagesInput(source_id=SOURCE_ID))
 

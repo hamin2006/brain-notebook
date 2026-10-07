@@ -1,0 +1,8 @@
+Write the overview of "{{ title }}" ({{ page_count }} pages) from its section summaries below.
+
+Start with one or two sentences on what the document is about, then cover each section in order with its page range, then list the key terms. Keep equations in LaTeX and cite pages as (pp. N-M). Only use what the summaries say. 250-450 words, no preamble.
+
+{% for s in sections %}
+## {{ s.title }} (pp. {{ s.page_start }}-{{ s.page_end }})
+{{ s.summary }}
+{% endfor %}

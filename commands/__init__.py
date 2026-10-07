@@ -8,6 +8,7 @@ from open_notebook.utils.proxy import ensure_internal_no_proxy
 
 ensure_internal_no_proxy()
 
+from .analyze_commands import analyze_source_command
 from .embedding_commands import (
     embed_insight_command,
     embed_note_command,
@@ -21,6 +22,7 @@ from .source_commands import process_source_command
 __all__ = [
     # Page commands
     "caption_pages_command",
+    "analyze_source_command",
     # Embedding commands
     "embed_note_command",
     "embed_insight_command",

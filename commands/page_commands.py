@@ -19,7 +19,7 @@ from typing import Optional
 from ai_prompter import Prompter
 from langchain_core.messages import HumanMessage
 from loguru import logger
-from surreal_commands import CommandInput, CommandOutput, command
+from surreal_commands import CommandInput, CommandOutput, command, submit_command
 
 from open_notebook.ai.provision import provision_langchain_model
 from open_notebook.database.repository import ensure_record_id, repo_query
@@ -135,6 +135,10 @@ async def caption_pages_command(input_data: CaptionPagesInput) -> CaptionPagesOu
 
     if input_data.embed and source is not None:
         await source.vectorize()
+    # Outline, metadata and summaries read the captions, so they run after.
+    submit_command(
+        "open_notebook", "analyze_source", {"source_id": input_data.source_id}
+    )
     return CaptionPagesOutput(
         success=True,
         source_id=input_data.source_id,

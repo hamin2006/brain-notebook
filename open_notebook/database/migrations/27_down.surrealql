@@ -1,0 +1,9 @@
+-- Down migration 27: drop document sections.
+
+DEFINE EVENT OVERWRITE source_delete ON TABLE source WHEN ($after == NONE) THEN {
+    delete source_embedding where source == $before.id;
+    delete source_insight where source == $before.id;
+    delete source_page where source == $before.id;
+};
+
+REMOVE TABLE IF EXISTS source_section;

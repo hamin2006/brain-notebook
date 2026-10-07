@@ -1,0 +1,182 @@
+"""Document analysis: outline normalization, section text, and the analyze job."""
+
+import json
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
+from commands.analyze_commands import AnalyzeSourceInput, analyze_source_command
+from open_notebook.utils.pdf_pages import PageGroup
+from open_notebook.utils.sections import (
+    PlannedSection,
+    Section,
+    normalize_sections,
+    page_index,
+    section_text,
+)
+
+GROUPS = [
+    PageGroup(1, 1, "Title"),
+    PageGroup(2, 5, "Momentum\n- heavy ball"),
+    PageGroup(6, 10, "Adam"),
+]
+
+
+def _spans(sections):
+    return [(s.page_start, s.page_end, s.title) for s in sections]
+
+
+def test_normalize_repairs_gaps_overlaps_and_range():
+    planned = [
+        PlannedSection(title="Optimizers", start_page=2, end_page=7),
+        PlannedSection(
+            title="Adam", start_page=6, end_page=99
+        ),  # overlaps, beyond the end
+    ]
+    assert _spans(normalize_sections(planned, GROUPS, 10)) == [
+        (1, 5, "Optimizers"),  # extended back to page 1
+        (6, 10, "Adam"),  # clipped to the document
+    ]
+
+
+def test_normalize_falls_back_to_page_windows():
+    sections = normalize_sections([], GROUPS, 10)
+    assert sections[0].page_start == 1 and sections[-1].page_end == 10
+
+
+def test_page_index_and_section_text():
+    assert page_index(GROUPS).splitlines()[1] == "pp. 2-5: Momentum"
+    text = section_text(GROUPS, Section(index=0, title="t", page_start=2, page_end=10))
+    assert text.startswith("[pp. 2-5]\nMomentum") and "[pp. 6-10]\nAdam" in text
+    assert "Title" not in text
+
+
+def _source():
+    source = MagicMock(
+        id="source:l4", title="AI 360 Lecture 4.pdf", add_insight=AsyncMock()
+    )
+    source.asset.file_path = None
+    return source
+
+
+PAGE_ROWS = [
+    {"page": 1, "text": "AI 360 Lecture 4: Losses, Optimizers", "caption": None},
+    {"page": 2, "text": "Regularization", "caption": None},
+    {"page": 3, "text": "", "caption": "Adam update rule with defaults alpha=0.001"},
+]
+
+
+@pytest.mark.asyncio
+async def test_analyze_writes_sections_metadata_and_summary():
+    outline = {
+        "metadata": {
+            "doc_type": "lecture",
+            "title": "Losses, Optimizers",
+            "course": "AI 360",
+            "sequence": 4,
+            "topics": ["Adam"],
+        },
+        "sections": [
+            {"title": "Regularization", "start_page": 1, "end_page": 2},
+            {"title": "Optimizers", "start_page": 3, "end_page": 3},
+        ],
+    }
+    replies = iter(
+        [json.dumps(outline), "Regularization summary", "Optimizer summary", "Overview"]
+    )
+    writes: list = []
+
+    async def fake_query(query, params=None):
+        if query.startswith("SELECT page, text, caption"):
+            return PAGE_ROWS
+        writes.append((query.split()[0], params))
+        return []
+
+    inserted: list = []
+    source = _source()
+    with (
+        patch(
+            "commands.analyze_commands.Source.get", new=AsyncMock(return_value=source)
+        ),
+        patch("commands.analyze_commands.repo_query", new=fake_query),
+        patch(
+            "commands.analyze_commands.repo_insert",
+            new=AsyncMock(side_effect=lambda t, rows: inserted.extend(rows)),
+        ),
+        patch(
+            "commands.analyze_commands._complete",
+            new=AsyncMock(side_effect=lambda *a, **k: next(replies)),
+        ),
+        patch(
+            "commands.analyze_commands.generate_embeddings",
+            new=AsyncMock(return_value=[[0.1], [0.2]]),
+        ),
+    ):
+        result = await analyze_source_command(AnalyzeSourceInput(source_id="source:l4"))
+
+    assert result.sections == 2
+    assert [
+        (r["title"], r["page_start"], r["page_end"], r["summary"]) for r in inserted
+    ] == [
+        ("Regularization", 1, 2, "Regularization summary"),
+        ("Optimizers", 3, 3, "Optimizer summary"),
+    ]
+    metadata = next(p["metadata"] for verb, p in writes if verb == "UPDATE")
+    assert (
+        metadata["sequence"] == 4
+        and metadata["course"] == "AI 360"
+        and metadata["page_count"] == 3
+    )
+    source.add_insight.assert_awaited_once_with("Document Summary", "Overview")
+
+
+@pytest.mark.asyncio
+async def test_analyze_survives_unparseable_outline():
+    replies = iter(["not json at all", "summary"])
+    inserted: list = []
+    with (
+        patch(
+            "commands.analyze_commands.Source.get",
+            new=AsyncMock(return_value=_source()),
+        ),
+        patch(
+            "commands.analyze_commands.repo_query",
+            new=AsyncMock(
+                side_effect=lambda q, p=None: PAGE_ROWS
+                if q.startswith("SELECT")
+                else []
+            ),
+        ),
+        patch(
+            "commands.analyze_commands.repo_insert",
+            new=AsyncMock(side_effect=lambda t, rows: inserted.extend(rows)),
+        ),
+        patch(
+            "commands.analyze_commands._complete",
+            new=AsyncMock(side_effect=lambda *a, **k: next(replies, "Overview")),
+        ),
+        patch(
+            "commands.analyze_commands.generate_embeddings",
+            new=AsyncMock(return_value=[[0.1]]),
+        ),
+    ):
+        result = await analyze_source_command(AnalyzeSourceInput(source_id="source:l4"))
+    assert result.success and result.sections == 1
+    assert inserted[0]["page_start"] == 1 and inserted[0]["page_end"] == 3
+
+
+@pytest.mark.asyncio
+async def test_analyze_skips_sources_without_pages():
+    with (
+        patch(
+            "commands.analyze_commands.Source.get",
+            new=AsyncMock(return_value=_source()),
+        ),
+        patch("commands.analyze_commands.repo_query", new=AsyncMock(return_value=[])),
+        patch("commands.analyze_commands._complete", new=AsyncMock()) as complete,
+    ):
+        result = await analyze_source_command(
+            AnalyzeSourceInput(source_id="source:web")
+        )
+    assert result.success and result.sections == 0
+    complete.assert_not_awaited()
