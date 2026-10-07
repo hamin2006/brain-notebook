@@ -38,6 +38,11 @@ const nextConfig: NextConfig = {
         source: '/api/:path*',
         destination: `${internalApiUrl}/api/:path*`,
       },
+      // MCP endpoint (research tools for Claude Code and other MCP clients)
+      {
+        source: '/mcp',
+        destination: `${internalApiUrl}/mcp`,
+      },
     ]
   },
 
