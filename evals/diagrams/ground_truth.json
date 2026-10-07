@@ -1,0 +1,82 @@
+{
+  "lecture6_p48_googlenet.png": {
+    "source": "AI 360 Lecture 6 - Convolutional Networks.pdf, page 48",
+    "questions": {
+      "inception_paths": {
+        "ask": "In the Inception module diagram (bottom right), list every parallel path from 'Previous layer' to 'Filter concatenation' as an ordered list of the operations on that path (exclude 'Previous layer' and 'Filter concatenation' themselves).",
+        "type": "paths",
+        "answer": [["conv1x1"], ["conv1x1", "conv3x3"], ["conv1x1", "conv5x5"], ["maxpool3x3", "conv1x1"]]
+      },
+      "concat_inputs": {
+        "ask": "In the Inception module diagram, how many incoming edges does 'Filter concatenation' have?",
+        "type": "int",
+        "answer": 4
+      },
+      "before_5x5": {
+        "ask": "In the Inception module diagram, which operation feeds directly into the '5x5 convolutions' box?",
+        "type": "op",
+        "answer": "conv1x1"
+      },
+      "after_maxpool": {
+        "ask": "In the Inception module diagram, which operation does the '3x3 max pooling' box feed directly into?",
+        "type": "op",
+        "answer": "conv1x1"
+      },
+      "softmax_outputs": {
+        "ask": "In the full GoogLeNet graph (the long diagonal network), how many softmax output nodes are there in total?",
+        "type": "int",
+        "answer": 3
+      },
+      "auxiliary_classifiers": {
+        "ask": "In the full GoogLeNet graph, how many of those softmax outputs are auxiliary classifiers branching off the middle of the network (not the final output)?",
+        "type": "int",
+        "answer": 2
+      },
+      "depthconcat_count": {
+        "ask": "In the full GoogLeNet graph, how many green 'DepthConcat' nodes are there (i.e. how many Inception modules)?",
+        "type": "int",
+        "answer": 9
+      }
+    }
+  },
+  "lecture6_p79_resnet_blocks.png": {
+    "source": "AI 360 Lecture 6 - Convolutional Networks.pdf, page 79",
+    "questions": {
+      "bottleneck_main_path": {
+        "ask": "In the right-most residual block (input '256-d'), list the layers on the main (non-skip) path in order, each as 'KxK, channels'.",
+        "type": "layers",
+        "answer": [["1x1", 64], ["3x3", 64], ["1x1", 256]]
+      },
+      "basic_block_main_path": {
+        "ask": "In the middle residual block (input '64-d'), list the layers on the main (non-skip) path in order, each as 'KxK, channels'.",
+        "type": "layers",
+        "answer": [["3x3", 64], ["3x3", 64]]
+      },
+      "bottleneck_input_dim": {
+        "ask": "What is the input dimensionality (number of channels) of the right-most block?",
+        "type": "int",
+        "answer": 256
+      },
+      "bottleneck_relu_count": {
+        "ask": "How many ReLU activations appear in the right-most block, counting the one after the addition?",
+        "type": "int",
+        "answer": 3
+      },
+      "addition_inputs": {
+        "ask": "How many inputs does the circled '+' node in each block take?",
+        "type": "int",
+        "answer": 2
+      },
+      "relu_after_addition": {
+        "ask": "Is a ReLU applied after the '+' addition node (true/false)?",
+        "type": "bool",
+        "answer": true
+      },
+      "skip_is_identity": {
+        "ask": "Does the skip connection apply any layer to x, or is it an identity mapping? Answer true if identity.",
+        "type": "bool",
+        "answer": true
+      }
+    }
+  }
+}
