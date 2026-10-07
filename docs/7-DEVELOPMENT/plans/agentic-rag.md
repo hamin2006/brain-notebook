@@ -178,13 +178,13 @@ rewrite (resolve follow-ups using history; skip on first turn)
 - **Traces:** per turn, store steps, tool calls, tokens and cost; viewable in the UI and via the API.
 - **Tests:** unit (fusion, scope, page mapping, metadata parsing), graph tests with a scripted fake model, API tests for SSE; CI must stay green (ruff, mypy, pytest, frontend lint/test/build).
 - **Docs:** ADRs for (1) agent architecture, (2) page-aware chunking, (3) async checkpointer; CHANGELOG entries.
-- **Deployment (PC):** docker compose with memory caps; OpenRouter credentials; models: chat and vision `z-ai/glm-5.3-flash` (fallback `qwen/qwen3.8-flash`); embeddings local via Ollama on the GTX 1660 Super (§8).
+- **Deployment (PC):** docker compose with memory caps; OpenRouter credentials; models: chat and vision `z-ai/glm-5.3-flash` (fallback `qwen/qwen3.8-flash`); embeddings `qwen/qwen3-embedding-8b` via OpenRouter (§8).
 
 ## 7. Phases
 
 | Phase | Scope | Done when |
 |---|---|---|
-| 0. Foundations | Dev env on the PC; Ollama + local embedding model on the GPU; explain the extraction inflation; async checkpointer; SSE skeleton; eval harness with baseline numbers for current Chat/Ask | Baseline scores recorded; existing tests pass |
+| 0. Foundations | Dev env on the PC; embedding model setup; explain the extraction inflation; async checkpointer; SSE skeleton; eval harness with baseline numbers for current Chat/Ask | Baseline scores recorded; existing tests pass |
 | 1. Ingestion | Page-aware extraction + slide mode, `source_page`, chunk page ranges, metadata extraction, section/doc summaries + outline, backfill command, keep originals | Lecture decks re-ingested with pages, metadata and summaries |
 | 2. Agent v1 | Retrieval backends; tools `list`, `grep`, `search`, `outline`, `read`, `view`; address format + page citations; Quick/Standard loop; streaming events | T1–T5, T10, T15 pass on the eval set |
 | 3. Frontend | Streaming chat with step trace, effort selector, page citations and previews, metadata/outline views, i18n | Usable end to end in the browser |
@@ -195,7 +195,7 @@ rewrite (resolve follow-ups using history; skip on first turn)
 
 | # | Decision | Made |
 |---|---|---|
-| 1 | **Embeddings run locally** on the PC's GTX 1660 Super (6 GB) via Ollama; no per-token cost. Model picked in Phase 0 (small, e.g. a Qwen3-Embedding or nomic variant). | 2026-10-06 |
+| 1 | ~~Embeddings run locally on the GTX 1660 Super via Ollama.~~ **Superseded the same day:** embeddings use `qwen/qwen3-embedding-8b` on OpenRouter (~$0.01 per million tokens; under $0.01 for the whole course). Measured on the 1660 (no tensor cores): Qwen3-Embedding-4B took 81 s per 50-chunk batch (over esperanto's 60 s timeout), 0.6B took 15 s but is the weakest of the family. Chat already sends notebook text to OpenRouter, so local embeddings added no privacy. Ollama stays installed, idle. | 2026-10-06 |
 | 2 | **Personal fork.** Upstream conventions are kept where they protect quality (tests, CI, typed errors, ADRs), but provider-specific features are allowed (e.g. OpenRouter routing/fallbacks), and new UI strings may ship English-only in non-en-US locales (still required by the locale parity check). | 2026-10-06 |
 | 3 | **Classic chat is removed, with no fallback.** No mode pastes whole files into the prompt, including "pinned" sources. The sidebar selection only sets the agent's search scope; whole-document questions go through stored summaries (§3.4), never full-text loading. | 2026-10-06 |
 | 4 | **OpenRouter credits** topped up. A capped, project-specific key is still recommended. | 2026-10-06 |

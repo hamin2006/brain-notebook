@@ -1,8 +1,7 @@
 """Configure the Brain deployment's models through the Open Notebook API.
 
-Creates (or reuses) an OpenRouter credential and a local Ollama credential,
-registers the chat and embedding models, and sets them as defaults. Safe to
-re-run. The OpenRouter key is read from a dotenv file on this machine and only
+Creates (or reuses) an OpenRouter credential for chat and embeddings,
+registers both models, and sets them as defaults. Safe to re-run. The OpenRouter key is read from a dotenv file on this machine and only
 ever sent to the local API.
 
 Usage (on the PC, next to the running API):
@@ -17,8 +16,10 @@ from pathlib import Path
 
 API = "http://127.0.0.1:5055/api"
 CHAT_MODEL = "z-ai/glm-5.3-flash"
-EMBEDDING_MODEL = "qwen3-embedding:0.6b"
-OLLAMA_URL = "http://localhost:11434"
+# Qwen3-Embedding-8B on OpenRouter: the strongest model of the family for ~$0.01/M
+# tokens. Chat already sends notebook text to OpenRouter, so embedding locally
+# bought no privacy, and the GTX 1660 could only run the 0.6B model at a usable speed.
+EMBEDDING_MODEL = "qwen/qwen3-embedding-8b"
 
 
 def call(method: str, path: str, body=None):
@@ -47,6 +48,8 @@ def read_key(path: str) -> str:
 def ensure_credential(provider: str, name: str, modalities, **fields) -> str:
     for cred in call("GET", f"/credentials/by-provider/{provider}") or []:
         if cred.get("name") == name:
+            if set(modalities) - set(cred.get("modalities") or []):
+                call("PUT", f"/credentials/{cred['id']}", {"modalities": modalities})
             return cred["id"]
     created = call(
         "POST",
@@ -78,14 +81,14 @@ def main():
     args = ap.parse_args()
 
     openrouter = ensure_credential(
-        "openrouter", "brain-openrouter", ["language"], api_key=read_key(args.key_file)
-    )
-    ollama = ensure_credential(
-        "ollama", "brain-ollama", ["embedding"], base_url=OLLAMA_URL
+        "openrouter",
+        "brain-openrouter",
+        ["language", "embedding"],
+        api_key=read_key(args.key_file),
     )
 
     chat = ensure_model(CHAT_MODEL, "openrouter", "language", openrouter)
-    embedding = ensure_model(EMBEDDING_MODEL, "ollama", "embedding", ollama)
+    embedding = ensure_model(EMBEDDING_MODEL, "openrouter", "embedding", openrouter)
 
     defaults = call("GET", "/models/defaults") or {}
     defaults.update(
