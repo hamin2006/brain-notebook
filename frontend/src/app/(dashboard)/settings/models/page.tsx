@@ -89,10 +89,10 @@ export default function ApiKeysPage() {
   return (
     <AppShell>
       <div className="flex-1 overflow-y-auto">
-        <div className="p-6 space-y-6">
+        <div className="mx-auto max-w-5xl space-y-6 px-6 py-10 md:px-10">
           {/* Header */}
           <div>
-            <h1 className="font-display text-2xl font-bold tracking-tight flex items-center gap-2">
+            <h1 className="font-display text-[34px] leading-tight tracking-tight flex items-center gap-2">
               <Key className="h-5 w-5 text-muted-foreground" />
               {t('apiKeys.title')}
             </h1>

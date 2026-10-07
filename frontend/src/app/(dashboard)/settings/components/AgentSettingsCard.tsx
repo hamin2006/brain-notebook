@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Trash2 } from 'lucide-react'
+import { Trash2, Sparkles, ArrowDownWideNarrow, ScanEye, Share2, Globe2, Brain, type LucideIcon } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -70,21 +71,27 @@ export function AgentSettingsCard() {
 
   const busy = update.isPending
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t('settings.agentTitle')}</CardTitle>
+    <Card className="gap-0 overflow-hidden py-0">
+      <CardHeader className="border-b bg-surface-recessed/50 py-5">
+        <CardTitle className="flex items-center gap-2 font-display text-[24px] font-normal">
+          <Sparkles className="h-4 w-4 text-iris" />
+          {t('settings.agentTitle')}
+        </CardTitle>
         <CardDescription>{t('settings.agentDescription')}</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <ModelField
-          id="rerank_model"
-          label={t('settings.rerankModel')}
-          help={t('settings.rerankHelp')}
-          value={settings.rerank_model}
-          onSave={value => update.mutate({ rerank_model: value })}
-          disabled={busy}
-        />
-        <div className="space-y-2">
+      <CardContent className="grid gap-px bg-border p-0 md:grid-cols-2">
+        <FeatureTile icon={ArrowDownWideNarrow} tone="text-iris" active={!!settings.rerank_model}>
+          <ModelField
+            id="rerank_model"
+            label={t('settings.rerankModel')}
+            help={t('settings.rerankHelp')}
+            value={settings.rerank_model}
+            onSave={value => update.mutate({ rerank_model: value })}
+            disabled={busy}
+          />
+        </FeatureTile>
+
+        <FeatureTile icon={ScanEye} tone="text-plum" active={!!settings.page_embedding_model}>
           <ModelField
             id="page_embedding_model"
             label={t('settings.pageEmbeddingModel')}
@@ -101,9 +108,9 @@ export function AgentSettingsCard() {
           >
             {t('settings.rebuildPageEmbeddings')}
           </Button>
-        </div>
+        </FeatureTile>
 
-        <div className="space-y-2">
+        <FeatureTile icon={Share2} tone="text-fern" active={settings.knowledge_graph}>
           <div className="flex items-center gap-2">
             <Checkbox
               id="knowledge_graph"
@@ -122,9 +129,9 @@ export function AgentSettingsCard() {
           >
             {t('settings.rebuildConcepts')}
           </Button>
-        </div>
+        </FeatureTile>
 
-        <div className="space-y-2">
+        <FeatureTile icon={Globe2} tone="text-slate-hue" active={settings.web_search}>
           <div className="flex items-center gap-2">
             <Checkbox
               id="web_search"
@@ -135,9 +142,9 @@ export function AgentSettingsCard() {
             <Label htmlFor="web_search">{t('settings.webSearch')}</Label>
           </div>
           <p className="text-sm text-muted-foreground">{t('settings.webSearchHelp')}</p>
-        </div>
+        </FeatureTile>
 
-        <div className="space-y-2">
+        <FeatureTile icon={Brain} tone="text-amber" active={settings.memory} wide>
           <div className="flex items-center gap-2">
             <Checkbox
               id="agent_memory"
@@ -148,14 +155,14 @@ export function AgentSettingsCard() {
             <Label htmlFor="agent_memory">{t('settings.agentMemory')}</Label>
           </div>
           <p className="text-sm text-muted-foreground">{t('settings.agentMemoryHelp')}</p>
-          <div className="space-y-1">
-            <p className="text-sm font-medium">{t('settings.memories')}</p>
+          <div className="space-y-2">
+            <p className="text-[10.5px] font-medium uppercase tracking-[0.12em] text-muted-foreground">{t('settings.memories')}</p>
             {memories.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t('settings.noMemories')}</p>
             ) : (
-              <ul className="space-y-1">
+              <ul className="grid gap-2 md:grid-cols-2">
                 {memories.map(memory => (
-                  <li key={memory.id} className="flex items-start justify-between gap-2 rounded-md border px-3 py-2 text-sm">
+                  <li key={memory.id} className="flex items-start justify-between gap-2 rounded-xl border bg-card px-3 py-2 text-sm shadow-soft">
                     <span>
                       {memory.content}
                       {!memory.notebook_id && (
@@ -178,8 +185,32 @@ export function AgentSettingsCard() {
               </ul>
             )}
           </div>
-        </div>
+        </FeatureTile>
       </CardContent>
     </Card>
+  )
+}
+
+/** One agent capability: an icon that lights up when it's on, and its controls. */
+function FeatureTile({
+  icon: Icon,
+  tone,
+  active,
+  wide,
+  children,
+}: {
+  icon: LucideIcon
+  tone: string
+  active: boolean
+  wide?: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <div className={cn('flex gap-4 bg-card p-5', wide && 'md:col-span-2')}>
+      <div className={cn('flex size-9 shrink-0 items-center justify-center rounded-xl border bg-surface-recessed', active ? tone : 'text-muted-foreground opacity-60')}>
+        <Icon className="h-4 w-4" />
+      </div>
+      <div className="min-w-0 flex-1 space-y-3">{children}</div>
+    </div>
   )
 }

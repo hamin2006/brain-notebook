@@ -84,7 +84,7 @@ export function EpisodesTab() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
-          <h2 className="font-display text-xl font-semibold tracking-tight">{t('podcasts.overviewTitle')}</h2>
+          <h2 className="font-display text-[24px] tracking-tight">{t('podcasts.overviewTitle')}</h2>
           <p className="text-sm text-muted-foreground">
             {t('podcasts.overviewDesc')}
           </p>

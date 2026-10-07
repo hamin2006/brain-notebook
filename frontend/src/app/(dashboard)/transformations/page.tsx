@@ -26,10 +26,10 @@ export default function TransformationsPage() {
   return (
     <AppShell>
       <div className="flex-1 overflow-y-auto">
-        <div className="p-6 space-y-6">
+        <div className="mx-auto max-w-5xl space-y-6 px-6 py-10 md:px-10">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <h1 className="font-display text-2xl font-bold tracking-tight">{t('transformations.title')}</h1>
+              <h1 className="font-display text-[34px] leading-tight tracking-tight">{t('transformations.title')}</h1>
               <Button variant="outline" size="sm" onClick={() => refetch()}>
                 <RefreshCw className="h-4 w-4" />
             </Button>

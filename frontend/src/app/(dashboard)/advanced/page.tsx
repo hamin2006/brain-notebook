@@ -10,10 +10,10 @@ export default function AdvancedPage() {
   return (
     <AppShell>
       <div className="flex-1 overflow-y-auto">
-        <div className="p-6">
+        <div className="px-6 py-10 md:px-10">
           <div className="max-w-4xl mx-auto space-y-6">
             <div>
-              <h1 className="font-display text-2xl font-bold tracking-tight">{t('advanced.title')}</h1>
+              <h1 className="font-display text-[34px] leading-tight tracking-tight">{t('advanced.title')}</h1>
               <p className="text-muted-foreground mt-2">
                 {t('advanced.desc')}
               </p>

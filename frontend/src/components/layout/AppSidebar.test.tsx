@@ -13,6 +13,12 @@ vi.mock('@/components/ui/tooltip', () => ({
   TooltipContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }))
 
+vi.mock('@/lib/hooks/use-notebooks', () => ({
+  useNotebooks: () => ({
+    data: [{ id: 'notebook:a', name: 'Course notes', source_count: 3 }],
+  }),
+}))
+
 describe('AppSidebar', () => {
   afterEach(() => {
     vi.mocked(usePathname).mockReturnValue('')
@@ -37,24 +43,21 @@ describe('AppSidebar', () => {
     // With mocked t() returning keys, check for translation key strings
     expect(screen.getByText('common.appName')).toBeDefined()
     expect(screen.getByText('navigation.sources')).toBeDefined()
-    expect(screen.getByText('navigation.notebooks')).toBeDefined()
+    expect(screen.getAllByText('navigation.notebooks').length).toBeGreaterThan(0)
   })
 
-  it('uses consistent spacing for expanded footer actions', () => {
+  it('lists notebooks for quick switching', () => {
     render(<AppSidebar />)
 
-    const themeButton = screen.getByText('common.theme').closest('button')
-    const languageButton = screen.getByText('common.language').closest('button')
-    const signOutButton = screen.getByRole('button', { name: 'common.signOut' })
+    const link = screen.getByText('Course notes').closest('a')
+    expect(link?.getAttribute('href')).toBe('/notebooks/notebook%3Aa')
+  })
 
-    expect(themeButton?.className.split(/\s+/)).toContain('px-3')
+  it('keeps theme, language and sign out in the footer', () => {
+    render(<AppSidebar />)
 
-    for (const button of [themeButton, languageButton, signOutButton]) {
-      expect(button?.className.split(/\s+/)).toContain('gap-2')
-    }
-
-    expect(themeButton?.querySelector(':scope > span.relative.size-4')).not.toBeNull()
-    expect(signOutButton.className.split(/\s+/)).not.toContain('gap-3')
+    expect(screen.getByText('navigation.theme')).toBeDefined()
+    expect(screen.getByRole('button', { name: 'common.signOut' })).toBeDefined()
   })
 
   it('toggles collapse state when clicking handle', () => {

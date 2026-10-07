@@ -5,25 +5,24 @@
 @variant dark (&:where(.dark, .dark *));
 
 /* ============================================================================
-   OPEN NOTEBOOK — DESIGN FOUNDATION ("Quiet Green")
+   BRAIN NOTEBOOK — DESIGN FOUNDATION ("Ink & Signal")
 
-   The laws, in one breath:
-     fern acts · teal speaks (AI/system voice) · red destroys, and only destroys
-     warn is clay, never the action hues · color never washes a reading surface
-     hairline borders, near-zero shadows — popovers own the one real shadow
-     geometry is squared, 4–6px, floor is 4 · mono is for data, not prose
+   ink acts (primary buttons are ink, not color) · iris is the agent's voice
+   (research steps, live state, focus) · amber is evidence (citations, pages,
+   highlights) · emerald confirms · red destroys, and only destroys.
+   Paper surfaces, hairline borders, soft layered depth; serif for titles,
+   Geist for interface, mono for data and addresses.
 
-   Layering: raw palette + semantic raws live in :root and are overridden by
-   `.dark`; every alias defined with var() re-resolves automatically — never
-   duplicate aliases into the dark block.
+   Legacy token names (fern/teal/gold…) are kept so components keep working:
+   teal = iris (agent), gold = amber (evidence), fern = emerald (included/ok).
    ========================================================================== */
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-instrument-sans), "Helvetica Neue", Arial, sans-serif;
-  --font-mono: var(--font-spline-mono), ui-monospace, "SF Mono", Menlo, monospace;
-  --font-display: var(--font-bricolage), "Avenir Next", "Trebuchet MS", sans-serif;
+  --font-sans: var(--font-geist), "Inter", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
+  --font-display: var(--font-instrument-serif), "Iowan Old Style", Georgia, serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -119,99 +118,148 @@
   --color-ctx-insights: var(--ctx-insights);
   --color-ctx-insights-tint: var(--ctx-insights-tint);
 
-  /* shape — squared: instrument, not toy; floor is 4px */
-  --radius-sm: 4px;
-  --radius-md: 5px;
-  --radius-lg: 5px;
-  --radius-xl: 6px;
+  /* shape — soft but precise */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-2xl: 18px;
 
   /* depth — hairlines separate; popovers own the one real shadow */
   --shadow-soft: var(--shadow-soft);
   --shadow-lift: var(--shadow-lift);
   --shadow-pop: var(--shadow-pop);
   --shadow-overlay: var(--shadow-overlay);
+  --shadow-composer: var(--shadow-composer);
+
+  --color-iris: var(--teal);
+  --color-iris-deep: var(--teal-deep);
+  --color-iris-tint: var(--teal-tint);
+  --color-amber: var(--gold);
+  --color-amber-deep: var(--gold-deep);
+  --color-amber-tint: var(--gold-tint);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-recessed: var(--surface-recessed);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-on-agent: var(--on-agent);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-faint: var(--ink-faint);
+  --color-line-soft: var(--line-soft);
+
+  --animate-shimmer: shimmer 2.2s linear infinite;
+  --animate-fade-up: fade-up 0.32s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-pulse-dot: pulse-dot 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 0.35; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes spin-border {
+  to { --border-angle: 360deg; }
+}
+
+@property --border-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
 }
 
 :root {
   /* --------------------------------------------------------------
-     core palette — the owned hues, red-free
+     core palette
      -------------------------------------------------------------- */
-  --fern: #2e6b4f;
-  --fern-deep: #245740;
-  --fern-tint: #dfeae2;
+  --fern: #15803d;
+  --fern-deep: #166534;
+  --fern-tint: #e6f4ea;
 
-  --sage: #5e7a54;
-  --sage-deep: #47603f;
-  --sage-tint: #e5ebdc;
+  --sage: #5f7a52;
+  --sage-deep: #48603d;
+  --sage-tint: #e8eee1;
 
-  --gold: #a97b12;
-  --gold-deep: #7c5a05;
-  --gold-tint: #f3ead3;
+  --gold: #b45309;
+  --gold-deep: #92400e;
+  --gold-tint: #fbf0dc;
 
-  --teal: #0e7268;
-  --teal-deep: #095a51;
-  --teal-tint: #ddece8;
+  --teal: #5b4ae6;
+  --teal-deep: #4535c9;
+  --teal-tint: #efedfd;
 
-  --plum: #5d4991;
-  --plum-tint: #eae6f3;
+  --plum: #7c3aed;
+  --plum-tint: #f1eafd;
 
-  --mauve: #8d5b80;
-  --mauve-deep: #714566;
-  --mauve-tint: #f1e5ee;
+  --mauve: #be185d;
+  --mauve-deep: #9d174d;
+  --mauve-tint: #fce8f1;
 
-  --slate: #4e6b84;
-  --slate-deep: #3a5468;
-  --slate-tint: #e1e8ee;
+  --slate: #3b6a96;
+  --slate-deep: #2d5378;
+  --slate-tint: #e5eef6;
 
-  --violet: #6e51a6;
-  --violet-deep: #57408a;
-  --violet-tint: #ebe5f5;
+  --violet: #6d28d9;
+  --violet-deep: #5b21b6;
+  --violet-tint: #efe8fc;
 
-  --clay: #b0451f;
-  --clay-deep: #93330f;
-  --clay-tint: #f5e4db;
+  --clay: #c2410c;
+  --clay-deep: #9a3412;
+  --clay-tint: #fcebe1;
 
   /* --------------------------------------------------------------
      semantic raws — surfaces, ink, hairlines, action, danger
      -------------------------------------------------------------- */
-  --bg: #f5f5f2;
-  --bg-deep: #eeeee9;
-  --surface: #fefefc;
+  --bg: #f7f6f3;
+  --bg-deep: #f1f0ec;
+  --surface: #ffffff;
   --surface-raised: #ffffff;
-  --surface-recessed: #f4f4f0;
-  --surface-sunken: #ecece7;
+  --surface-recessed: #f4f3ef;
+  --surface-sunken: #ecebe6;
 
-  --ink: #23252a;
-  --ink-soft: #565a61;
-  --ink-faint: #878b92;
-  --ink-faintest: #a8abb1;
+  --ink: #18181b;
+  --ink-soft: #52525b;
+  --ink-faint: #8a8a93;
+  --ink-faintest: #b4b4bb;
 
-  --line: #e0e0da;
-  --line-soft: #e8e8e2;
-  --line-strong: #23252a;
+  --line: #e6e4df;
+  --line-soft: #eeede9;
+  --line-strong: #18181b;
 
-  --primary: #2e6b4f;
-  --primary-hover: #245740;
-  --on-primary: #f1f8f3;
+  --primary: #18181b;
+  --primary-hover: #2e2e33;
+  --on-primary: #fafaf9;
+  --on-agent: #ffffff;
 
-  --danger: #b0432d;
-  --danger-deep: #93341f;
-  --danger-tint: #f5e4df;
+  --danger: #c4321f;
+  --danger-deep: #a12514;
+  --danger-tint: #fbe7e3;
 
   --warn: var(--clay);
   --warn-deep: var(--clay-deep);
   --warn-tint: var(--clay-tint);
 
   /* teal evidence washes — the one sanctioned tinted text bg */
-  --excerpt-wash: #ecf3f0;
-  --best-match: rgba(14, 114, 104, 0.16);
-  --best-match-ring: rgba(14, 114, 104, 0.16);
+  --excerpt-wash: #fbf3e4;
+  --best-match: rgba(91, 74, 230, 0.12);
+  --best-match-ring: rgba(91, 74, 230, 0.2);
 
   /* depth */
-  --shadow-soft: 0 1px 2px rgba(35, 37, 42, 0.06);
-  --shadow-lift: 0 1px 3px rgba(35, 37, 42, 0.1);
-  --shadow-pop: 0 1px 2px rgba(35, 37, 42, 0.08), 0 8px 26px rgba(35, 37, 42, 0.13);
-  --shadow-overlay: 0 2px 6px rgba(35, 37, 42, 0.1), 0 16px 44px rgba(35, 37, 42, 0.18);
+  --shadow-soft: 0 1px 2px rgba(16, 16, 20, 0.04);
+  --shadow-lift: 0 1px 2px rgba(16, 16, 20, 0.04), 0 4px 14px rgba(16, 16, 20, 0.06);
+  --shadow-pop: 0 1px 2px rgba(16, 16, 20, 0.06), 0 12px 32px rgba(16, 16, 20, 0.12);
+  --shadow-overlay: 0 2px 8px rgba(16, 16, 20, 0.08), 0 24px 60px rgba(16, 16, 20, 0.18);
+  --shadow-composer: 0 1px 2px rgba(16, 16, 20, 0.04), 0 8px 28px rgba(16, 16, 20, 0.08);
 
   /* --------------------------------------------------------------
      aliases — re-resolve automatically in dark; defined once
@@ -219,8 +267,8 @@
   /* content-type hues */
   --type-video: var(--plum);
   --type-video-soft: var(--plum-tint);
-  --type-pdf: var(--gold);
-  --type-pdf-soft: var(--gold-tint);
+  --type-pdf: var(--clay);
+  --type-pdf-soft: var(--clay-tint);
   --type-web: var(--sage);
   --type-web-soft: var(--sage-tint);
   --type-audio: var(--mauve);
@@ -235,8 +283,8 @@
   --type-insight-soft: var(--teal-tint);
 
   /* evidence classes */
-  --cite-source: var(--teal);
-  --cite-source-deep: var(--teal-deep);
+  --cite-source: var(--gold);
+  --cite-source-deep: var(--gold-deep);
   --cite-note: var(--gold);
   --cite-note-deep: var(--gold-deep);
   --cite-derived: var(--violet);
@@ -256,13 +304,14 @@
 
   /* motion — quick and quiet */
   --motion-fast: 0.12s;
-  --motion-base: 0.15s;
-  --motion-slow: 0.25s;
+  --motion-base: 0.18s;
+  --motion-slow: 0.3s;
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
 
   /* --------------------------------------------------------------
      shadcn semantic slots — the contract existing components use
      -------------------------------------------------------------- */
-  --radius: 5px;
+  --radius: 8px;
   --background: var(--bg);
   --foreground: var(--ink);
   --card: var(--surface);
@@ -285,11 +334,11 @@
   --chart-3: var(--gold);
   --chart-4: var(--plum);
   --chart-5: var(--slate);
-  --sidebar: var(--bg-deep);
+  --sidebar: var(--bg);
   --sidebar-foreground: var(--ink);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--on-primary);
-  --sidebar-accent: var(--surface);
+  --sidebar-accent: var(--surface-sunken);
   --sidebar-accent-foreground: var(--ink);
   --sidebar-border: var(--line);
   --sidebar-ring: var(--teal);
@@ -300,68 +349,70 @@
    ========================================================================== */
 .dark {
   /* core palette */
-  --fern: #55b285;
-  --fern-deep: #6cc298;
-  --fern-tint: #1b2f25;
-  --sage: #93b084;
-  --sage-deep: #a8c299;
-  --sage-tint: #232b1d;
-  --gold: #cfa13e;
-  --gold-deep: #ddb55f;
-  --gold-tint: #322b1b;
-  --teal: #3fb3a5;
-  --teal-deep: #64c5b9;
-  --teal-tint: #16302c;
-  --plum: #a290d3;
-  --plum-tint: #29253a;
-  --mauve: #c892ba;
-  --mauve-deep: #d6a8cb;
-  --mauve-tint: #322230;
-  --slate: #8fafc8;
-  --slate-deep: #a5c1d6;
-  --slate-tint: #212b34;
-  --violet: #a995db;
-  --violet-deep: #bcaae6;
-  --violet-tint: #2b2540;
-  --clay: #f08a5c;
-  --clay-deep: #f5a07a;
-  --clay-tint: #35211a;
+  --fern: #4ade80;
+  --fern-deep: #86efac;
+  --fern-tint: #13271b;
+  --sage: #a3bf94;
+  --sage-deep: #b8d0aa;
+  --sage-tint: #1f271a;
+  --gold: #f0b54a;
+  --gold-deep: #f6c873;
+  --gold-tint: #2b2112;
+  --teal: #9d90ff;
+  --teal-deep: #b7adff;
+  --teal-tint: #1d1a36;
+  --plum: #b794f6;
+  --plum-tint: #251d38;
+  --mauve: #f472b6;
+  --mauve-deep: #f9a8d4;
+  --mauve-tint: #33192a;
+  --slate: #93b8dc;
+  --slate-deep: #b1cde8;
+  --slate-tint: #18242f;
+  --violet: #b9a2f8;
+  --violet-deep: #cdbcfb;
+  --violet-tint: #241d3a;
+  --clay: #fb8a4c;
+  --clay-deep: #fdab7d;
+  --clay-tint: #33201a;
 
   /* semantic raws */
-  --bg: #17181b;
-  --bg-deep: #121316;
-  --surface: #1e2024;
-  --surface-raised: #24262b;
-  --surface-recessed: #24262b;
-  --surface-sunken: #2b2d33;
+  --bg: #0b0b0d;
+  --bg-deep: #08080a;
+  --surface: #131316;
+  --surface-raised: #19191d;
+  --surface-recessed: #17171a;
+  --surface-sunken: #1f1f24;
 
-  --ink: #ecedea;
-  --ink-soft: #a9acb1;
-  --ink-faint: #74777d;
-  --ink-faintest: #63666c;
+  --ink: #ededef;
+  --ink-soft: #a1a1aa;
+  --ink-faint: #71717a;
+  --ink-faintest: #52525b;
 
-  --line: #2e3036;
-  --line-soft: #26282d;
-  --line-strong: #ecedea;
+  --line: #24242a;
+  --line-soft: #1c1c21;
+  --line-strong: #ededef;
 
-  --primary: #3d8e67;
-  --primary-hover: #479e74;
-  --on-primary: #ecf7f0;
+  --primary: #ededef;
+  --primary-hover: #ffffff;
+  --on-primary: #0b0b0d;
+  --on-agent: #0b0b0d;
 
-  --danger: #df7c63;
-  --danger-deep: #e9937d;
-  --danger-tint: #37231d;
+  --danger: #f87171;
+  --danger-deep: #fca5a5;
+  --danger-tint: #341818;
 
   /* evidence washes */
-  --excerpt-wash: #1c2a28;
-  --best-match: rgba(63, 179, 165, 0.2);
-  --best-match-ring: rgba(63, 179, 165, 0.2);
+  --excerpt-wash: #241d10;
+  --best-match: rgba(157, 144, 255, 0.16);
+  --best-match-ring: rgba(157, 144, 255, 0.28);
 
   /* depth */
-  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.35);
-  --shadow-lift: 0 1px 3px rgba(0, 0, 0, 0.45);
-  --shadow-pop: 0 1px 2px rgba(0, 0, 0, 0.45), 0 10px 30px rgba(0, 0, 0, 0.5);
-  --shadow-overlay: 0 2px 6px rgba(0, 0, 0, 0.4), 0 20px 52px rgba(0, 0, 0, 0.55);
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-lift: 0 0 0 1px rgba(255, 255, 255, 0.02), 0 6px 20px rgba(0, 0, 0, 0.45);
+  --shadow-pop: 0 0 0 1px rgba(255, 255, 255, 0.04), 0 16px 40px rgba(0, 0, 0, 0.6);
+  --shadow-overlay: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 28px 70px rgba(0, 0, 0, 0.7);
+  --shadow-composer: 0 0 0 1px rgba(255, 255, 255, 0.03), 0 12px 36px rgba(0, 0, 0, 0.55);
 }
 
 @layer base {
@@ -417,9 +468,15 @@
     @apply transition-colors duration-150 cursor-pointer;
   }
 
+  .card-hover {
+    transition: border-color var(--motion-base) var(--ease-out),
+      box-shadow var(--motion-base) var(--ease-out),
+      transform var(--motion-base) var(--ease-out);
+  }
+
   .card-hover:hover {
     background-color: var(--surface-raised) !important;
-    border-color: var(--border);
+    border-color: color-mix(in oklab, var(--ink) 14%, var(--line));
     box-shadow: var(--shadow-lift);
   }
 
@@ -445,5 +502,138 @@
 
   .w-md-editor-preview :where(.wmde-markdown ol) {
     list-style-type: decimal;
+  }
+}
+
+/* ============================================================================
+   Brain Notebook utilities
+   ========================================================================== */
+
+/* Instrument Serif ships one weight: never synthesize bold */
+.font-display {
+  font-weight: 400 !important;
+  letter-spacing: -0.012em;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--teal) 22%, transparent);
+}
+
+/* quiet scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--ink) 16%, transparent) transparent;
+}
+
+/* paper with a faint dot grid, for hero areas */
+.paper-dots {
+  background-image: radial-gradient(
+    color-mix(in oklab, var(--ink) 9%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: 18px 18px;
+}
+
+/* the agent's voice: iris → violet → amber */
+.text-agent-gradient {
+  background: linear-gradient(100deg, var(--teal) 0%, var(--plum) 45%, var(--gold) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* "Researching…" — a slow light sweep across the text */
+.shimmer-text {
+  background: linear-gradient(
+    90deg,
+    var(--ink-faint) 0%,
+    var(--ink-faint) 40%,
+    var(--teal) 50%,
+    var(--ink-faint) 60%,
+    var(--ink-faint) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 2.2s linear infinite;
+}
+
+/* a live agent run: a slowly rotating iris edge */
+.agent-live {
+  position: relative;
+  isolation: isolate;
+}
+
+.agent-live::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(
+    from var(--border-angle),
+    transparent 0deg,
+    var(--teal) 70deg,
+    var(--plum) 120deg,
+    transparent 190deg,
+    transparent 360deg
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: spin-border 3.2s linear infinite;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* answers: comfortable reading measure and rhythm */
+.answer-prose {
+  font-size: 0.9375rem;
+  line-height: 1.7;
+}
+
+.answer-prose :where(p, ul, ol) {
+  margin-block: 0.7em;
+}
+
+.answer-prose :where(h1, h2, h3) {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+/* citation chips inside answers */
+.cite-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  height: 1.2rem;
+  padding: 0 0.35rem;
+  margin-inline: 0.1rem;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 500;
+  line-height: 1;
+  vertical-align: 0.12em;
+  color: var(--gold-deep);
+  background: var(--gold-tint);
+  border: 1px solid color-mix(in oklab, var(--gold) 25%, transparent);
+  transition: background var(--motion-fast), color var(--motion-fast), transform var(--motion-fast);
+  text-decoration: none !important;
+}
+
+.cite-chip:hover {
+  background: var(--gold);
+  color: var(--surface);
+  transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer-text,
+  .agent-live::before {
+    animation: none;
   }
 }

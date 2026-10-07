@@ -35,7 +35,7 @@ export function SystemInfo() {
     return (
       <Card className="p-6">
         <div className="space-y-4">
-          <h2 className="font-display text-xl font-semibold tracking-tight">{t('advanced.systemInfo')}</h2>
+          <h2 className="font-display text-[24px] tracking-tight">{t('advanced.systemInfo')}</h2>
           <div className="text-sm text-muted-foreground">{t('common.loading')}</div>
         </div>
       </Card>
@@ -45,7 +45,7 @@ export function SystemInfo() {
   return (
     <Card className="p-6">
       <div className="space-y-4">
-        <h2 className="font-display text-xl font-semibold tracking-tight">{t('advanced.systemInfo')}</h2>
+        <h2 className="font-display text-[24px] tracking-tight">{t('advanced.systemInfo')}</h2>
 
         <div className="space-y-3">
           {/* Current Version */}

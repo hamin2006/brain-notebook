@@ -96,6 +96,26 @@ describe('ChatPanel composer', () => {
     uaSpy.mockRestore()
   })
 
+  it('sends on plain Enter and keeps Shift+Enter for a new line', () => {
+    const onSendMessage = vi.fn()
+    render(
+      <ChatPanel
+        messages={[]}
+        isStreaming={false}
+        contextIndicators={null}
+        onSendMessage={onSendMessage}
+      />
+    )
+
+    const textarea = getTextarea()
+    fireEvent.change(textarea, { target: { value: 'first line' } })
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: true })
+    expect(onSendMessage).not.toHaveBeenCalled()
+
+    fireEvent.keyDown(textarea, { key: 'Enter' })
+    expect(onSendMessage).toHaveBeenCalledWith('first line', undefined, undefined)
+  })
+
   it('does not send while streaming', () => {
     const onSendMessage = vi.fn()
     render(

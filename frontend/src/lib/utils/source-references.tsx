@@ -373,7 +373,8 @@ export function createReferenceLinkComponent(
 export function convertReferencesToCompactMarkdown(
   text: string,
   referencesLabel: string = 'References',
-  formatLocator: LocatorFormatter = defaultLocatorFormatter
+  formatLocator: LocatorFormatter = defaultLocatorFormatter,
+  appendList: boolean = true
 ): string {
   // Step 1: Parse all references using existing function
   const references = parseSourceReferences(text)
@@ -437,6 +438,10 @@ export function convertReferencesToCompactMarkdown(
     result = result.substring(0, replaceStart) + citationLink + result.substring(replaceEnd)
   }
 
+  if (!appendList) {
+    return result
+  }
+
   // Step 5: Build reference list
   const refListLines: string[] = [`\n\n${referencesLabel}:`]
 
@@ -451,6 +456,21 @@ export function convertReferencesToCompactMarkdown(
   result = result + refListLines.join('\n')
 
   return result
+}
+
+/**
+ * The distinct references of a text in citation order, numbered as
+ * convertReferencesToCompactMarkdown numbers them.
+ */
+export function collectReferences(text: string): ReferenceData[] {
+  const seen = new Map<string, ReferenceData>()
+  for (const reference of parseSourceReferences(text)) {
+    const key = `${reference.type}:${reference.id}${reference.locator ?? ''}`
+    if (!seen.has(key)) {
+      seen.set(key, { number: seen.size + 1, type: reference.type, id: reference.id, locator: reference.locator })
+    }
+  }
+  return [...seen.values()]
 }
 
 /**

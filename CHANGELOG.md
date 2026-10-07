@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **A redesigned interface ("Ink & Signal")** built around the research agent ([ADR-018](docs/7-DEVELOPMENT/decisions/ADR-018-research-workspace-ui.md)). The notebook page is a workspace: a library (Sources · Notes · Concepts) on the left, the conversation in the middle, and an evidence panel that opens a cited page (browsable, with its outline section) or a concept (relations, mentions, *Ask about this*) beside the answer. Answers show a live research timeline while the agent works, citation chips that preview the page on hover, and thumbnails of every cited page. Empty conversations offer starter questions built from the notebook's key concepts; **New chat** starts a fresh conversation. New home page with an ask-everywhere box, recent items and notebook cards with page covers; a sidebar with a search button and your notebooks; Ask restyled to match; a **Structure** tab on paged sources (metadata, summary, outline, concepts, every page). New type (Instrument Serif, Geist), palette, light and dark themes
+- `GET /api/notebooks/{id}/overview` (document, page, section, note and concept counts plus the most shared concepts), `GET /api/notebooks/{id}/concepts/{concept_id}` (a concept's mentions and relations) and `GET /api/sources/{id}/structure` (metadata, page count, summary, outline, concepts)
+- Page images take `format=jpeg` for small thumbnails (`/api/sources/{id}/pages/{n}/image?max_side=480&format=jpeg`)
+- `API_URL=relative` makes the UI call the API through its own origin; `scripts/brain/install_services.sh` sets it, so a systemd install whose API listens on 127.0.0.1 works from other machines. Existing installs: add `Environment=API_URL=relative` to `brain-frontend.service`
+
+### Changed
+- In the chat and Ask boxes **Enter** sends and **Shift+Enter** adds a line (Cmd/Ctrl+Enter still sends)
+- The notebook's grounding switch moved from the chat box to the notebook header; effort is a Quick / Standard / Deep toggle in the message box
+
+### Fixed
+- Notebook chat failed with HTTP 422 on every message: the API required a legacy `context` field the UI no longer sends
+- Opening a link to a notebook or source in a fresh browser (no saved session) bounced through the login page to the notebook list
+
 ## [2.0.0] - 2026-10-07 — Brain Notebook
 
 First release as **Brain Notebook**, a fork of Open Notebook 1.15.0 rebuilt around a research agent: chat, Ask and source chat no longer paste documents into a prompt but research the notebook with tools (page-level search, grep, outlines, reading and *looking at* pages, a concept graph, sub-agents, optional web search) and answer with page citations. PDFs are ingested page by page with equation recovery, vision captions, outlines, summaries and metadata. The app is also an MCP server. Deployment builds this repository (the upstream images do not include any of it). Code identifiers (`open_notebook` package, `OPEN_NOTEBOOK_*` variables) keep their names so upstream changes can still be merged.

@@ -60,7 +60,10 @@ export function useAuth() {
 
   return {
     isAuthenticated,
-    isLoading: isLoading || !hasHydrated, // Treat lack of hydration as loading
+    // Loading until hydrated and, unless a stored session says we're signed in,
+    // until we know whether a password is required at all (a fresh browser
+    // would otherwise bounce deep links through /login).
+    isLoading: isLoading || !hasHydrated || (authRequired === null && !isAuthenticated),
     error,
     login: handleLogin,
     logout: handleLogout

@@ -1,9 +1,8 @@
 'use client'
 
-import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { SourceListResponse } from '@/lib/types/api'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,8 +20,6 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { useModalManager } from '@/lib/hooks/use-modal-manager'
 import { ContextMode } from '../[id]/page'
 import type { SourceBulkAction } from '@/lib/utils/source-context'
-import { CollapsibleColumn, createCollapseButton } from '@/components/notebooks/CollapsibleColumn'
-import { useNotebookColumnsStore } from '@/lib/stores/notebook-columns-store'
 import { useTranslation } from '@/lib/hooks/use-translation'
 
 interface SourcesColumnProps {
@@ -65,13 +62,6 @@ export function SourcesColumn({
   const deleteSource = useDeleteSource()
   const retrySource = useRetrySource()
   const removeFromNotebook = useRemoveSourceFromNotebook()
-
-  // Collapsible column state
-  const { sourcesCollapsed, toggleSources } = useNotebookColumnsStore()
-  const collapseButton = useMemo(
-    () => createCollapseButton(toggleSources, t('navigation.sources')),
-    [toggleSources, t('navigation.sources')]
-  )
 
   // Scroll container ref for infinite scroll
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -150,107 +140,90 @@ export function SourcesColumn({
 
   return (
     <>
-      <CollapsibleColumn
-        isCollapsed={sourcesCollapsed}
-        onToggle={toggleSources}
-        collapsedIcon={FileText}
-        collapsedLabel={t('navigation.sources')}
-      >
-        <Card className="h-full flex flex-col flex-1 overflow-hidden">
-          <CardHeader className="pb-3 flex-shrink-0">
-            <div className="flex items-center justify-between gap-2">
-              <CardTitle className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.13em] text-muted-foreground">
-                <span aria-hidden className="h-3.5 w-[3px] rounded-full bg-sage" />
-                {t('navigation.sources')}
-              </CardTitle>
-              <div className="flex items-center gap-2">
-                {onBulkContextModeChange && sources && sources.length > 0 && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="text-muted-foreground" title={t('sources.bulkContext')}>
-                        <ListChecks className="h-4 w-4" />
-                        <ChevronDown className="h-4 w-4 ml-1" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => onBulkContextModeChange('insights')}>
-                        {t('sources.includeAllInsights')}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => onBulkContextModeChange('full')}>
-                        {t('sources.includeAllFull')}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => onBulkContextModeChange('exclude')}>
-                        {t('sources.excludeAllFromContext')}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-                <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
-                  <DropdownMenuTrigger asChild>
-                    <Button size="sm">
-                      <Plus className="h-4 w-4 mr-2" />
-                      {t('sources.addSource')}
-                      <ChevronDown className="h-4 w-4 ml-2" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => { setDropdownOpen(false); setAddDialogOpen(true); }}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      {t('sources.addSource')}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => { setDropdownOpen(false); setAddExistingDialogOpen(true); }}>
-                      <Link2 className="h-4 w-4 mr-2" />
-                      {t('sources.addExistingTitle')}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                {collapseButton}
-              </div>
-            </div>
-          </CardHeader>
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="flex flex-shrink-0 items-center gap-1.5 px-3 pb-2">
+          <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline" className="h-8 flex-1 justify-start">
+                <Plus className="h-4 w-4" />
+                {t('sources.addSource')}
+                <ChevronDown className="ml-auto h-3.5 w-3.5 opacity-60" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuItem onClick={() => { setDropdownOpen(false); setAddDialogOpen(true); }}>
+                <Plus className="h-4 w-4 mr-2" />
+                {t('sources.addSource')}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { setDropdownOpen(false); setAddExistingDialogOpen(true); }}>
+                <Link2 className="h-4 w-4 mr-2" />
+                {t('sources.addExistingTitle')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {onBulkContextModeChange && sources && sources.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon-sm" className="text-muted-foreground" title={t('sources.bulkContext')} aria-label={t('sources.bulkContext')}>
+                  <ListChecks className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onBulkContextModeChange('insights')}>
+                  {t('sources.includeAllInsights')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onBulkContextModeChange('full')}>
+                  {t('sources.includeAllFull')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onBulkContextModeChange('exclude')}>
+                  {t('sources.excludeAllFromContext')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
 
-          <CardContent ref={scrollContainerRef} className="flex-1 overflow-y-auto min-h-0">
-            {isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <LoadingSpinner />
-              </div>
-            ) : !sources || sources.length === 0 ? (
-              <EmptyState
-                icon={FileText}
-                title={t('sources.noSourcesYet')}
-                description={t('sources.createFirstSource')}
-              />
-            ) : (
-              <div className="space-y-2">
-                {sources.map((source) => (
-                  <SourceCard
-                    key={source.id}
-                    source={source}
-                    onClick={handleSourceClick}
-                    onDelete={handleDeleteClick}
-                    onRetry={handleRetry}
-                    onRefreshContent={handleRetry}
-                    onRemoveFromNotebook={handleRemoveFromNotebook}
-                    onRefresh={onRefresh}
-                    showRemoveFromNotebook={true}
-                    contextMode={contextSelections?.[source.id]}
-                    onContextModeChange={onContextModeChange
-                      ? (mode) => onContextModeChange(source.id, mode)
-                      : undefined
-                    }
-                  />
-                ))}
-                {/* Loading indicator for infinite scroll */}
-                {isFetchingNextPage && (
-                  <div className="flex items-center justify-center py-4">
-                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </CollapsibleColumn>
+        <div ref={scrollContainerRef} className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-3">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <LoadingSpinner />
+            </div>
+          ) : !sources || sources.length === 0 ? (
+            <EmptyState
+              icon={FileText}
+              title={t('sources.noSourcesYet')}
+              description={t('sources.createFirstSource')}
+            />
+          ) : (
+            <div className="space-y-0.5">
+              {sources.map((source) => (
+                <SourceCard
+                  key={source.id}
+                  source={source}
+                  onClick={handleSourceClick}
+                  onDelete={handleDeleteClick}
+                  onRetry={handleRetry}
+                  onRefreshContent={handleRetry}
+                  onRemoveFromNotebook={handleRemoveFromNotebook}
+                  onRefresh={onRefresh}
+                  showRemoveFromNotebook={true}
+                  contextMode={contextSelections?.[source.id]}
+                  onContextModeChange={onContextModeChange
+                    ? (mode) => onContextModeChange(source.id, mode)
+                    : undefined
+                  }
+                />
+              ))}
+              {/* Loading indicator for infinite scroll */}
+              {isFetchingNextPage && (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
 
       <AddSourceDialog
         open={addDialogOpen}

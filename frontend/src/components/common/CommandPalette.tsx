@@ -55,6 +55,13 @@ const getThemeItems = (t: TFunction) => [
   { name: t('common.system'), value: 'system' as const, icon: Monitor, keywords: ['auto', 'default'] },
 ]
 
+const OPEN_EVENT = 'brain:open-command-palette'
+
+/** Open the command palette from anywhere (e.g. the sidebar's search button). */
+export function openCommandPalette() {
+  window.dispatchEvent(new Event(OPEN_EVENT))
+}
+
 export function CommandPalette() {
   const { t } = useTranslation()
   const commandInputId = useId()
@@ -89,9 +96,15 @@ export function CommandPalette() {
       }
     }
 
+    const openFromEvent = () => setOpen(true)
+
     // Use capture phase to intercept before other handlers
     document.addEventListener('keydown', down, true)
-    return () => document.removeEventListener('keydown', down, true)
+    window.addEventListener(OPEN_EVENT, openFromEvent)
+    return () => {
+      document.removeEventListener('keydown', down, true)
+      window.removeEventListener(OPEN_EVENT, openFromEvent)
+    }
   }, [])
 
   // Reset query when dialog closes

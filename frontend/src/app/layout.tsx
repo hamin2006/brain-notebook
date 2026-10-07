@@ -1,9 +1,5 @@
 import type { Metadata } from "next";
-import {
-  Bricolage_Grotesque,
-  Instrument_Sans,
-  Spline_Sans_Mono,
-} from "next/font/google";
+import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 import "katex/dist/katex.min.css";
 import { Toaster } from "@/components/ui/sonner";
@@ -14,25 +10,26 @@ import { ConnectionGuard } from "@/components/common/ConnectionGuard";
 import { themeScript } from "@/lib/theme-script";
 import { I18nProvider } from "@/components/providers/I18nProvider";
 
-const instrumentSans = Instrument_Sans({
+const geist = Geist({
   subsets: ["latin"],
-  variable: "--font-instrument-sans",
+  variable: "--font-geist",
 });
 
-const bricolageGrotesque = Bricolage_Grotesque({
+const geistMono = Geist_Mono({
   subsets: ["latin"],
-  weight: ["600", "700"],
-  variable: "--font-bricolage",
+  variable: "--font-geist-mono",
 });
 
-const splineSansMono = Spline_Sans_Mono({
+const instrumentSerif = Instrument_Serif({
   subsets: ["latin"],
-  variable: "--font-spline-mono",
+  weight: "400",
+  style: ["normal", "italic"],
+  variable: "--font-instrument-serif",
 });
 
 export const metadata: Metadata = {
   title: "Brain Notebook",
-  description: "Privacy-focused research and knowledge management",
+  description: "A self-hosted research notebook: answers researched from your documents, cited to the page",
 };
 
 export default function RootLayout({
@@ -46,7 +43,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body
-        className={`${instrumentSans.variable} ${bricolageGrotesque.variable} ${splineSansMono.variable} font-sans`}
+        className={`${geist.variable} ${geistMono.variable} ${instrumentSerif.variable} font-sans`}
       >
         <ErrorBoundary>
           <ThemeProvider>

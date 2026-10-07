@@ -84,14 +84,15 @@ export function ModelSelector({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button 
-          variant="outline" 
+        <Button
+          variant="ghost"
           size="sm"
           disabled={disabled}
-          className="gap-2"
+          className="h-7 max-w-[180px] gap-1.5 px-2 text-muted-foreground hover:text-foreground"
+          title={t('chat.model')}
         >
-          <Settings2 className="h-4 w-4" />
-          <span className="text-xs">
+          <Settings2 className="h-3.5 w-3.5" />
+          <span className="hidden truncate font-mono text-[11px] @lg:inline">
             {currentModelName}
           </span>
         </Button>

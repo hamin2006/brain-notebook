@@ -19,6 +19,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { useSourceStructure } from '@/lib/hooks/use-explore'
+import { SourceStructureView } from '@/components/brain/SourceStructure'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   DropdownMenu,
@@ -123,6 +125,12 @@ function SourceDetailContentInner({
   const loadError = loadQueryError ? (isNotFoundError(loadQueryError) ? 'not-found' : 'error') : null
   const updateSource = useUpdateSource()
   const deleteSource = useDeleteSource()
+
+  // Outline, pages and concepts from ingestion; shown first when present
+  const { data: structure } = useSourceStructure(source ? sourceId : null)
+  const hasStructure = !!structure && (structure.page_count > 0 || structure.sections.length > 0)
+  const [tab, setTab] = useState<string | null>(null)
+  const activeTab = tab ?? (hasStructure ? 'structure' : 'content')
 
   // file_available comes from the source payload; downloads may flip it later,
   // so keep it as local state synced from the query data.
@@ -448,8 +456,8 @@ function SourceDetailContentInner({
             <InlineEdit
               value={source.title || ''}
               onSave={handleUpdateTitle}
-              className="text-2xl font-bold"
-              inputClassName="text-2xl font-bold"
+              className="font-display text-[28px] leading-tight tracking-tight"
+              inputClassName="font-display text-[28px] tracking-tight"
               placeholder={t('sources.titlePlaceholder')}
               emptyText={t('sources.untitledSource')}
             />
@@ -517,14 +525,21 @@ function SourceDetailContentInner({
 
       {/* Tabs Content */}
       <div className="flex-1 overflow-y-auto">
-        <Tabs defaultValue="content" className="w-full">
-          <TabsList className="w-full sticky top-0 z-10 bg-card">
+        <Tabs value={activeTab} onValueChange={setTab} className="w-full">
+          <TabsList className="w-full sticky top-0 z-10 bg-background">
+            {hasStructure && <TabsTrigger value="structure">{t('brain.structure')}</TabsTrigger>}
             <TabsTrigger value="content">{t('sources.content')}</TabsTrigger>
             <TabsTrigger value="insights">
               {t('common.insights')} {insights.length > 0 && `(${insights.length})`}
             </TabsTrigger>
             <TabsTrigger value="details">{t('sources.details')}</TabsTrigger>
           </TabsList>
+
+          {hasStructure && structure && (
+            <TabsContent value="structure" className="mt-5">
+              <SourceStructureView structure={structure} />
+            </TabsContent>
+          )}
 
           <TabsContent value="content" className="mt-5">
             <section>

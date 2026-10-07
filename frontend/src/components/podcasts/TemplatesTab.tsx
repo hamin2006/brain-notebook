@@ -30,7 +30,7 @@ export function TemplatesTab() {
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h2 className="font-display text-xl font-semibold tracking-tight">{t('podcasts.templatesWorkspaceTitle')}</h2>
+        <h2 className="font-display text-[24px] tracking-tight">{t('podcasts.templatesWorkspaceTitle')}</h2>
         <p className="text-sm text-muted-foreground">
           {t('podcasts.templatesWorkspaceDesc')}
         </p>

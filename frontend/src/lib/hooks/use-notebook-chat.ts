@@ -100,14 +100,17 @@ export function useNotebookChat({ notebookId, sources, notes, contextSelections 
     }
   }, [currentSession])
 
+  // A "new chat" that has no session until its first message is sent
+  const [freshChat, setFreshChat] = useState(false)
+
   // Auto-select most recent session when sessions are loaded
   useEffect(() => {
-    if (sessions.length > 0 && !currentSessionId) {
+    if (sessions.length > 0 && !currentSessionId && !freshChat) {
       // Sessions are sorted by created date desc from API
       const mostRecentSession = sessions[0]
       setCurrentSessionId(mostRecentSession.id)
     }
-  }, [sessions, currentSessionId])
+  }, [sessions, currentSessionId, freshChat])
 
   // Create session mutation
   const createSessionMutation = useMutation({
@@ -198,6 +201,7 @@ export function useNotebookChat({ notebookId, sources, notes, contextSelections 
         })
         sessionId = newSession.id
         setCurrentSessionId(sessionId)
+        setFreshChat(false)
         // Clear pending model override now that it's applied to the session
         setPendingModelOverride(null)
         queryClient.invalidateQueries({
@@ -290,7 +294,15 @@ export function useNotebookChat({ notebookId, sources, notes, contextSelections 
 
   // Switch session
   const switchSession = useCallback((sessionId: string) => {
+    setFreshChat(false)
     setCurrentSessionId(sessionId)
+  }, [])
+
+  // Start an empty conversation; the session is created by its first message
+  const startNewChat = useCallback(() => {
+    setFreshChat(true)
+    setCurrentSessionId(null)
+    setMessages([])
   }, [])
 
   // Create session
@@ -345,6 +357,7 @@ export function useNotebookChat({ notebookId, sources, notes, contextSelections 
     updateSession,
     deleteSession,
     switchSession,
+    startNewChat,
     sendMessage,
     setEffort,
     setModelOverride,

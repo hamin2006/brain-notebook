@@ -1,6 +1,6 @@
 "use client"
 
-// Living styleguide for the "Quiet Green" design foundation.
+// Living styleguide for the "Ink & Signal" design foundation (ADR-018).
 // Dev-only: returns 404 in production builds. Not translated on purpose —
 // this is an internal spec artifact, not user-facing UI.
 
@@ -149,12 +149,12 @@ function Sheet() {
     <div className="bg-background text-foreground p-8">
       <header className="mb-2 flex items-start justify-between gap-4">
         <div>
-          <h1 className="font-display text-2xl font-bold tracking-tight">
-            Quiet Green — design foundation
+          <h1 className="font-display text-[34px] tracking-tight">
+            Ink &amp; Signal — design foundation
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            fern acts · teal speaks · red destroys · warn is clay · color never
-            washes a reading surface · popovers own the one real shadow
+            ink acts · iris (teal) is the agent&apos;s voice · amber (gold) is evidence ·
+            emerald (fern) confirms · red only destroys
           </p>
         </div>
         <Button

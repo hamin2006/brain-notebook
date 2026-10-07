@@ -20,6 +20,7 @@ interface NotebookListProps {
   emptyDescription?: string
   onAction?: () => void
   actionLabel?: string
+  hideTitle?: boolean
 }
 
 export function NotebookList({ 
@@ -31,6 +32,7 @@ export function NotebookList({
   emptyDescription,
   onAction,
   actionLabel,
+  hideTitle = false,
 }: NotebookListProps) {
   const { t } = useTranslation()
   const viewMode = useNotebookViewStore((state) => state.viewMode)
@@ -62,7 +64,7 @@ export function NotebookList({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
+      <div className={hideTitle ? 'hidden' : 'flex items-center gap-2'}>
         {collapsible && (
           <Button
             variant="ghost"
@@ -76,7 +78,7 @@ export function NotebookList({
             )}
           </Button>
         )}
-        <h2 className="font-display text-lg font-semibold tracking-tight">{title}</h2>
+        <h2 className="font-display text-[22px] tracking-tight">{title}</h2>
         <span className="text-sm text-muted-foreground">({notebooks.length})</span>
       </div>
 
@@ -88,7 +90,7 @@ export function NotebookList({
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
             {notebooks.map((notebook) => (
               <NotebookCard key={notebook.id} notebook={notebook} />
             ))}

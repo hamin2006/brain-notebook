@@ -11,10 +11,10 @@ import { Button } from '@/components/ui/button'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { Search, ChevronDown, AlertCircle, Settings, Save, MessageCircleQuestion } from 'lucide-react'
+import { Search, ChevronDown, AlertCircle, Settings, Save, Sparkles, ArrowUp } from 'lucide-react'
 import { useSearch } from '@/lib/hooks/use-search'
 import { useAsk } from '@/lib/hooks/use-ask'
 import { useModelDefaults, useModels } from '@/lib/hooks/use-models'
@@ -163,172 +163,123 @@ export default function SearchPage() {
 
   return (
     <AppShell>
-      <div className="flex-1 overflow-y-auto p-4 md:p-6">
-        <h1 className="font-display text-xl md:text-2xl font-bold tracking-tight mb-4 md:mb-6">{t('searchPage.askAndSearch')}</h1>
+      <div className="flex-1 overflow-y-auto">
+        <div className="mx-auto w-full max-w-3xl px-4 pb-20 pt-10 md:px-6 md:pt-14">
+        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">{t('searchPage.askAndSearch')}</p>
+        <h1 className="mt-2 font-display text-[40px] leading-[1.05] tracking-tight md:text-[48px]">
+          {activeTab === 'ask' ? t('brain.askTitle') : t('brain.searchTitle')}
+        </h1>
+        <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+          {activeTab === 'ask' ? t('brain.askSubtitle') : t('searchPage.searchDesc')}
+        </p>
 
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'ask' | 'search')} className="w-full space-y-6">
-          <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('searchPage.chooseAMode')}</p>
-            <TabsList aria-label={t('common.accessibility.searchKB')} className="w-full max-w-xl">
-              <TabsTrigger value="ask">
-                <MessageCircleQuestion className="h-4 w-4" />
-                {t('searchPage.askBeta')}
-              </TabsTrigger>
-              <TabsTrigger value="search">
-                <Search className="h-4 w-4" />
-                {t('searchPage.search')}
-              </TabsTrigger>
-            </TabsList>
-          </div>
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'ask' | 'search')} className="mt-6 w-full gap-6">
+          <TabsList aria-label={t('common.accessibility.searchKB')} className="gap-0 rounded-lg border-0 bg-surface-recessed p-0.5">
+            <TabsTrigger value="ask" className="mb-0 h-8 rounded-md border-0 px-3 data-[state=active]:bg-card data-[state=active]:shadow-soft">
+              <Sparkles className="h-3.5 w-3.5" />
+              {t('searchPage.ask')}
+            </TabsTrigger>
+            <TabsTrigger value="search" className="mb-0 h-8 rounded-md border-0 px-3 data-[state=active]:bg-card data-[state=active]:shadow-soft">
+              <Search className="h-3.5 w-3.5" />
+              {t('searchPage.search')}
+            </TabsTrigger>
+          </TabsList>
 
-          <TabsContent value="ask" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">{t('searchPage.askYourKb')}</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  {t('searchPage.askYourKbDesc')}
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Question Input */}
-                <div className="space-y-2">
-                  <Label htmlFor="ask-question">{t('searchPage.question')}</Label>
-                  <Textarea
-                    id="ask-question"
-                    name="ask-question"
-                    placeholder={t('searchPage.enterQuestionPlaceholder')}
-                    value={askQuestion}
-                    onChange={(e) => setAskQuestion(e.target.value)}
-                    onKeyDown={(e) => {
-                      // Submit on Cmd/Ctrl+Enter
-                      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !ask.isStreaming && askQuestion.trim()) {
-                        e.preventDefault()
-                        handleAsk()
-                      }
-                    }}
-                    disabled={ask.isStreaming}
-                    rows={3}
-                    aria-label={t('common.accessibility.enterQuestion')}
-                  />
-                  <p className="text-xs text-muted-foreground">{t('searchPage.pressToSubmit')}</p>
-                </div>
-
-                {/* Notebook scope */}
+          <TabsContent value="ask" className="space-y-8">
+            <div className="rounded-2xl border bg-card shadow-composer transition-colors focus-within:border-foreground/25">
+              <Label htmlFor="ask-question" className="sr-only">{t('searchPage.question')}</Label>
+              <Textarea
+                id="ask-question"
+                name="ask-question"
+                placeholder={t('searchPage.enterQuestionPlaceholder')}
+                value={askQuestion}
+                onChange={(e) => setAskQuestion(e.target.value)}
+                onKeyDown={(e) => {
+                  // Enter submits; Shift+Enter is a new line
+                  if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && !ask.isStreaming && askQuestion.trim()) {
+                    e.preventDefault()
+                    handleAsk()
+                  }
+                }}
+                disabled={ask.isStreaming}
+                rows={2}
+                aria-label={t('common.accessibility.enterQuestion')}
+                className="min-h-[72px] resize-none border-0 bg-transparent px-4 pt-4 text-[15px] shadow-none focus-visible:ring-0"
+              />
+              <div className="flex flex-wrap items-center gap-2 px-3 pb-3">
                 <NotebookScopeSelector
                   selectedIds={scopeNotebookIds}
                   onChange={setScopeNotebookIds}
                   disabled={ask.isStreaming}
                 />
+                <div className="flex-1" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAdvancedModels(true)}
+                  disabled={ask.isStreaming}
+                  className="h-8 gap-1.5 text-muted-foreground"
+                  title={`${t('searchPage.final')}: ${resolveModelName(customModels?.finalAnswer || modelDefaults?.default_chat_model)}`}
+                >
+                  <Settings className="h-3.5 w-3.5" />
+                  <span className="text-xs">{customModels ? t('searchPage.usingCustomModels') : t('searchPage.advanced')}</span>
+                </Button>
+                <Button
+                  onClick={handleAsk}
+                  disabled={ask.isStreaming || !askQuestion.trim() || !hasEmbeddingModel}
+                  size="sm"
+                  className="h-8"
+                >
+                  {ask.isStreaming ? <LoadingSpinner size="sm" /> : <ArrowUp className="h-4 w-4" />}
+                  {ask.isStreaming ? t('searchPage.processing') : t('brain.research')}
+                </Button>
+              </div>
+            </div>
 
-                {/* Models Display */}
-                {!hasEmbeddingModel ? (
-                  <div className="flex items-center gap-2 p-3 text-sm text-warn bg-warn-tint rounded-md">
-                    <AlertCircle className="h-4 w-4" />
-                    <span>{t('searchPage.noEmbeddingModel')}</span>
-                  </div>
-                ) : (
-                  <>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-xs text-muted-foreground">
-                          {customModels ? t('searchPage.usingCustomModels') : t('searchPage.usingDefaultModels')}
-                        </Label>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setShowAdvancedModels(true)}
-                          disabled={ask.isStreaming}
-                          className="h-auto py-1 px-2"
-                        >
-                          <Settings className="h-3 w-3 mr-1" />
-                          {t('searchPage.advanced')}
-                        </Button>
-                      </div>
-                      <div className="flex gap-2 text-xs flex-wrap">
-                        <Badge variant="secondary" className="font-mono text-[11px]">
-                          {t('searchPage.strategy')}: {resolveModelName(customModels?.strategy || modelDefaults?.default_chat_model)}
-                        </Badge>
-                        <Badge variant="secondary" className="font-mono text-[11px]">
-                          {t('searchPage.answer')}: {resolveModelName(customModels?.answer || modelDefaults?.default_chat_model)}
-                        </Badge>
-                        <Badge variant="secondary" className="font-mono text-[11px]">
-                          {t('searchPage.final')}: {resolveModelName(customModels?.finalAnswer || modelDefaults?.default_chat_model)}
-                        </Badge>
-                      </div>
-                    </div>
+            {!hasEmbeddingModel && (
+              <div className="flex items-center gap-2 rounded-xl bg-warn-tint p-3 text-sm text-warn">
+                <AlertCircle className="h-4 w-4" />
+                <span>{t('searchPage.noEmbeddingModel')}</span>
+              </div>
+            )}
 
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <Button
-                        onClick={handleAsk}
-                        disabled={ask.isStreaming || !askQuestion.trim()}
-                        className="w-full"
-                      >
-                        {ask.isStreaming ? (
-                          <>
-                            <LoadingSpinner size="sm" className="mr-2" />
-                            {t('searchPage.processing')}
-                          </>
-                        ) : (
-                          t('searchPage.ask')
-                        )}
-                      </Button>
+            <StreamingResponse
+              isStreaming={ask.isStreaming}
+              strategy={ask.strategy}
+              answers={ask.answers}
+              finalAnswer={ask.finalAnswer}
+            />
 
-                      {ask.finalAnswer && (
-                        <Button
-                          variant="outline"
-                          onClick={() => setShowSaveDialog(true)}
-                          className="w-full"
-                        >
-                          <Save className="h-4 w-4 mr-2" />
-                          {t('searchPage.saveToNotebooks')}
-                        </Button>
-                      )}
-                    </div>
-                  </>
-                )}
+            {ask.finalAnswer && (
+              <Button variant="outline" size="sm" onClick={() => setShowSaveDialog(true)}>
+                <Save className="h-4 w-4" />
+                {t('searchPage.saveToNotebooks')}
+              </Button>
+            )}
 
-                {/* Streaming Response */}
-                <StreamingResponse
-                  isStreaming={ask.isStreaming}
-                  strategy={ask.strategy}
-                  answers={ask.answers}
-                  finalAnswer={ask.finalAnswer}
-                />
+            <AdvancedModelsDialog
+              open={showAdvancedModels}
+              onOpenChange={setShowAdvancedModels}
+              defaultModels={{
+                strategy: customModels?.strategy || modelDefaults?.default_chat_model || '',
+                answer: customModels?.answer || modelDefaults?.default_chat_model || '',
+                finalAnswer: customModels?.finalAnswer || modelDefaults?.default_chat_model || ''
+              }}
+              onSave={setCustomModels}
+            />
 
-                {/* Advanced Models Dialog */}
-                <AdvancedModelsDialog
-                  open={showAdvancedModels}
-                  onOpenChange={setShowAdvancedModels}
-                  defaultModels={{
-                    strategy: customModels?.strategy || modelDefaults?.default_chat_model || '',
-                    answer: customModels?.answer || modelDefaults?.default_chat_model || '',
-                    finalAnswer: customModels?.finalAnswer || modelDefaults?.default_chat_model || ''
-                  }}
-                  onSave={setCustomModels}
-                />
-
-                {/* Save to Notebooks Dialog */}
-                {ask.finalAnswer && (
-                  <SaveToNotebooksDialog
-                    open={showSaveDialog}
-                    onOpenChange={setShowSaveDialog}
-                    question={askQuestion}
-                    answer={ask.finalAnswer}
-                  />
-                )}
-              </CardContent>
-            </Card>
+            {ask.finalAnswer && (
+              <SaveToNotebooksDialog
+                open={showSaveDialog}
+                onOpenChange={setShowSaveDialog}
+                question={askQuestion}
+                answer={ask.finalAnswer}
+              />
+            )}
           </TabsContent>
 
-          <TabsContent value="search" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">{t('searchPage.search')}</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  {t('searchPage.searchDesc')}
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-4">
+          <TabsContent value="search">
+            <div className="space-y-5 rounded-2xl border bg-card p-4 shadow-soft">
                 {/* Search Input */}
                 <div className="space-y-2">
                   <Label htmlFor="search-query" className="sr-only">
@@ -508,10 +459,10 @@ export default function SearchPage() {
                     )}
                   </div>
                 )}
-              </CardContent>
-            </Card>
+            </div>
           </TabsContent>
         </Tabs>
+        </div>
       </div>
     </AppShell>
   )
