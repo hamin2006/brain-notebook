@@ -39,6 +39,47 @@ Or all at once: `make start-all` (status: `make status`, stop: `make stop-all`).
 - **Agent tools are general primitives** that take and return addresses (`source:abc#p12-18`), never shortcuts for one kind of question; tool output is untrusted input to the model ([playbook](docs/7-DEVELOPMENT/change-playbooks.md#playbook-add-an-agent-tool)).
 - Upstream's `.maintainer/` release, triage and discussions workflows don't apply to this fork.
 
+## Market position (reviewed 2026-10)
+
+What Brain Notebook offers that NotebookLM and most alternatives don't. Protect these when changing things, and lead
+with them in docs and UI:
+
+- **Agentic research, not retrieval**: the agent lists, greps, searches, reads page ranges, looks at pages and
+  delegates per document, with every step visible. Exhaustive and cross-document questions work ("every page that
+  mentions X", "compare lectures 3–6"): 35/35 on the course eval against 27/35 for upstream's classic chat.
+- **Reads diagrams**: `view` shows the agent the rendered page; visual page search; paste a screenshot to find slides
+  that look like it.
+- **Page-exact citations**: hover previews the cited page, click opens it beside the answer (NotebookLM cites text
+  passages).
+- **Structure at ingestion**: LaTeXiT equation recovery, merged animation builds, metadata (course, sequence) and
+  outlines with page ranges, so "the 4th lecture" and "section 3" resolve.
+- **Persistent cross-document concept graph** with typed relations and page mentions, explorable as a map or in 3D
+  (NotebookLM's Mind Map is a per-notebook summary tree).
+- **Ownership**: self-hosted, no source caps (NotebookLM: 50 free / 300 Plus), any model, about $0.003 per
+  question, open source, eval-tested.
+- **MCP server**: Claude Code and Claude Desktop can research the notebooks, including page images.
+- **Controllable grounding** (notebook only, or + general knowledge with free self-hosted web search) and user-controlled
+  memory across conversations.
+
+What we lack, roughly in priority order:
+
+1. **Study and creative outputs**: NotebookLM's Studio produces audio and video overviews, revisable slide decks,
+   mind maps, study guides and FAQs in one click. We have upstream podcasts (untested in this fork) and free-form
+   transformations, but no quizzes, flashcards or study guides.
+2. **Latency**: 10–60 s per answer against a few seconds.
+3. **Zero setup and mobile**: we need a running host, Tailscale, API keys and a deploy script.
+4. **Sharing and collaboration**: single user, basic password auth, no shared notebooks or links.
+5. **Source breadth**: no Drive, Docs or Slides connectors or source discovery; PPTX isn't ingested slide by slide;
+   scanned PDFs need OCR to get pages.
+6. **Source-anchored writing tools**: NotebookLM is adding AI Editing and Canvas.
+7. **Proven robustness**: the eval covers one course (seven decks); papers, books and mixed libraries are untested.
+8. **Paper workflows**: table extraction across papers and systematic reviews (Elicit, SciSpace).
+
+Next bets: study outputs built on our strengths (quizzes and flashcards from the outline with page citations, a study
+guide that cites pages, "explain this slide" from the evidence panel); a faster first response (stream a quick draft
+while deeper research continues); PPTX and OCR ingestion; read-only shared answers. Competitor details move fast:
+re-check before relying on them.
+
 ## Where to look
 
 | Need | Location |
