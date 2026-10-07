@@ -24,7 +24,71 @@ NotebookLM alternative, rebuilt around **agentic retrieval**. Instead of pasting
 prompt, every question is researched: the agent lists your documents, greps and searches them, reads the pages it
 needs, looks at slides when the answer is in a diagram, and only then writes a cited answer.
 
-![Notebook view](docs/assets/asset_list.png)
+![The notebook workspace: an answer with page citations, and the cited slide in the evidence panel](docs/assets/screenshots/workspace.webp)
+
+## A tour
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+**Watch it research.** Every question runs a visible investigation: the agent searches, greps, reads page ranges
+and *looks at* slides, and each step shows what it found.
+
+<img src="docs/assets/screenshots/research-live.webp" alt="Live research timeline: search, grep, read and view steps with their results">
+
+</td>
+<td width="50%" valign="top">
+
+**Check every claim.** Citations are numbered chips; hover one to see the exact page, click it to open the page
+beside the answer. Every answer ends with thumbnails of the pages it cites.
+
+<img src="docs/assets/screenshots/citations.webp" alt="Hovering a citation previews the cited slide">
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+**See how ideas connect.** The concept graph maps every concept across your documents: one column per lecture,
+relations the slides state as curved links, shared sections as faint ones.
+
+<img src="docs/assets/screenshots/concept-graph.webp" alt="Concept graph of seven lectures, coloured by the lecture that introduces each concept">
+
+</td>
+<td width="50%" valign="top">
+
+**Follow a concept.** Hover to light up its neighbourhood and relation names; click to see where every document
+covers it, and ask the agent about it in one click.
+
+<img src="docs/assets/screenshots/concept-graph-focus.webp" alt="Backpropagation focused in the graph, with its relations and mentions in the side panel">
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+**Start from what's there.** An empty conversation knows the notebook: its size, starter questions built from its
+own key concepts, and the concepts themselves.
+
+<img src="docs/assets/screenshots/welcome.webp" alt="Empty conversation with notebook stats, starter questions and key concepts">
+
+</td>
+<td width="50%" valign="top">
+
+**Documents with structure.** Each PDF gets metadata, a summary, an outline with page ranges and section
+summaries, its concepts and every page as a thumbnail.
+
+<img src="docs/assets/screenshots/source-structure.webp" alt="A lecture's Structure tab: outline section with its pages and summary">
+
+</td>
+</tr>
+</table>
+
+<p align="center">
+  <img src="docs/assets/screenshots/home.webp" alt="Home: ask across all notebooks, recent items and notebook cards" width="80%">
+  <br><sub>Home: ask across every notebook, jump back in, notebooks with their decks as covers. Light and dark themes, 14 languages.</sub>
+</p>
 
 ## What it does
 
@@ -32,7 +96,8 @@ needs, looks at slides when the answer is in a diagram, and only then writes a c
 - Tools instead of prompt stuffing: `list`, `grep`, `search` (passage / section / document / *page appearance*),
   `outline`, `read`, `view` (the page as an image), `graph`, `calculate`, `note`, and `delegate` (parallel
   sub-agents, one per document).
-- Every claim cites the most specific address it read: `[source:abc#p94]`. Click a page citation to see the page.
+- Every claim cites the most specific address it read: `[source:abc#p94]`. Hover a citation to preview the page,
+  click it to open the page beside the answer.
 - Effort levels: *quick*, *standard*, *deep* (deep adds a reviewer that sends the agent back for gaps).
 - Two models per question: a cheap research model makes the many tool calls, a stronger model writes the answer
   once. On the 35-question course eval this costs about **$0.003 per question**.
@@ -48,6 +113,12 @@ needs, looks at slides when the answer is in a diagram, and only then writes a c
   page ranges, section summaries and a document summary.
 - Page images are embedded for **visual search** ("the slide with the inception module diagram"), passages are
   **reranked**, and a **concept graph** links ideas across documents.
+
+**A workspace built for research**
+- Library (sources, notes, concepts) · conversation · evidence panel, side by side; the live research timeline;
+  starter questions from the notebook's own concepts; **New chat** and saved sessions.
+- An interactive **concept graph** of the whole notebook, and a **Structure** view of every document.
+- Ask across all notebooks from the home page; paste or drop images into chat.
 
 **Everything Open Notebook already had**: notebooks, sources of many types (PDF, web, audio, video, Office), notes,
 transformations, podcasts, 20+ AI providers, REST API, 14 UI languages.

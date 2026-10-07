@@ -18,6 +18,8 @@ reads and looks at your documents before answering with page citations. How it w
 
 The first message creates a chat session automatically; **New chat** starts another.
 
+![Hovering a citation previews the cited page](../assets/screenshots/citations.webp)
+
 ---
 
 ## The controls

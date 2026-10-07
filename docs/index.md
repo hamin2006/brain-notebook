@@ -4,7 +4,10 @@ Brain Notebook is a self-hosted research notebook whose chat is a research agent
 your documents, then answers with page citations. It is a fork of [Open Notebook](https://github.com/lfnovo/open-notebook);
 most of Open Notebook's features (sources, notes, transformations, podcasts, 20+ providers) are still here.
 
-New here? Start with **[0-START-HERE](0-START-HERE/index.md)**.
+![The notebook workspace: an answer with page citations and the cited slide beside it](assets/screenshots/workspace.webp)
+
+New here? Start with **[0-START-HERE](0-START-HERE/index.md)**. For a tour of the interface, see
+[Interface Overview](3-USER-GUIDE/interface-overview.md).
 
 | Section | Read it when you want to… |
 |---|---|

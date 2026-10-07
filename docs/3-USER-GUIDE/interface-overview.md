@@ -52,6 +52,8 @@ it's always the icon rail.
 A notebook opens as a research workspace: the library on the left, the conversation in the middle, and the evidence
 panel on the right when you open a citation or a concept.
 
+![An answer in the conversation with the cited slide open in the evidence panel](../assets/screenshots/workspace.webp)
+
 ```
 ┌────────────────────────────────────────────────────────────────────────────────┐
 │ ⊟ Notebooks / Course notes   7 docs · 794 pages · 509 concepts [Chat|Graph] [Notebook only ▾] ⋯ │
@@ -107,11 +109,15 @@ The message box has the paperclip (or paste, or drop) to attach images, **Effort
 agent will search ("Searching 7 sources · 4 notes"), the answer model, and send. **Enter** sends; **Shift+Enter**
 starts a new line.
 
+![The research timeline while the agent works](../assets/screenshots/research-live.webp)
+
 While the agent works, its research steps appear live with the tool, what it looked for and what it found. Each answer
 keeps them folded into one line (**Researched in N steps**), shows its citations as numbered chips (hover one to see
 the cited page) and ends with thumbnails of every cited page. See [Chatting with the agent](chat-effectively.md).
 
 ### Graph
+
+![The concept graph: one column per lecture, concepts coloured by the lecture that introduces them](../assets/screenshots/concept-graph.webp)
 
 **Graph** (next to **Chat** in the header) replaces the conversation with the notebook's concept graph as a map.
 Each document is a column, left to right in course order; a concept sits between the documents that mention it,
@@ -125,6 +131,8 @@ a section (**Shared sections** turns them off).
 
 The graph shows the 400 most shared concepts (the count is top right). Asking about a concept switches back to Chat.
 
+![A focused concept with its relations, and the concept in the evidence panel](../assets/screenshots/concept-graph-focus.webp)
+
 ### Evidence panel
 
 - **A page citation** opens the rendered page, marked *Cited*, with the arrows to move through the document, the
@@ -137,6 +145,8 @@ The graph shows the 400 most shared concepts (the count is top right). Asking ab
 ## The Source View
 
 Clicking a source opens it with these tabs:
+
+![A lecture's Structure tab with an outline section open](../assets/screenshots/source-structure.webp)
 
 - **Structure** (paged sources): the document's metadata and topics, its summary, the outline with page ranges (open
   a section for its pages and summary), the concepts it mentions and every page as a thumbnail. Click a page to view

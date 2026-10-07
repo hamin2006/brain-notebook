@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `API_URL=relative` makes the UI call the API through its own origin; `scripts/brain/install_services.sh` sets it, so a systemd install whose API listens on 127.0.0.1 works from other machines. Existing installs: add `Environment=API_URL=relative` to `brain-frontend.service`
 
 ### Changed
+- README and docs show the new interface (screenshots in `docs/assets/screenshots/`); the favicon and README mark are the new Brain Notebook logo
 - In the chat and Ask boxes **Enter** sends and **Shift+Enter** adds a line (Cmd/Ctrl+Enter still sends)
 - The notebook's grounding switch moved from the chat box to the notebook header; effort is a Quick / Standard / Deep toggle in the message box
 
