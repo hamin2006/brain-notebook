@@ -4,6 +4,7 @@ Loaded once per turn and passed to every tool, so tools never reach outside the
 user's selection. Also carries images queued by `view` for the next model call.
 """
 
+import asyncio
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -12,6 +13,22 @@ from open_notebook.database.repository import ensure_record_id, repo_query
 
 PDF_SUFFIXES = {".pdf"}
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".webp", ".gif", ".bmp"}
+
+
+async def per_source(
+    sql: str, source_ids: List[Any], **params: Any
+) -> List[Dict[str, Any]]:
+    """Run `sql` (filtering on `source = $s`) once per source and concatenate.
+
+    `WHERE source IN $ids` returns no rows on source_page and source_section
+    (SurrealDB v2: both have a composite unique index on (source, ...), and the
+    planner mishandles IN against it), while equality works. Querying per
+    source keeps those lookups correct.
+    """
+    results = await asyncio.gather(
+        *(repo_query(sql, {"s": sid, **params}) for sid in source_ids)
+    )
+    return [row for rows in results for row in rows]
 
 
 class ToolError(Exception):
@@ -84,9 +101,9 @@ async def load_scope(source_ids: List[str], note_ids: List[str]) -> AgentScope:
             "SELECT id, title, asset, metadata FROM source WHERE id IN $ids",
             {"ids": ids},
         )
-        counts = await repo_query(
-            "SELECT source, count() AS n FROM source_page WHERE source IN $ids GROUP BY source",
-            {"ids": ids},
+        counts = await per_source(
+            "SELECT source, count() AS n FROM source_page WHERE source = $s GROUP BY source",
+            ids,
         )
         page_counts = {str(c["source"]): c["n"] for c in counts}
         for row in rows:

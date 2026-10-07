@@ -15,7 +15,7 @@ import re
 from typing import Any, Dict, List, Optional
 
 from open_notebook.agent.addresses import Address
-from open_notebook.agent.scope import AgentScope
+from open_notebook.agent.scope import AgentScope, per_source
 from open_notebook.database.repository import ensure_record_id, repo_query
 
 RRF_K = 60
@@ -130,12 +130,12 @@ async def section_rows(
     sources, _ = _ids(scope, only)
     if not sources:
         return []
-    return await repo_query(
+    return await per_source(
         """
         SELECT id, source, index, title, page_start, page_end, summary, embedding
-        FROM source_section WHERE source IN $sources ORDER BY source, index
+        FROM source_section WHERE source = $s ORDER BY index
         """,
-        {"sources": sources},
+        sources,
     )
 
 
@@ -275,9 +275,9 @@ async def fetch_pages(source_id: str, start: int, end: int) -> List[Dict[str, An
 async def all_pages(source_ids: List[str]) -> List[Dict[str, Any]]:
     if not source_ids:
         return []
-    return await repo_query(
-        "SELECT source, page, text, caption FROM source_page WHERE source IN $ids ORDER BY source, page",
-        {"ids": [ensure_record_id(s) for s in source_ids]},
+    return await per_source(
+        "SELECT source, page, text, caption FROM source_page WHERE source = $s ORDER BY page",
+        [ensure_record_id(s) for s in source_ids],
     )
 
 
