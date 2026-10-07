@@ -52,7 +52,7 @@
      "facts": [["1x1", "1×1", "1 x 1", "pointwise"]], "image_only": true},
     {"id": "bottleneck-layers", "task": "T4", "question": "In lecture 6's residual block diagrams, what layers are on the main path of the bottleneck block, in order?",
      "lectures": [6], "pages": {"6": [[79, 79]]},
-     "facts": [["1\\s*[x×]\\s*1[^\\n]{0,12}64"], ["3\\s*[x×]\\s*3[^\\n]{0,12}64"], ["1\\s*[x×]\\s*1[^\\n]{0,12}256"]], "image_only": true},
+     "facts": [["1\\s*[x×]\\s*1[^\\n]{0,25}64"], ["3\\s*[x×]\\s*3[^\\n]{0,25}64"], ["1\\s*[x×]\\s*1[^\\n]{0,25}256"]], "image_only": true},
     {"id": "adam-combines", "task": "T4", "question": "According to lecture 4, what two ideas does the Adam optimizer combine?",
      "lectures": [4], "pages": {"4": [[94, 94]]},
      "facts": [["momentum"], ["rmsprop"]], "image_only": true},
