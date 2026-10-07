@@ -1,6 +1,6 @@
 # Brain Notebook — Agent Rules
 
-Brain Notebook is a self-hosted research notebook whose chat is a tool-calling research agent with page-cited answers. It is a personal fork of Open Notebook (1.15.0); code identifiers (`open_notebook` package, `OPEN_NOTEBOOK_*` vars, DB namespace) intentionally keep upstream's names so upstream can be merged ([PDR-003](docs/7-DEVELOPMENT/decisions/PDR-003-personal-fork.md)). The design and its history are in [docs/7-DEVELOPMENT/plans/agentic-rag.md](docs/7-DEVELOPMENT/plans/agentic-rag.md).
+Brain Notebook is a self-hosted research notebook whose chat is a tool-calling research agent with page-cited answers. Its UI is a research workspace (library · conversation · evidence panel, a concept graph as a 2D map or in 3D; [ADR-018](docs/7-DEVELOPMENT/decisions/ADR-018-research-workspace-ui.md)) that shows what the agent did and the pages it cites. It is a personal fork of Open Notebook (1.15.0); code identifiers (`open_notebook` package, `OPEN_NOTEBOOK_*` vars, DB namespace) intentionally keep upstream's names so upstream can be merged ([PDR-003](docs/7-DEVELOPMENT/decisions/PDR-003-personal-fork.md)). The design and its history are in [docs/7-DEVELOPMENT/plans/agentic-rag.md](docs/7-DEVELOPMENT/plans/agentic-rag.md).
 
 This file holds the project-wide rules every coding session needs. Component rules: [open_notebook/AGENTS.md](open_notebook/AGENTS.md) (backend — also covers `api/`, `commands/`, `prompts/`) and [frontend/AGENTS.md](frontend/AGENTS.md). Knowledge lives in the docs (see [Where to look](#where-to-look)) — read it on demand instead of guessing.
 
@@ -25,7 +25,8 @@ Or all at once: `make start-all` (status: `make status`, stop: `make stop-all`).
 - CI runs `uv run ruff check .`, `uv run ruff format --check .`, mypy, pytest and, in `frontend/`, `npm run lint`, `npm run test:coverage` and `npm run build`; all must pass
 - Real-DB integration tests: `SURREAL_TEST_URL=ws://127.0.0.1:18000/rpc uv run pytest tests/integration` against a throwaway SurrealDB ([testing.md](docs/7-DEVELOPMENT/testing.md#integration-tests-real-surrealdb)); run them when you change queries
 - Agent eval (real models, running API): `uv run python evals/agent/run_eval.py --mode agent --notebook "<name>"` ([testing.md](docs/7-DEVELOPMENT/testing.md#the-agent-eval)); run it after agent or ingestion changes
-- Deploy a systemd install: `bash scripts/brain/deploy_pc.sh`. The upstream `make docker-*` publishing targets don't apply to this fork
+- Deploy a systemd install: push, then on the host `bash scripts/brain/deploy_pc.sh` (ff-only pull of the current branch, `uv sync`, rebuilds the frontend when `frontend/` changed, restarts the `brain-*` units). If the frontend build fails the script stops before restarting, so the previous build keeps serving; fix and redeploy. The upstream `make docker-*` publishing targets don't apply to this fork
+- UI work against a remote install's data: in `frontend/`, `INTERNAL_API_URL=http://<host>:3000 API_URL=relative npx next dev -p 3100` (the remote UI proxies `/api` to its own API)
 
 ## Hard rules
 
@@ -34,6 +35,9 @@ Or all at once: `make start-all` (status: `make status`, stop: `make stop-all`).
 - CORS is wide-open and auth is a simple password middleware — **dev defaults, not production hardening**. Don't build features that assume otherwise.
 - Product direction questions (does this feature fit?) → [VISION.md](VISION.md). Past decisions ("why is it like this?") → [docs/7-DEVELOPMENT/decisions/](docs/7-DEVELOPMENT/decisions/). Structural decisions made while coding should produce a new decision record there.
 - **Conventional Commits** for commits and PR titles (`fix(podcasts): …`, `feat(providers): …`, `docs: …`).
+- **Commit only what you mean to.** `git rm` stages a deletion immediately, so a later "commit just these files" can ship it (this once broke a deploy). Stage paths explicitly and check `git status` before committing a subset.
+- **`frontend/package-lock.json` must be written by npm 10** (the deploy host's `npm ci` rejects lockfiles from npm 11): add packages with `npx -y npm@10.9.2 install <pkg>`.
+- **Visible UI changes refresh the screenshots** in `docs/assets/screenshots/` (README tour, docs index, user guide): WebP, about 2000 px wide, taken from a real notebook.
 - **Every user-visible change adds a CHANGELOG entry** under `## [Unreleased]`, in the one section for its type (`### Added` / `### Changed` / `### Deprecated` / `### Removed` / `### Fixed` / `### Security`); never create a duplicate section. Details: [contributing.md](docs/7-DEVELOPMENT/contributing.md#changelog).
 - **No prompt stuffing.** No feature pastes whole documents into a prompt; the agent reads through its tools, and whole-document questions use stored summaries ([ADR-014](docs/7-DEVELOPMENT/decisions/ADR-014-agentic-notebook-chat.md)).
 - **Agent tools are general primitives** that take and return addresses (`source:abc#p12-18`), never shortcuts for one kind of question; tool output is untrusted input to the model ([playbook](docs/7-DEVELOPMENT/change-playbooks.md#playbook-add-an-agent-tool)).
@@ -85,6 +89,8 @@ re-check before relying on them.
 | Need | Location |
 |---|---|
 | Architecture (processes, layout, the agent, ingestion jobs, data model) | [docs/7-DEVELOPMENT/architecture.md](docs/7-DEVELOPMENT/architecture.md) |
+| Frontend: the workspace, `components/brain/`, chat flow | [docs/7-DEVELOPMENT/frontend.md](docs/7-DEVELOPMENT/frontend.md) · [ADR-018](docs/7-DEVELOPMENT/decisions/ADR-018-research-workspace-ui.md) |
+| What the user sees, screen by screen | [docs/3-USER-GUIDE/interface-overview.md](docs/3-USER-GUIDE/interface-overview.md) |
 | Research agent & ingestion design, findings, eval results | [docs/7-DEVELOPMENT/plans/agentic-rag.md](docs/7-DEVELOPMENT/plans/agentic-rag.md) |
 | Step-by-step recipes (add endpoint, provider, migration, command, i18n…) | [docs/7-DEVELOPMENT/change-playbooks.md](docs/7-DEVELOPMENT/change-playbooks.md) |
 | Dev environment setup | [docs/7-DEVELOPMENT/development-setup.md](docs/7-DEVELOPMENT/development-setup.md) |
