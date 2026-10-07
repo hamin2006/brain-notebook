@@ -61,13 +61,15 @@ async def provision_langchain_model(
     return model.to_langchain()
 
 
-def limit_reasoning(model: BaseChatModel, effort: str = "low") -> BaseChatModel:
-    """Cap an OpenRouter reasoning model's thinking so it can't spend the whole
-    output budget before answering (it then returns an empty reply). Other
-    providers are left unchanged."""
+def limit_reasoning(model: BaseChatModel, max_tokens: int = 1024) -> BaseChatModel:
+    """Cap an OpenRouter reasoning model's thinking at `max_tokens`, so it can't
+    spend the whole output budget before answering (it then returns an empty
+    reply). A token budget is the control the providers honor: GLM-5.3 can't
+    turn reasoning off and Qwen3.7 ignores effort levels. Other providers are
+    left unchanged."""
     base_url = str(getattr(model, "openai_api_base", "") or "")
     if "openrouter.ai" in base_url:
         extra = dict(getattr(model, "extra_body", None) or {})
-        extra["reasoning"] = {"effort": effort}
+        extra["reasoning"] = {"max_tokens": max_tokens}
         setattr(model, "extra_body", extra)
     return model

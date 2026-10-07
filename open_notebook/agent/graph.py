@@ -368,7 +368,7 @@ def make_answer_writer(
                 "Answer writer returned nothing; retrying with low reasoning"
             )
             final = await _stream_step(
-                limit_reasoning(model, "low"), prompt, writer, step
+                limit_reasoning(model, 1024), prompt, writer, step
             )
             answer = extract_text_content(final.content)
         return answer

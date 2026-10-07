@@ -239,7 +239,7 @@ async def test_empty_writer_reply_is_retried_once():
     ) as limit:
         _, final = await _run(model, [], writer=writer)
     assert final["messages"][-1].content == "Answer."
-    limit.assert_called_once_with(writer, "low")
+    limit.assert_called_once_with(writer, 1024)
     assert len(writer.calls) == 2
 
 

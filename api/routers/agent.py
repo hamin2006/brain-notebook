@@ -1,6 +1,6 @@
 """Agent extensions: settings, memories and backfills (agentic RAG plan, Phase 5)."""
 
-from typing import List, Literal, Optional
+from typing import Any, List, Literal, Optional
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
@@ -112,12 +112,12 @@ async def rebuild_agent_data(request: RebuildAgentDataRequest):
     """Run page embedding or concept extraction for every analyzed source, e.g.
     after turning a feature on or changing the page embedding model."""
     table = "source_page" if request.what == "page_embeddings" else "source_section"
-    sources = await repo_query("SELECT VALUE id FROM source")
+    sources: List[Any] = await repo_query("SELECT VALUE id FROM source")
     ids: List[str] = []
     for source_id in sources:
         has_rows = await repo_query(
             f"SELECT VALUE id FROM {table} WHERE source = $s LIMIT 1",
-            {"s": ensure_record_id(source_id)},
+            {"s": ensure_record_id(str(source_id))},
         )
         if not has_rows:
             continue
