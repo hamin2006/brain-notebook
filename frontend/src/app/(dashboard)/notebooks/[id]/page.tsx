@@ -16,6 +16,7 @@ import { useNotebookOverview } from '@/lib/hooks/use-explore'
 import { useModalManager } from '@/lib/hooks/use-modal-manager'
 import { ConceptsPanel } from '@/components/brain/ConceptsPanel'
 import { EvidencePanel } from '@/components/brain/EvidencePanel'
+import { ConceptGraph } from '@/components/brain/ConceptGraph'
 import { useIsDesktop, useMediaQuery } from '@/lib/hooks/use-media-query'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { cn } from '@/lib/utils'
@@ -59,6 +60,7 @@ export default function NotebookPage() {
   const libraryTab = useWorkspaceStore((s) => s.libraryTab)
   const setLibraryTab = useWorkspaceStore((s) => s.setLibraryTab)
   const evidence = useWorkspaceStore((s) => s.evidence)
+  const view = useWorkspaceStore((s) => s.view)
   const closeEvidence = useWorkspaceStore((s) => s.closeEvidence)
 
   // The evidence panel belongs to one notebook; close it when switching.
@@ -81,7 +83,7 @@ export default function NotebookPage() {
   const isWide = useMediaQuery('(min-width: 1600px)')
 
   // Mobile tab state (Sources, Notes, or Chat)
-  const [mobileActiveTab, setMobileActiveTab] = useState<'sources' | 'notes' | 'chat' | 'concepts'>('chat')
+  const [mobileActiveTab, setMobileActiveTab] = useState<'sources' | 'notes' | 'chat' | 'concepts' | 'graph'>('chat')
 
   // Context selection state
   const [contextSelections, setContextSelections] = useState<ContextSelections>({
@@ -224,7 +226,7 @@ export default function NotebookPage() {
         {!isDesktop && (
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex gap-1 border-b px-3 py-2">
-              {(['chat', 'sources', 'notes', 'concepts'] as const).map((tab) => (
+              {(['chat', 'graph', 'sources', 'notes', 'concepts'] as const).map((tab) => (
                 <button
                   key={tab}
                   type="button"
@@ -234,7 +236,7 @@ export default function NotebookPage() {
                     mobileActiveTab === tab ? 'bg-card text-foreground shadow-soft ring-1 ring-inset ring-border' : 'text-muted-foreground'
                   )}
                 >
-                  {tab === 'chat' ? t('common.chat') : tab === 'concepts' ? t('brain.concepts') : tab === 'sources' ? t('navigation.sources') : t('common.notes')}
+                  {tab === 'chat' ? t('common.chat') : tab === 'graph' ? t('brain.graph') : tab === 'concepts' ? t('brain.concepts') : tab === 'sources' ? t('navigation.sources') : t('common.notes')}
                 </button>
               ))}
             </div>
@@ -243,6 +245,7 @@ export default function NotebookPage() {
               {mobileActiveTab === 'notes' && notesPanel}
               {mobileActiveTab === 'concepts' && <ConceptsPanel notebookId={notebookId} />}
               {mobileActiveTab === 'chat' && chat}
+              {mobileActiveTab === 'graph' && <ConceptGraph notebookId={notebookId} />}
             </div>
             {evidence && (
               <div className="fixed inset-0 z-40 flex flex-col bg-background">
@@ -286,7 +289,9 @@ export default function NotebookPage() {
               </aside>
             )}
 
-            <main className="flex min-w-0 flex-1 flex-col">{chat}</main>
+            <main className="flex min-w-0 flex-1 flex-col">
+              {view === 'graph' ? <ConceptGraph notebookId={notebookId} /> : chat}
+            </main>
 
             {evidence && (
               <aside className="flex w-[400px] shrink-0 flex-col border-l bg-sidebar/60 2xl:w-[460px]">

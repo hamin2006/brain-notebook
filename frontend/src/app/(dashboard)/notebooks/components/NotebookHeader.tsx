@@ -5,7 +5,7 @@ import { NotebookResponse } from '@/lib/types/api'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
-import { Archive, ArchiveRestore, Trash2, PanelLeft, Globe2, ShieldCheck, ChevronDown, MoreHorizontal } from 'lucide-react'
+import { Archive, ArchiveRestore, Trash2, PanelLeft, Globe2, ShieldCheck, ChevronDown, MoreHorizontal, MessagesSquare, Waypoints } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +31,8 @@ export function NotebookHeader({ notebook, overview }: NotebookHeaderProps) {
   const libraryOpen = useWorkspaceStore((s) => s.libraryOpen)
   const toggleLibrary = useWorkspaceStore((s) => s.toggleLibrary)
   const setLibraryTab = useWorkspaceStore((s) => s.setLibraryTab)
+  const view = useWorkspaceStore((s) => s.view)
+  const setView = useWorkspaceStore((s) => s.setView)
   const { t, language } = useTranslation()
   const dfLocale = getDateLocale(language)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
@@ -126,6 +128,28 @@ export function NotebookHeader({ notebook, overview }: NotebookHeaderProps) {
             )}
           </div>
         )}
+
+        <div className="flex shrink-0 items-center rounded-lg bg-surface-recessed p-0.5" role="tablist" aria-label={t('brain.workspaceView')}>
+          {([
+            { value: 'chat', icon: MessagesSquare, label: t('common.chat') },
+            { value: 'graph', icon: Waypoints, label: t('brain.graph') },
+          ] as const).map(({ value, icon: Icon, label }) => (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              aria-selected={view === value}
+              onClick={() => setView(value)}
+              className={cn(
+                'flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors',
+                view === value ? 'bg-card text-foreground shadow-soft' : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <Icon className={cn('h-3.5 w-3.5', view === value && value === 'graph' && 'text-iris')} />
+              <span className="hidden md:inline">{label}</span>
+            </button>
+          ))}
+        </div>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

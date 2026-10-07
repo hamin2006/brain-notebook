@@ -7,15 +7,18 @@ export type EvidenceTarget =
   | { kind: 'concept'; conceptId: string; name?: string }
 
 export type LibraryTab = 'sources' | 'notes' | 'concepts'
+export type WorkspaceView = 'chat' | 'graph'
 
 interface WorkspaceState {
   libraryOpen: boolean
   libraryTab: LibraryTab
+  view: WorkspaceView
   evidence: EvidenceTarget | null
   // A question queued from outside the composer (starters, concept panel)
   queuedQuestion: { text: string; nonce: number } | null
   toggleLibrary: () => void
   setLibraryTab: (tab: LibraryTab) => void
+  setView: (view: WorkspaceView) => void
   openEvidence: (target: EvidenceTarget) => void
   closeEvidence: () => void
   ask: (text: string) => void
@@ -27,13 +30,15 @@ export const useWorkspaceStore = create<WorkspaceState>()(
     (set) => ({
       libraryOpen: true,
       libraryTab: 'sources',
+      view: 'chat',
       evidence: null,
       queuedQuestion: null,
       toggleLibrary: () => set((state) => ({ libraryOpen: !state.libraryOpen })),
       setLibraryTab: (libraryTab) => set({ libraryTab, libraryOpen: true }),
+      setView: (view) => set({ view }),
       openEvidence: (evidence) => set({ evidence }),
       closeEvidence: () => set({ evidence: null }),
-      ask: (text) => set({ queuedQuestion: { text, nonce: Date.now() } }),
+      ask: (text) => set({ queuedQuestion: { text, nonce: Date.now() }, view: 'chat' }),
       clearQueuedQuestion: () => set({ queuedQuestion: null }),
     }),
     {

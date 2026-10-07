@@ -21,6 +21,15 @@ export function useConcept(notebookId: string, conceptId: string | null) {
   })
 }
 
+export function useConceptGraph(notebookId: string, enabled = true) {
+  return useQuery({
+    queryKey: ['explore', 'graph', notebookId],
+    queryFn: () => exploreApi.graph(notebookId),
+    enabled: !!notebookId && enabled,
+    staleTime: 5 * 60_000,
+  })
+}
+
 export function useSourceStructure(sourceId: string | null) {
   return useQuery({
     queryKey: ['explore', 'structure', sourceId],

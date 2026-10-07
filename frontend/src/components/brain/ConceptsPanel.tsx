@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Search, Share2 } from 'lucide-react'
+import { Search, Share2, Waypoints } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { useNotebookOverview } from '@/lib/hooks/use-explore'
@@ -16,6 +16,8 @@ export function ConceptsPanel({ notebookId }: { notebookId: string }) {
   const [filter, setFilter] = useState('')
   const evidence = useWorkspaceStore((s) => s.evidence)
   const openEvidence = useWorkspaceStore((s) => s.openEvidence)
+  const view = useWorkspaceStore((s) => s.view)
+  const setView = useWorkspaceStore((s) => s.setView)
 
   const concepts = useMemo(() => {
     const q = filter.trim().toLowerCase()
@@ -38,7 +40,22 @@ export function ConceptsPanel({ notebookId }: { notebookId: string }) {
   const docs = Math.max(data.documents, 1)
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="px-3 pb-2">
+      <div className="space-y-2 px-3 pb-2">
+        {view !== 'graph' && (
+          <button
+            type="button"
+            onClick={() => setView('graph')}
+            className="group flex w-full items-center gap-2.5 rounded-xl border bg-card p-2.5 text-left shadow-soft transition-colors hover:border-iris/40"
+          >
+            <span className="flex size-8 items-center justify-center rounded-lg bg-iris-tint text-iris">
+              <Waypoints className="h-4 w-4" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13px] font-medium">{t('brain.openGraph')}</span>
+              <span className="block text-[11px] text-muted-foreground">{t('brain.openGraphDesc')}</span>
+            </span>
+          </button>
+        )}
         <div className="relative">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <input

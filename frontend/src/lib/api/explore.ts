@@ -58,6 +58,35 @@ export interface SourceStructure {
   concepts: ConceptSummary[]
 }
 
+export interface GraphDocument {
+  id: string
+  title: string
+  sequence?: number | null
+}
+
+export interface GraphNode {
+  id: string
+  name: string
+  mentions: number
+  documents: string[]
+  home: string
+}
+
+export interface GraphEdge {
+  source: string
+  target: string
+  kind: 'relation' | 'co'
+  label?: string | null
+  weight: number
+}
+
+export interface ConceptGraphData {
+  documents: GraphDocument[]
+  nodes: GraphNode[]
+  edges: GraphEdge[]
+  total_concepts: number
+}
+
 const enc = encodeURIComponent
 
 /** What ingestion built: counts, the concept graph and document structure. */
@@ -73,6 +102,13 @@ export const exploreApi = {
     const response = await apiClient.get<ConceptDetail>(
       `/notebooks/${enc(notebookId)}/concepts/${enc(conceptId)}`
     )
+    return response.data
+  },
+
+  graph: async (notebookId: string, limit = 400) => {
+    const response = await apiClient.get<ConceptGraphData>(`/notebooks/${enc(notebookId)}/graph`, {
+      params: { limit },
+    })
     return response.data
   },
 

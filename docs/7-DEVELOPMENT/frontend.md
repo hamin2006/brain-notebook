@@ -23,7 +23,7 @@ Provider tree in `app/layout.tsx` (outermost → innermost): ErrorBoundary → T
 `notebooks/[id]/page.tsx` lays out the workspace ([ADR-018](decisions/ADR-018-research-workspace-ui.md)):
 `NotebookHeader` (name, description, stats from `useNotebookOverview`, the grounding switch), a library pane with
 `SourcesColumn` / `NotesColumn` / `ConceptsPanel` tabs, `ChatColumn` in the middle and `EvidencePanel` on the right.
-Shared state (library open and tab, the evidence target, questions queued from outside the composer) is the
+Shared state (library open and tab, the Chat/Graph view, the evidence target, questions queued from outside the composer) is the
 `useWorkspaceStore` zustand store (`lib/stores/workspace-store.ts`; only layout preferences persist). Phones get tabs
 and a full-screen evidence overlay.
 
@@ -37,6 +37,7 @@ Reusable research UI lives in `components/brain/`:
 | `ResearchTimeline` | `LiveResearch` (live steps, elapsed time) and `ResearchTrace` (folded trace of a saved answer), `traceStats` |
 | `ChatWelcome` | Empty conversation: notebook stats, starter questions from top concepts, key concepts |
 | `EvidencePanel`, `ConceptsPanel` | The evidence pane (pages or concept) and the library's concept list |
+| `ConceptGraph` | The Graph view: d3-force layout on a canvas (columns per document, relation and co-occurrence links, hover focus, search, zoom, legend filter) from `GET /notebooks/{id}/graph` |
 | `SourceStructure` | The source view's Structure tab |
 | `AskBar` | The home page's ask-everywhere box (opens `/search?mode=ask&q=…`) |
 

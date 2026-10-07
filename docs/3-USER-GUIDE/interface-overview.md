@@ -54,7 +54,7 @@ panel on the right when you open a citation or a concept.
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────┐
-│ ⊟ Notebooks / Course notes          7 docs · 794 pages · 509 concepts [Notebook only ▾] ⋯ │
+│ ⊟ Notebooks / Course notes   7 docs · 794 pages · 509 concepts [Chat|Graph] [Notebook only ▾] ⋯ │
 │    description (click to edit)                                                 │
 ├───────────────────┬──────────────────────────────────────┬─────────────────────┤
 │ Sources│Notes│Concepts │ conversation title  [New chat] [Sessions] │ EVIDENCE      ✕ │
@@ -110,6 +110,20 @@ starts a new line.
 While the agent works, its research steps appear live with the tool, what it looked for and what it found. Each answer
 keeps them folded into one line (**Researched in N steps**), shows its citations as numbered chips (hover one to see
 the cited page) and ends with thumbnails of every cited page. See [Chatting with the agent](chat-effectively.md).
+
+### Graph
+
+**Graph** (next to **Chat** in the header) replaces the conversation with the notebook's concept graph as a map.
+Each document is a column, left to right in course order; a concept sits between the documents that mention it,
+in the colour of the one that introduces it, and bigger the more it's mentioned (a ring means it spans documents).
+Curved links are relations the documents state ("uses", "is a type of"); faint straight links join concepts that share
+a section (**Shared sections** turns them off).
+
+- **Hover** a concept to focus it: its neighbours stay lit, relation names appear, and a card shows its documents.
+- **Click** it to open it in the evidence panel; **drag** to move it; scroll or **+ / −** to zoom; **⤢** fits the view.
+- **Find a concept…** flies to it. The **Introduced in** legend filters to one document.
+
+The graph shows the 400 most shared concepts (the count is top right). Asking about a concept switches back to Chat.
 
 ### Evidence panel
 

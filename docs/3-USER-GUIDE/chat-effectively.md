@@ -67,8 +67,8 @@ The agent resolves references itself, so you can ask the way you'd ask a person 
 If the notebook doesn't cover something, *Notebook only* answers say so and list what was searched. Switch the header
 to *+ General knowledge* if you want outside information.
 
-To explore before asking, open the **Concepts** tab of the library (or click a key concept on the empty
-conversation): a concept shows where each document covers it and how it relates to others, and **Ask about this**
+To explore before asking, switch the header to **Graph** to see how concepts connect across documents, or open the
+**Concepts** tab of the library (or click a key concept on the empty conversation): a concept shows where each document covers it and how it relates to others, and **Ask about this**
 asks the agent to explain it.
 
 ---
