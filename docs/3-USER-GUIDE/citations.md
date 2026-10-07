@@ -1,49 +1,54 @@
 # Citations - Verify AI Answers
 
-Chat and Ask answers include references to the items they are based on, so you can check a claim against your own material.
+Every claim the research agent makes from your notebook is followed by a citation to the most specific place it
+read: usually a page or page range. Citations are how you check an answer against the source.
 
 ---
 
-## What a Citation Points To
+## What a citation points to
 
-The model is told to cite items by their record ID, such as `source:abc123`, `note:def456` or `insight:ghi789`. A citation always points to a **whole item**:
+The agent cites **addresses** it actually read (it's told never to invent one):
 
-- a **source** (its full extracted text),
-- a **note**, or
-- an **insight** (a transformation's output for a source).
+| In the answer | Shown as | Points to |
+|---|---|---|
+| `[source:abc#p94]` | p. 94 | one page of a PDF source |
+| `[source:abc#p86-93]` | pp. 86–93 | a page range |
+| `[source:abc#s3]` | section 3 | a topic section of the document's outline |
+| `[source:abc/summary]` | summary | the document summary |
+| `[source:abc#c12]` | #12 | a chunk of a non-PDF source (web page, text, transcript) |
+| `[note:xyz]` | the note | a note |
+| `[source:abc]` | the source | the whole source (older answers, or when no finer address applies) |
 
-Citations don't carry page numbers, sections or highlighted passages. To find the exact place, open the item and look for the claim (your browser's find-in-page helps).
+Answers that use [web search](../5-CONFIGURATION/research-agent.md#web-search) cite web pages as ordinary links,
+separate from notebook citations.
 
-## Where You See Them
+## Where you see them
 
-- **Notebook chat and source chat**: inline numbers like **[1]**, with a **References** list at the end of the answer. Click a number or a reference to open the item in a dialog.
-- **Ask**: inline links in the answer; click one to open the item.
+- **Notebook chat and source chat**: inline numbers like **[1]**, with a **References** list at the end of the
+  answer labeled with the page or section ("source:abc · pp. 86–93"). Each distinct location gets its own number;
+  repeated citations of the same page reuse it.
+- **Clicking a page citation** opens a preview of the cited page, rendered from the original PDF. For a range, the
+  arrows step through its pages. **Open source** opens the whole source. Other citations open the source, note or
+  insight in a dialog.
+- **Ask**: the same references in the final answer.
 
-If a cited item was deleted after the answer was written, the dialog says *This content no longer exists*.
-
-Transformations don't produce citations; an insight is the transformation's output for one known source.
-
----
-
-## Checking a Claim
-
-1. Click the citation next to the claim.
-2. Read the opened item and find the supporting text.
-3. If you can't find it, ask a follow-up in notebook chat (or the source's own chat): "Where exactly in that source does it say this? Quote the passage." Ask answers can't be followed up; take the question to chat with the cited source in context.
-
-Things that make citations more reliable:
-
-- **Ask for them.** "Cite the source for each claim" in your question.
-- **Put the right content in context.** In notebook chat, a source at *Insights only* can only be cited through its title and insights. If you need claims backed by the full text, set it to *Full content*.
-- **Prefer specific questions.** Broad summaries tend to cite less.
-
-The model chooses what to cite, so a citation can be missing or point to the wrong item. Treat citations as a pointer to check, not as proof.
+If the original file isn't stored, the preview says *This page can't be shown*; the citation still names the page.
 
 ---
 
-## Keeping Cited Answers
+## Checking a claim
 
-- **Save to note** (notebook chat) and **Save to Notebooks** (Ask) save the answer text, including its references. See [Working with Notes](working-with-notes.md).
-- **Copy to clipboard** copies the answer text.
+1. Click the citation next to the claim and read the page.
+2. If the page doesn't support it, ask a follow-up: "Where exactly does it say that? Quote the passage." The agent
+   re-reads the cited pages.
+3. **N research steps** under the answer shows what the agent searched and read, which helps when a citation looks off.
 
-There is no export or share feature for citations.
+The model chooses what to cite, so a citation can be missing or imprecise. In the course eval the agent cited the
+right page for 30 of 30 answers, but treat citations as a pointer to check, not as proof.
+
+---
+
+## Keeping cited answers
+
+**Save to note** (notebook chat) and **Save to Notebooks** (Ask) keep the answer text with its citations; they stay
+clickable in the note. **Copy to clipboard** copies the answer text.

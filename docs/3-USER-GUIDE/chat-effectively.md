@@ -1,98 +1,104 @@
-# Chat Effectively - Conversations with Your Research
+# Chatting with the Research Agent
 
-Notebook chat is a conversation with an AI model about the sources and notes you put in context. This page covers how to use it. How the context is built, and how Chat differs from Ask, is explained in [AI Context & RAG](../2-CORE-CONCEPTS/ai-context-rag.md).
+Notebook chat is where you ask questions about a notebook. Each message is researched by an agent that searches,
+reads and looks at your documents before answering with page citations. How it works is explained in
+[The Research Agent](../2-CORE-CONCEPTS/research-agent.md); this page is about using it.
 
 ---
 
 ## Quick Start
 
-1. Open a notebook. The **Chat with Notebook** column is on the right (on a phone, the **Chat** tab).
-2. Check what's in context: the panel above the message box shows how many sources and notes are included and an estimated token count.
-3. Type your question in **Ask anything about your sources...** and press **Ctrl+Enter** (**⌘+Enter** on Mac). Plain **Enter** adds a new line.
-4. Click a numbered reference in the answer to open the source, note or insight it cites.
+1. Open a notebook. **Chat with Notebook** is the right-hand column (on a phone, the **Chat** tab).
+2. Type a question in **Ask anything about your sources...** and press **Ctrl+Enter** (**⌘+Enter** on Mac).
+   Plain **Enter** adds a new line.
+3. Watch the research happen under **Researching…**: each step is listed as it runs ("Searching for “adam”",
+   "Reading source:…#p94", "Looking at…"), with a one-line result. Then the answer streams in.
+4. Click a numbered reference to check it: page citations open a preview of the page.
 
 The first message creates a chat session automatically.
 
 ---
 
-## Choosing What the AI Sees
+## The controls above the message box
 
-Every source and note in the notebook has a context level. Chat sends the selected content with **every** message, so this is where you control quality, cost and what a cloud provider receives.
+| Control | What it does |
+|---|---|
+| **Model** | The model that **writes the answer** for this session (default: your Chat Model). Research steps always use the Tools Model. |
+| **Effort** | **Quick** (up to 4 research steps), **Standard** (up to 10, default), **Deep** (up to 20, plus a reviewer that checks the draft and sends the agent back for gaps). Per message. |
+| **Answers from** | **Notebook only** (default) or **Notebook + general knowledge**. Saved on the notebook. In general mode the agent may add general knowledge, marked as such, and use web search if it's turned on. |
+| **Attach image** (paperclip) | Attach up to 4 images to the message, or paste them into the message box. |
 
-**Per item:** click the **context icon** on a source or note card to cycle through its levels. Hover it to see the current one.
-
-| Level | Sources | Notes |
-|-------|---------|-------|
-| **Not included in chat** | Not sent | Not sent |
-| **Insights only** | Title and insights (only offered when the source has insights) | — |
-| **Full content** | Title, insights and full text | Title and content |
-
-**All at once:** the **Context** menu in each column header.
-- Sources: **Include all (insights only)** (sources without insights are left out), **Include all (full content)**, **Exclude all from context**.
-- Notes: **Include all in context**, **Exclude all from context**.
-
-Things to know:
-
-- When you open a notebook, sources with insights start at *Insights only*, other sources at *Full content*, and notes are included.
-- Your choices are **not saved**. Reloading the page resets them to the defaults.
-- To make *Insights only* available for a source, generate an insight for it ([Transformations](transformations.md)).
-
-**Choosing levels:**
-
-- Use *Full content* for the few sources you are reading closely or quoting.
-- Use *Insights only* for background sources. It's much smaller and usually enough for orientation.
-- Exclude anything unrelated to the current question. Less noise gives better answers.
-- If the context is very large (over about 105,000 tokens), Open Notebook switches to your **Large Context Model**.
+Use **Quick** for lookups ("what's on the Adam slide?"), **Standard** for most questions, **Deep** for questions that
+span many documents or need everything ("list every activation function the course mentions", "compare how lectures
+3–6 treat regularization").
 
 ---
+
+## What the agent can look at
+
+The sources and notes panel decides the agent's **scope**: anything not set to **Not included in chat** can be
+searched and read. (*Insights only* and *Full content* both mean "in scope"; nothing is sent up front either way.)
+Click a card's context icon to change it, or use the **Context** menu in the column header for all at once. Choices
+aren't saved and reset when you reload.
+
+Narrowing the scope helps when a notebook mixes topics; for a single course or project, leave everything in.
+
+---
+
+## Asking good questions
+
+The agent resolves references itself, so you can ask the way you'd ask a person who has the documents:
+
+- **Point at documents naturally**: "in the 4th lecture", "the paper by Kingma", "the slide after the ResNet one".
+- **Ask for pages**: "What does page 12 of lecture 6 show?"
+- **Ask about diagrams**: "In the residual block diagram, what's on the main path?" The agent looks at the page.
+- **Ask across documents**: "Which lectures discuss dropout, and how do they differ?" It may run one sub-agent per
+  document in parallel.
+- **Ask for structure**: "Summarize lecture 6 section by section, then find related lectures."
+- **Ask about a picture**: paste a screenshot of a slide or a homework problem and ask "which lecture covers this?"
+- **Follow up**: "and the next lecture?", "expand on the second point". The agent sees the conversation (older turns
+  as a summary).
+- **Calculations** use an exact calculator: "how many weights does that layer have?"
+- **Save things**: "save a short note summarizing this" creates a note; "remember that my exam is on Dec 10" adds it
+  to the agent's [memory](../2-CORE-CONCEPTS/research-agent.md#memory).
+
+If the notebook doesn't cover something, *Notebook only* answers say so and list what was searched. Switch to
+*Notebook + general knowledge* if you want outside information.
+
+---
+
+## Working with answers
+
+Under each answer:
+
+- **N research steps**: expands the list of tool calls behind the answer.
+- **Copy to clipboard**, and **Save to note** (saves it as an *AI Generated* note in this notebook).
+
+References are explained in [Citations](citations.md).
 
 ## Sessions
 
-A session is one conversation; its messages are saved and reloaded when you come back. Click **Sessions** to open **Chat Sessions**, where you can create a session (give it a title), switch to another one, rename it or delete it. Each session remembers the conversation, not the context selection.
-
-## Choosing the Model
-
-The model button next to the message box opens **Model Configuration**. Pick a model to use for this session instead of your **Chat Model** default, or click **Reset to Default**. Only language models you have added in **Manage → Models** are listed.
+A session is one conversation; it's saved and reloaded when you come back. **Sessions** opens the list, where you
+can create, switch, rename or delete sessions. Starting a new session for a new topic keeps the agent's view of the
+conversation focused. Attached images aren't saved with the session.
 
 ---
 
-## Working With Answers
+## Source chat
 
-Under each AI answer:
-
-- **Copy to clipboard** copies the answer text.
-- **Save to note** saves it as an **AI Generated** note in this notebook, with a generated title. There is no dialog; the note appears in the Notes column.
-
-**References** are the numbered links in the answer. They point to whole items (a source, note or insight), not to pages or passages. See [Citations](citations.md) for how to check them.
+Each source has its own chat (open the source, **Chat with Sources**). It's the same agent limited to that one
+source, with its own sessions and model choice. **Save to note** isn't available there; use **Copy to clipboard**.
 
 ---
 
-## Asking Good Questions
-
-- **Be specific.** "What sample size and method did the 2024 survey use?" gets a better answer than "Tell me about the survey."
-- **Name the sources** when several are in context: "Compare how the Smith paper and the OECD report define productivity."
-- **Ask for the format you want:** a table, a bullet list, a short paragraph.
-- **Ask for references** when you plan to verify: "Cite the source for each claim."
-- **Follow up.** The model sees the whole session, so "Expand on the second point" works.
-
----
-
-## Source Chat
-
-Each source also has its own chat. Open the source and click **Chat with Sources**: the source page shows the content on the left and the chat on the right, with its own sessions and model choice.
-
-Source chat always uses that source's full text and insights; there are no context levels. Long sources are truncated to fit about 50,000 tokens, so questions about the later parts of a very long document may not be answerable there; use notebook chat with the source at *Full content* instead (large contexts switch to your Large Context Model). **Save to note** is not available in source chat (the source isn't tied to one notebook); use **Copy to clipboard**.
-
----
-
-## When Something Goes Wrong
+## When something goes wrong
 
 | Symptom | What to do |
-|---------|-----------|
-| *The model returned an empty response...* | Retry, or pick another model. Reasoning models with a small output limit can spend everything on thinking. The failed question is not kept in the session, so retrying doesn't duplicate it |
-| Answers ignore a source | Check its context icon; it may be excluded or at *Insights only* with thin insights |
-| Slow or expensive | Reduce context: exclude sources, use *Insights only*, or start a new session (the whole session history is sent too) |
-| *The AI provider took too long to respond...* | The request hit the backend timeout (`ESPERANTO_LLM_TIMEOUT`, 180 seconds by default). Retry, use a faster model, reduce context, or raise the timeout |
-| *No model configured...* | Set the Chat Model in **Manage → Models → Default Model Assignments** |
+|---|---|
+| Answer cites no pages | The source has no pages (not a PDF, a scanned PDF, or added before page-aware ingestion). Re-add the PDF; see [Ingestion](../2-CORE-CONCEPTS/ingestion.md#re-processing). |
+| *The model returned an empty answer…* | Retry. Already retried once automatically with less reasoning; if it keeps happening, pick another answer model. |
+| "The notebook doesn't cover…" but it does | Check the source is in scope and finished processing; try **Deep**, or name the document. |
+| Slow | Deep effort and cross-document questions take longer (30 s–2 min). Use **Quick** for lookups. |
+| *No model configured…* | Set the default models: [Models for the research agent](../4-AI-PROVIDERS/index.md#models-for-the-research-agent). |
 
 More in [AI & Chat Issues](../6-TROUBLESHOOTING/ai-chat-issues.md).

@@ -1,20 +1,21 @@
-# User Guide - How to Use Open Notebook
+# User Guide - How to Use Brain Notebook
 
-Step-by-step instructions for each feature. If you want to understand how things work first (notebooks, sources, insights, context levels), read [Core Concepts](../2-CORE-CONCEPTS/index.md).
+Step-by-step instructions for each feature. To understand how things work first (the research agent, ingestion, notebooks and sources), read [Core Concepts](../2-CORE-CONCEPTS/index.md).
 
 ---
 
 ## Before You Start
 
-Open Notebook needs at least one AI provider and default models. Follow [AI Providers → Connect a provider](../4-AI-PROVIDERS/index.md#connect-a-provider) to add a provider in **Manage → Models**, add its models and set the **Default Model Assignments**. [API Configuration](api-configuration.md) covers the rest of the Models page.
+Brain Notebook needs default models. The quickest way is `scripts/brain/provision_models.py` with an OpenRouter key; or follow [Models for the research agent](../4-AI-PROVIDERS/index.md#models-for-the-research-agent). [API Configuration](api-configuration.md) covers the rest of the Models page.
 
 What each feature needs:
 
 | Feature | Models needed |
 |---------|---------------|
-| Notebook chat, source chat | Chat Model |
+| Notebook chat, source chat, Ask | Tools Model (research; tool calling), Chat Model (answer), Embedding Model |
+| PDF captions and document analysis | Transformation Model (vision-capable), or the Chat Model if none is set |
 | Transformations (insights) | Transformation Model, or the Chat Model if none is set |
-| Ask | Chat Model and Embedding Model |
+| Reranking, visual page search | An OpenRouter credential (or turn them off in **Settings → Research agent**) |
 | Vector search | Embedding Model |
 | Text search | None |
 | Uploaded audio and video files, YouTube videos without a transcript | Speech-to-Text Model (YouTube videos with a transcript don't need one) |
@@ -31,8 +32,8 @@ What each feature needs:
 | [Adding Sources](adding-sources.md) | The Add Source wizard, file types, processing status, failures |
 | [Content Processing Engines](content-processing-engines.md) | How files and URLs are extracted (Docling, Firecrawl, Jina, Crawl4AI, OCR) |
 | [Transformations](transformations.md) | Generating insights from sources, built-in and custom transformations |
-| [Chat Effectively](chat-effectively.md) | Notebook chat, context levels, sessions, model choice, source chat |
-| [Citations](citations.md) | Reading and checking the references in AI answers |
+| [Chatting with the agent](chat-effectively.md) | Notebook chat: effort, grounding, attached images, scope, sessions, source chat |
+| [Citations](citations.md) | Page citations and page previews |
 | [Working with Notes](working-with-notes.md) | Writing notes and saving AI answers |
 | [Search and Ask](search.md) | Text and vector search, and Ask across your knowledge base |
 | [Creating Podcasts](creating-podcasts.md) | Generating episodes, episode and speaker profiles |
@@ -41,9 +42,9 @@ What each feature needs:
 
 ## Your First 15 Minutes
 
-1. **Create a notebook.** Sidebar **New → Notebook** (or **Notebooks → New Notebook**). Give it a name and a short description; the description is sent to the AI in notebook Chat.
-2. **Add a source.** In the notebook, **Add Source → Add Source**, then choose **Add URL**, **Upload File** or **Enter Text**. On the Process step, keep the pre-selected transformation and embedding, and click **Done**. Processing runs in the background; the card shows **Queued**, **Processing**, then **Completed**. See [Adding Sources](adding-sources.md).
-3. **Chat.** In the Chat column, type a question and press **Ctrl+Enter** (**⌘+Enter** on Mac). Click a numbered reference in the answer to open what it cites.
+1. **Create a notebook.** Sidebar **New → Notebook** (or **Notebooks → New Notebook**). Give it a name and a short description ("AI 360 deep learning lectures 0-6"); the agent reads the description.
+2. **Add a PDF.** In the notebook, **Add Source → Add Source → Upload File**. On the Process step keep embedding on and click **Done**. Processing runs in the background; the card shows **Queued**, **Processing**, then **Completed**, and the outline and summaries follow a few minutes later. See [Adding Sources](adding-sources.md).
+3. **Ask.** In the Chat column, ask something specific and press **Ctrl+Enter** (**⌘+Enter** on Mac). Watch the research steps, then click a page citation to see the page.
 4. **Keep the answer.** Click the **Save to note** icon under the answer. It appears in the Notes column.
 5. **Ask across everything.** Open **Ask and Search**, stay on **Ask (beta)**, type a question and click **Ask**. Save the answer with **Save to Notebooks**.
 
@@ -53,7 +54,8 @@ What each feature needs:
 
 | Task | Use |
 |------|-----|
-| Explore a few sources with follow-up questions | [Notebook Chat](chat-effectively.md) |
+| Research questions about a notebook, with follow-ups | [Notebook Chat](chat-effectively.md) |
+| Find a slide by what it looks like | Ask in chat ("the slide with the ResNet diagram"), or paste a screenshot |
 | Ask one question across everything | [Ask](search.md#ask) |
 | Find a passage or term you remember | [Text search](search.md#search) |
 | Find content about an idea, whatever the wording | [Vector search](search.md#search) |

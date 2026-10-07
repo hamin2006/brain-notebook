@@ -25,11 +25,22 @@ Pick the notebooks to link the source to (optional). Opened from a notebook, tha
 ### Step 3: Process
 
 - **Transformations (optional)**: transformations to run on the source after extraction. Each one produces an [insight](../2-CORE-CONCEPTS/notebooks-sources-notes.md#insights). Transformations marked *Suggest by default on new sources* are pre-selected (on a new install, that's **Dense Summary**). See [Transformations](transformations.md).
-- **Enable embedding for search**: embeds the source so vector search and Ask can find it. Its default comes from **Settings → Embedding and Search → Default Embedding Option**: *Ask* shows this checkbox (checked), *Always* embeds without asking, *Never* skips embedding.
+- **Enable embedding for search**: embeds the source so the research agent's `search` (and vector search) can find it. **Leave it on**: without embeddings the agent can only `grep` and `read` the source. Its default comes from **Settings → Embedding and Search → Default Embedding Option**: *Ask* shows this checkbox (checked), *Always* embeds without asking (recommended), *Never* skips embedding.
 
 Click **Done**. You can click **Done** on any step to submit with the current choices.
 
 ---
+
+## PDFs: what the research agent gets
+
+PDFs with a text layer go through Brain Notebook's page-aware pipeline: text per page (with LaTeXiT equations
+recovered and animation builds merged), vision captions for pages that are mostly pictures, page-ranged chunks, then
+document analysis (metadata such as course and lecture number, a topic outline with page ranges, summaries), page-image
+embeddings and the concept graph. That's what makes page citations, "the 4th lecture", diagram questions and visual
+search work. Details: [How Documents Are Ingested](../2-CORE-CONCEPTS/ingestion.md).
+
+Lecture decks and papers exported to PDF give the best results. If you have PowerPoint/Keynote files, export them
+to PDF first: PPTX is supported but gets no pages, captions or outline.
 
 ## Supported Content
 
@@ -44,7 +55,7 @@ Click **Done**. You can click **Done** on any step to submit with the current ch
 
 - **Audio and video are transcribed** with your **Speech-to-Text Model** (set in **Manage → Models → Default Model Assignments**). Without one, they can't be processed. For a local option, see [Local Speech-to-Text](../5-CONFIGURATION/local-stt.md).
 - **Upload size** is limited to 100 MB by default; `OPEN_NOTEBOOK_MAX_UPLOAD_SIZE_MB` changes the API's limit. By default the browser sends uploads straight to the API (port 5055), so that is the only limit in the app. If your setup routes API calls through the frontend's `/api` path instead (for example `API_URL` set to the frontend's own address), the frontend also caps request bodies at 100 MB. A reverse proxy in front may add its own limit.
-- **Scanned PDFs** need Docling with OCR to give usable text.
+- **Scanned PDFs** (no text layer) need Docling with OCR to give usable text, and don't get pages.
 
 ### Web links
 
@@ -71,7 +82,9 @@ A background job extracts the text, embeds it (if enabled) and runs the selected
 
 Sources are processed by the background worker. If sources stay **Queued** forever, the worker isn't running (`make worker-start` for source installs; it runs inside the Docker image automatically).
 
-Transformations and embedding finish after the text is saved, so insights can appear a little after the source shows **Completed**.
+Captions, embedding, transformations and document analysis finish after the text is saved, so for a PDF the outline,
+*Document Summary* insight, visual search and concept graph appear a few minutes after the source shows
+**Completed** (about 3–5 minutes for a 100-page deck). The agent can already search the source by then.
 
 ---
 
@@ -103,4 +116,5 @@ The specific reason is stored with the job. You can read it in the worker log (w
 - **Delete Source** (⋮ menu): deletes the source everywhere, with its insights, embeddings and uploaded file. This can't be undone.
 - **Refresh content** (⋮ menu, completed links): fetches the page again and reprocesses it.
 - **Embed Content** (source view ⋮ menu): embeds a source that was added without embedding.
-- **Control what Chat sees**: the context icon on each card. See [Chat Effectively](chat-effectively.md#choosing-what-the-ai-sees).
+- **Control what the agent may look at**: the context icon on each card. See [Chatting with the agent](chat-effectively.md#what-the-agent-can-look-at).
+- **Re-process a PDF** added before page-aware ingestion: delete it and add the file again.

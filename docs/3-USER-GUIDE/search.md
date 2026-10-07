@@ -6,11 +6,11 @@ You can also start either from **Quick actions** (**Ctrl+K** / **⌘K**): type a
 
 | | Search | Ask (beta) |
 |---|---|---|
-| **Gives you** | A list of matching sources, insights and notes | One written answer with citations |
-| **Uses an AI model** | Vector search uses the embedding model; text search uses none | Embedding model plus a language model for each stage |
-| **Best for** | Finding a passage, term or document | Questions whose answer is spread across sources |
+| **Gives you** | A list of matching sources, insights and notes | One researched answer with citations |
+| **Uses an AI model** | Vector search uses the embedding model; text search uses none | The [research agent](../2-CORE-CONCEPTS/research-agent.md): Tools Model to research, a language model to answer |
+| **Best for** | Finding a passage, term or document | Questions across notebooks, when you don't know where the answer is |
 
-How both work under the hood is explained in [AI Context & RAG](../2-CORE-CONCEPTS/ai-context-rag.md#search-text-vs-vector).
+Search is explained further in [What the AI Sees](../2-CORE-CONCEPTS/ai-context-rag.md#the-search-tab).
 
 ---
 
@@ -45,34 +45,31 @@ If no Embedding Model is set, the page says *Vector search requires an embedding
 
 ## Ask
 
+Ask runs the research agent once over the notebooks you pick (or everything), without a conversation.
+
 1. Open **Ask and Search** and stay on the **Ask (beta)** tab.
 2. Type your question.
 3. Optionally limit it to some **Notebooks** (leave all unchecked for your whole knowledge base).
 4. Press **Cmd/Ctrl+Enter** or click **Ask**.
 
-While it runs, you'll see the stages as they finish:
+While it runs, the **Strategy** area shows the agent's research steps as they happen (searches, reads, pages it
+looks at); then the **Final Answer** appears with citations. Click **Save to Notebooks** to keep the answer as a note
+(titled with your question) in one or more notebooks.
 
-- **Strategy**: the model's reasoning and the **Search Terms** it chose (up to five searches).
-- **Individual Answers**: one partial answer per search, based on the top matches.
-- **Final Answer**: the combined answer, with links to the cited items.
+### Requirements and models
 
-Click **Save to Notebooks** to keep the answer as a note (titled with your question) in one or more notebooks.
-
-### Requirements
-
-- **An Embedding Model** must be set. Without one, the Ask tab says *You can't use this feature because you have no embedding model selected.*
-- **A Chat Model** must be set; it is used for all three stages by default.
-- Ask only sees **embedded** content (sources added with embedding enabled, notes and insights).
-
-### Choosing models
-
-The tab shows **Using Default Models** or **Using Custom Models**. Click **Advanced** to open **Advanced Model Selection** and choose a **Strategy Model**, **Answer Model** and **Final Answer Model**, then **Save Changes**. The strategy step needs a model that reliably returns structured output; if it fails with *The strategy model returned no search terms for this question...*, pick a different Strategy Model or rephrase.
+- The default models must be set ([Models for the research agent](../4-AI-PROVIDERS/index.md#models-for-the-research-agent)):
+  the **Tools Model** does the research.
+- **Advanced** lets you pick models; the **Final Answer Model** writes the answer. The Strategy and Answer model
+  fields are kept for compatibility and are not used by the agent.
+- Ask uses Standard effort and the *Notebook only* grounding rules: it answers from your documents and says when
+  they don't cover the question.
 
 ### When to use Ask
 
-- Use Ask when you don't know which sources contain the answer.
-- Ask is single-turn. To follow up, open a notebook and use [Chat](chat-effectively.md) with the sources Ask cited.
-- Answers come only from matched chunks, so they can miss context that is spread thinly across a document. For close reading, use Chat with *Full content*.
+- Use Ask when you don't know which notebook holds the answer.
+- Ask is single-turn. To follow up, open the notebook and use [Chat](chat-effectively.md); the citations tell you
+  where to look.
 
 ---
 
@@ -80,7 +77,7 @@ The tab shows **Using Default Models** or **Using Custom Models**. Click **Advan
 
 | Problem | Try |
 |---------|-----|
-| No results in vector search or Ask | Check that an Embedding Model is set and the sources are embedded; rebuild from **Advanced → Rebuild Embeddings** if you changed the embedding model |
+| No results in vector search | Check that an Embedding Model is set and the sources are embedded; rebuild from **Advanced → Rebuild Embeddings** if you changed the embedding model |
 | Text search misses a word | Try another form of the word or a synonym; stemming is English-only |
 | Too many results | Limit to specific notebooks, or turn off **Search Sources** or **Search Notes** |
-| Ask answer is empty or fails | Pick other models under **Advanced**; reasoning models with small output limits can return nothing |
+| Ask answer is empty or fails | Pick another **Final Answer Model** under **Advanced**, and check the Tools Model supports tool calling |

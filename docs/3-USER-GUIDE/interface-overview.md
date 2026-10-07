@@ -6,7 +6,7 @@ The workspace pages have a sidebar on the left (it can be collapsed to icons). T
 
 ```
 ┌──────────────────────┐
-│ Open Notebook        │
+│ Brain Notebook        │
 │ [+ New]              │  → Source, Notebook, Podcast
 │                      │
 │ COLLECT              │
@@ -37,7 +37,7 @@ The workspace pages have a sidebar on the left (it can be collapsed to icons). T
 | **Podcasts** | Generated episodes and the episode/speaker profiles ([Creating Podcasts](creating-podcasts.md)) |
 | **Models** | AI provider configurations and default models ([API Configuration](api-configuration.md)) |
 | **Transformations** | Your transformation prompts and the Playground ([Transformations](transformations.md)) |
-| **Settings** | Content Processing, Embedding and Search, File Management |
+| **Settings** | Content Processing, Embedding and Search, File Management, Research agent |
 | **Advanced** | System Info (version and update check) and Rebuild Embeddings |
 | **Quick actions** | The command palette: jump to pages and notebooks, search or ask, create items, change theme |
 | **Theme / Language** | Light, dark or system theme; interface language |
@@ -71,7 +71,7 @@ On desktop the Sources and Notes columns can be collapsed. On small screens the 
 
 - **Add Source** opens a menu: **Add Source** (the wizard for new content) or **Add Existing Sources** (link sources from your library). See [Adding Sources](adding-sources.md).
 - **Context** sets every source at once: **Include all (insights only)**, **Include all (full content)** or **Exclude all from context**.
-- Each **source card** shows the title, the type (Add URL, Upload File or Enter Text), the processing status while it isn't finished, and the insight count (when there are any). The **context icon** cycles the source's [context level](../2-CORE-CONCEPTS/ai-context-rag.md#context-levels-in-notebook-chat) when you click it. The **⋮ menu** has **Remove from Notebook**, **Retry Processing** (failed sources), **Refresh content** (completed links) and **Delete Source**.
+- Each **source card** shows the title, the type (Add URL, Upload File or Enter Text), the processing status while it isn't finished, and the insight count (when there are any). The **context icon** cycles whether the source is in the research agent's [scope](../2-CORE-CONCEPTS/ai-context-rag.md#scope-what-the-agent-may-look-at) (*Insights only* and *Full content* both mean in scope). The **⋮ menu** has **Remove from Notebook**, **Retry Processing** (failed sources), **Refresh content** (completed links) and **Delete Source**.
 - Click a card to open the source view.
 
 ### Notes column
@@ -82,7 +82,7 @@ On desktop the Sources and Notes columns can be collapsed. On small screens the 
 
 ### Chat column
 
-Notebook chat with the sources and notes in context. **Sessions** opens your saved chat sessions, the model button picks a model for the session, and the panel shows how much content is in context. Send with **Ctrl+Enter** (**⌘+Enter** on Mac). See [Chat Effectively](chat-effectively.md).
+Notebook chat with the research agent over the sources and notes in scope. **Sessions** opens your saved chat sessions; above the message box are **Model** (the answer model for the session), **Effort** (Quick / Standard / Deep), **Answers from** (the notebook's grounding) and the paperclip to attach images. While the agent works, its research steps appear live; each answer has a collapsible list of them, and page citations open a page preview. Send with **Ctrl+Enter** (**⌘+Enter** on Mac). See [Chatting with the agent](chat-effectively.md).
 
 ---
 
@@ -102,7 +102,7 @@ Clicking a source opens it with three tabs:
 
 - **Sources** (library): a table of all sources with type, insight count and embedding status. **New Source** adds a source without opening a notebook.
 - **Notebooks**: **New Notebook**, a search box, **Recently Viewed**, and the **Active Notebooks** and **Archived Notebooks** lists.
-- **Settings**: Content Processing (document and URL engines, OCR and other Docling options; see [Content Processing Engines](content-processing-engines.md)), Embedding and Search (**Default Embedding Option**: Ask, Always or Never), and File Management (**Auto Delete Files**: whether uploaded files are deleted after processing).
+- **Settings**: Content Processing (document and URL engines, OCR and other Docling options; see [Content Processing Engines](content-processing-engines.md)), Embedding and Search (**Default Embedding Option**: Ask, Always or Never), File Management (**Auto Delete Files**: whether uploaded files are deleted after processing; keep it at *No* so the agent can look at pages), and **Research agent** (rerank model, page-image embedding model, concept graph, memory, web search, backfills and the list of remembered items; see [Research agent settings](../5-CONFIGURATION/research-agent.md)).
 - **Advanced**: **System Info** shows your version and whether an update is available. **Rebuild Embeddings** re-embeds content after you change the embedding model (mode *Existing* or *All*); it runs in the background.
 
 ---
