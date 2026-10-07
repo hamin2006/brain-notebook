@@ -1,6 +1,6 @@
 # ADR-011: Visual identity is a token contract in globals.css, reviewed through /dev/design
 
-- **Status**: Accepted
+- **Status**: Accepted; the palette and its laws are superseded by [ADR-018](ADR-018-research-workspace-ui.md) (the token contract stands)
 - **Date**: 2026-07
 - **Related**: Discussion #1202 (community co-design), #1218 (foundation), #1220 (screen reskin), [frontend rules](../../7-DEVELOPMENT/frontend.md)
 

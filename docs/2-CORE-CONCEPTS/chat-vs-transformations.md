@@ -5,7 +5,7 @@ whether you can follow up. Transformations are different: a fixed prompt run on 
 
 | | Notebook Chat | Source Chat | Ask | Transformations |
 |---|---|---|---|---|
-| **Where** | Notebook page, Chat column | Source page | Ask and Search → Ask | Add Source wizard, or a source's Insights tab |
+| **Where** | Notebook page, conversation | Source page | Ask and Search → Ask | Add Source wizard, or a source's Insights tab |
 | **What it uses** | The research agent over the notebook (sources and notes in scope) | The research agent over one source | The research agent over the notebooks you pick, or everything | One source's full text |
 | **Follow-ups** | Yes, in saved sessions | Yes, in saved sessions | No | No |
 | **Output** | Answer with page citations, research steps | Answer with page citations | Answer with citations | An insight attached to the source |

@@ -45,10 +45,11 @@ Use `/docs` for request and response shapes. This map shows where things are:
 | Area | Paths |
 |---|---|
 | Notebooks | `/api/notebooks` (incl. `grounding`), `/api/notebooks/{id}/sources/{source_id}` (link/unlink), `/api/recently-viewed` |
-| Sources | `/api/sources` (multipart create with optional file upload), `/api/sources/json`, `/api/sources/{id}/status`, `/api/sources/{id}/retry`, `/api/sources/{id}/insights`, `/api/sources/{id}/download`, `/api/sources/{id}/pages/{page}/image` (a rendered PDF page, PNG) |
+| Sources | `/api/sources` (multipart create with optional file upload), `/api/sources/json`, `/api/sources/{id}/status`, `/api/sources/{id}/retry`, `/api/sources/{id}/insights`, `/api/sources/{id}/download`, `/api/sources/{id}/pages/{page}/image` (a rendered PDF page, PNG; `format=jpeg` and `max_side` for thumbnails) |
 | Notes, insights | `/api/notes`, `/api/insights/{id}`, `/api/insights/{id}/save-as-note` |
 | Chat (research agent) | `/api/chat/sessions`, `/api/chat/execute/stream` (SSE), `/api/chat/execute`; source chat under `/api/sources/{id}/chat/sessions` |
 | Research agent | `/api/agent/settings` (GET/PUT), `/api/agent/memories` (GET), `/api/agent/memories/{id}` (DELETE), `/api/agent/rebuild` (POST: `page_embeddings` / `concepts`) |
+| Explore (what ingestion built) | `/api/notebooks/{id}/overview` (counts, most shared concepts; `limit`), `/api/notebooks/{id}/concepts/{concept_id}` (mentions, relations), `/api/sources/{id}/structure` (metadata, page count, summary, outline, concepts) |
 | MCP | `/mcp` (streamable HTTP, not under `/api`): see [MCP Integration](../5-CONFIGURATION/mcp-integration.md) |
 | Search and Ask | `/api/search`, `/api/search/ask` (streaming), `/api/search/ask/simple` |
 | Transformations | `/api/transformations`, `/api/transformations/execute`, `/api/transformations/default-prompt` |

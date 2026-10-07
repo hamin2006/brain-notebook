@@ -24,13 +24,14 @@ separate from notebook citations.
 
 ## Where you see them
 
-- **Notebook chat and source chat**: inline numbers like **[1]**, with a **References** list at the end of the
-  answer labeled with the page or section ("source:abc · pp. 86–93"). Each distinct location gets its own number;
-  repeated citations of the same page reuse it.
-- **Clicking a page citation** opens a preview of the cited page, rendered from the original PDF. For a range, the
-  arrows step through its pages. **Open source** opens the whole source. Other citations open the source, note or
-  insight in a dialog.
-- **Ask**: the same references in the final answer.
+- **In the answer**: numbered chips like **①**. Each distinct location gets its own number; repeated citations of
+  the same page reuse it. **Hover** a chip to see the cited page, the document title and the page or section.
+- **Under the answer**: **Sources**, a thumbnail of every cited page with its number, title and page.
+- **Clicking a page citation** in notebook chat opens the page in the **evidence panel** beside the conversation,
+  rendered from the original PDF and marked *Cited*. The arrows move through the whole document, the outline section
+  it belongs to is shown, and for a range the cited pages are listed as thumbnails. **Open source** opens the whole
+  source. In Ask and source chat the page opens in a preview dialog instead. Other citations open the source, note
+  or insight in a dialog.
 
 If the original file isn't stored, the preview says *This page can't be shown*; the citation still names the page.
 
@@ -41,7 +42,7 @@ If the original file isn't stored, the preview says *This page can't be shown*; 
 1. Click the citation next to the claim and read the page.
 2. If the page doesn't support it, ask a follow-up: "Where exactly does it say that? Quote the passage." The agent
    re-reads the cited pages.
-3. **N research steps** under the answer shows what the agent searched and read, which helps when a citation looks off.
+3. **Researched in N steps** above the answer shows what the agent searched and read, which helps when a citation looks off.
 
 The model chooses what to cite, so a citation can be missing or imprecise. In the course eval the agent cited the
 right page for 30 of 30 answers, but treat citations as a pointer to check, not as proof.

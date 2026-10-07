@@ -44,7 +44,7 @@ What each feature needs:
 
 1. **Create a notebook.** Sidebar **New → Notebook** (or **Notebooks → New Notebook**). Give it a name and a short description ("AI 360 deep learning lectures 0-6"); the agent reads the description.
 2. **Add a PDF.** In the notebook, **Add Source → Add Source → Upload File**. On the Process step keep embedding on and click **Done**. Processing runs in the background; the card shows **Queued**, **Processing**, then **Completed**, and the outline and summaries follow a few minutes later. See [Adding Sources](adding-sources.md).
-3. **Ask.** In the Chat column, ask something specific and press **Ctrl+Enter** (**⌘+Enter** on Mac). Watch the research steps, then click a page citation to see the page.
+3. **Ask.** In the conversation, ask something specific (or click a starter question) and press **Enter**. Watch the research steps, then hover or click a page citation to see the page.
 4. **Keep the answer.** Click the **Save to note** icon under the answer. It appears in the Notes column.
 5. **Ask across everything.** Open **Ask and Search**, stay on **Ask (beta)**, type a question and click **Ask**. Save the answer with **Save to Notebooks**.
 

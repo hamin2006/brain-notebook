@@ -112,7 +112,7 @@ Scroll down to **Default Model Assignments** on the same page.
 
 1. In the sidebar, click **Notebooks** → **New Notebook**, enter a name and click **Create New Notebook**.
 2. In the notebook, click the **Add Source** button and pick **Add Source** from its menu (the other entry, **Add Existing Sources**, reuses sources you already have). Choose **Enter Text**, paste a paragraph, give it a title, then click **Next** through the remaining steps and **Done**.
-3. Wait for the source to finish processing, then type a question in the chat panel and send it with **Ctrl+Enter** (**⌘+Enter** on macOS).
+3. Wait for the source to finish processing, then type a question in the chat panel and press **Enter**.
 
 If you get an answer, you're done. Add more providers the same way at any time; each one gets its own configurations and models.
 

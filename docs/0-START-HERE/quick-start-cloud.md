@@ -67,7 +67,7 @@ turn off reranking and visual page search in **Settings → Research agent**.
 3. Wait until the source shows as processed. A 100-page deck takes a few minutes: pages are extracted, visual pages
    captioned, then the document is analyzed (outline, summaries, metadata) and its pages are embedded.
 4. In the chat panel ask something specific, e.g. *"What does the slide on page 12 say about X?"* or *"Summarize this
-   document section by section"*, and send it with **Ctrl+Enter** (**⌘+Enter** on macOS).
+   document section by section"*, and press **Enter**.
 
 You'll see the agent's research steps live ("Searching for…", "Reading…"), then the answer with citations like
 `[1]` that show the page range. Click one to preview the page.

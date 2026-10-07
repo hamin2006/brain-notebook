@@ -89,7 +89,7 @@ When the budget runs out, the answer is written from what was gathered, and says
 
 ## Grounding
 
-Each notebook has a grounding setting (the **Answers from** selector in notebook chat):
+Each notebook has a grounding setting (the **Notebook only / + General knowledge** switch in the notebook header):
 
 - **Notebook only** (default): answers use only the notebook. If it doesn't cover the question, the answer says so,
   says what was searched, and gives the closest thing the notebook does contain.

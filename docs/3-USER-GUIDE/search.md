@@ -50,7 +50,7 @@ Ask runs the research agent once over the notebooks you pick (or everything), wi
 1. Open **Ask and Search** and stay on the **Ask (beta)** tab.
 2. Type your question.
 3. Optionally limit it to some **Notebooks** (leave all unchecked for your whole knowledge base).
-4. Press **Cmd/Ctrl+Enter** or click **Ask**.
+4. Press **Enter** or click **Research**.
 
 While it runs, the **Strategy** area shows the agent's research steps as they happen (searches, reads, pages it
 looks at); then the **Final Answer** appears with citations. Click **Save to Notebooks** to keep the answer as a note

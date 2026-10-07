@@ -18,22 +18,47 @@ Pages (src/app/, App Router) → Feature components (src/components/) → Hooks 
 
 Provider tree in `app/layout.tsx` (outermost → innermost): ErrorBoundary → ThemeProvider → QueryProvider → I18nProvider → ConnectionGuard → Toaster.
 
+## The notebook workspace
+
+`notebooks/[id]/page.tsx` lays out the workspace ([ADR-018](decisions/ADR-018-research-workspace-ui.md)):
+`NotebookHeader` (name, description, stats from `useNotebookOverview`, the grounding switch), a library pane with
+`SourcesColumn` / `NotesColumn` / `ConceptsPanel` tabs, `ChatColumn` in the middle and `EvidencePanel` on the right.
+Shared state (library open and tab, the evidence target, questions queued from outside the composer) is the
+`useWorkspaceStore` zustand store (`lib/stores/workspace-store.ts`; only layout preferences persist). Phones get tabs
+and a full-screen evidence overlay.
+
+Reusable research UI lives in `components/brain/`:
+
+| Component | What it does |
+|---|---|
+| `PageThumb` | A rendered page via `usePageImage` (auth fetch → object URL, cached for the session; `lazy` waits until visible) |
+| `Citations` | `CitationChip` (numbered chip, hover preview of the page), `CitedSources` (thumbnails under an answer), href/locator helpers |
+| `Answer` | `AnswerContent`: markdown with citation chips plus cited sources; fetches titles it isn't given (Ask) |
+| `ResearchTimeline` | `LiveResearch` (live steps, elapsed time) and `ResearchTrace` (folded trace of a saved answer), `traceStats` |
+| `ChatWelcome` | Empty conversation: notebook stats, starter questions from top concepts, key concepts |
+| `EvidencePanel`, `ConceptsPanel` | The evidence pane (pages or concept) and the library's concept list |
+| `SourceStructure` | The source view's Structure tab |
+| `AskBar` | The home page's ask-everywhere box (opens `/search?mode=ask&q=…`) |
+
+Data for these comes from `lib/api/explore.ts` / `lib/hooks/use-explore.ts` (overview, concept, structure, page images).
+
 ## Flow walkthrough: notebook chat (research agent)
 
-1. `notebooks/[id]/page.tsx` passes `notebookId` and the context selections to `ChatColumn`, which also reads the
-   notebook (for `grounding`) and renders `ChatPanel` with `allowImages`.
-2. `useNotebookChat()` (`lib/hooks/use-notebook-chat.ts`) manages sessions, messages, `effort` and the live
-   `activity`. `scope()` turns the selections into `source_ids` / `note_ids` (anything not "not included").
+1. `ChatColumn` reads the notebook, builds citation titles from the sources and notes, sends questions queued in the
+   workspace store, and renders `ChatPanel` with `allowImages`, the overview and `onOpenPages` (→ evidence panel).
+2. `useNotebookChat()` (`lib/hooks/use-notebook-chat.ts`) manages sessions (including `startNewChat`), messages,
+   `effort` and the live `activity`. `scope()` turns the selections into `source_ids` / `note_ids` (anything not
+   "not included").
 3. On send it adds the user message optimistically (with attached image previews), then calls
    `chatApi.streamMessage()` (`POST /api/chat/execute/stream`, proxied by `app/api/chat/execute/stream/route.ts`) and
    reads the SSE stream. `applyAgentEvent()` (pure, tested) folds `step` / `step_result` / `text_delta` into
-   `{steps, text}`; `AgentActivityView` shows them under *Researching…*. `ai_message` replaces the live view with the
-   saved answer (with `trace`), rendered with `ResearchSteps` and references.
-4. `ChatComposer` (in `ChatPanel.tsx`) holds the model, `EffortSelect`, `GroundingSelect` (updates the notebook) and
-   image attachments (`ImageAttachments.tsx`: paste or pick, scaled to ≤1600 px JPEG data URLs, max 4).
-5. References: `lib/utils/source-references.tsx` parses addresses with locators (`[source:abc#p94]`), numbers each
-   location, and labels it via `localizedLocator`; clicking a page reference opens `PagePreviewDialog`, which fetches
-   `/api/sources/{id}/pages/{n}/image` with the auth token.
+   `{steps, text}`, shown by `LiveResearch` and the streaming answer. `ai_message` replaces the live view with the
+   saved answer (with `trace`), rendered by `ResearchTrace` and `AnswerContent`.
+4. `ChatComposer` (in `ChatPanel.tsx`) holds image attachments (`ImageAttachments.tsx`: paste, pick or drop, scaled
+   to ≤1600 px JPEG data URLs, max 4), the effort toggle, the scope label and the model. Enter sends.
+5. References: `lib/utils/source-references.tsx` parses addresses with locators (`[source:abc#p94]`) and numbers each
+   location (`collectReferences` gives the same numbering for the thumbnails). A page citation calls `onOpenPages`
+   (notebook) or opens `PagePreviewDialog` (Ask, source chat).
 
 Settings → Research agent is `app/(dashboard)/settings/components/AgentSettingsCard.tsx` with hooks in
 `lib/hooks/use-agent.ts`. App-wide links to the repository come from `lib/project.ts`.

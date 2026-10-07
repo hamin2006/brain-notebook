@@ -23,7 +23,7 @@ NOTEBOOK  "AI Safety Research"  (name + description)
 A **notebook** is a workspace for one project or topic. It has a name, an optional description, its linked sources, its notes and its chat sessions.
 
 - The **name and description are given to the research agent** in notebook chat as project information ("AI 360 deep learning course, lectures 0-6"), so a good description helps it interpret questions. Ask, Search and transformations don't use them.
-- Each notebook has a **grounding** setting (*Notebook only* or *Notebook + general knowledge*), set from the chat panel. See [Grounding](research-agent.md#grounding).
+- Each notebook has a **grounding** setting (*Notebook only* or *Notebook + general knowledge*), set from the notebook header. See [Grounding](research-agent.md#grounding).
 - Notebooks can be **archived** (hidden from the active list, nothing is deleted) and unarchived.
 - **Deleting** a notebook permanently deletes its notes. Sources that are linked only to this notebook can be deleted too or kept in your library; sources shared with other notebooks are just unlinked. The delete dialog shows the counts before you confirm.
 
