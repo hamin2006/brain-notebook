@@ -146,9 +146,27 @@ async def summarize_sections(
             }
         )
         async with semaphore:
-            return await _complete(prompt, max_tokens=1500)
+            summary = await _complete(prompt, max_tokens=1500)
+            if not summary:
+                # Reasoning models can spend the whole budget thinking and
+                # return nothing; give it room once before falling back.
+                summary = await _complete(prompt, max_tokens=4000)
+        return summary or _extract_fallback(section, text)
 
     return list(await asyncio.gather(*(one(s) for s in sections)))
+
+
+def _extract_fallback(section: Section, text: str) -> str:
+    """A plain extract when the model returns no summary: better than an empty one."""
+    lines = [
+        line.strip()
+        for line in text.splitlines()
+        if line.strip() and not line.startswith("[p")
+    ]
+    return (
+        f"{section.title} (pp. {section.page_start}-{section.page_end}): "
+        + " ".join(lines)[:600]
+    )
 
 
 @command("analyze_source", app="open_notebook", retry=ANALYZE_RETRY_CONFIG)

@@ -180,3 +180,26 @@ async def test_analyze_skips_sources_without_pages():
         )
     assert result.success and result.sections == 0
     complete.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_empty_section_summary_is_retried_then_falls_back():
+    from commands.analyze_commands import summarize_sections
+    from open_notebook.utils.pdf_pages import PdfPage
+
+    pages = [PdfPage(1, "Regularization\naltering optimization"), PdfPage(2, "Dropout")]
+    sections = [
+        Section(index=0, title="Regularization", page_start=1, page_end=1),
+        Section(index=1, title="Dropout", page_start=2, page_end=2),
+    ]
+    replies = {"Regularization": ["", ""], "Dropout": ["", "Dropout summary"]}
+
+    async def fake_complete(prompt, max_tokens, json_mode=False):
+        key = "Regularization" if '"Regularization"' in prompt else "Dropout"
+        return replies[key].pop(0)
+
+    with patch("commands.analyze_commands._complete", new=fake_complete):
+        summaries = await summarize_sections("Lecture 4", pages, sections)
+    assert summaries[1] == "Dropout summary"  # retried with more room
+    assert summaries[0].startswith("Regularization (pp. 1-1): ")  # extract fallback
+    assert "altering optimization" in summaries[0]
