@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
+from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
@@ -108,7 +109,7 @@ class _State(TypedDict, total=False):
     notebook: object
 
 
-def _toy_graph(replies: list):
+def _toy_graph(replies: list, saver=None):
     """A checkpointed graph whose node raises like the real one on an empty
     reply, then answers on the next call."""
 
@@ -122,7 +123,7 @@ def _toy_graph(replies: list):
     builder.add_node("agent", node)
     builder.add_edge(START, "agent")
     builder.add_edge("agent", END)
-    saver = SqliteSaver(sqlite3.connect(":memory:", check_same_thread=False))
+    saver = saver or SqliteSaver(sqlite3.connect(":memory:", check_same_thread=False))
     return builder.compile(checkpointer=saver)
 
 
@@ -170,10 +171,12 @@ def test_notebook_chat_failed_turn_is_rolled_back_and_retry_is_clean():
     from api.main import app
 
     client = TestClient(app)
-    graph = _toy_graph(["", "the answer"])
+    # Notebook chat runs the async agent graph; an in-memory saver supports both
+    # the async calls the router makes and the sync reads _history makes.
+    graph = _toy_graph(["", "the answer"], saver=InMemorySaver())
     session = MagicMock(model_override=None, save=AsyncMock())
     with (
-        patch("api.routers.chat.chat_graph", graph),
+        patch("api.routers.chat.get_agent_graph", new=AsyncMock(return_value=graph)),
         patch(
             "api.routers.chat.get_session_or_404",
             new=AsyncMock(return_value=("chat_session:n", session)),

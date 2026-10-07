@@ -1,9 +1,12 @@
 import asyncio
+import json
 import traceback
-from typing import Any, Dict, List, Optional
+from typing import Any, AsyncIterator, Dict, List, Literal, Optional, Tuple
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import StreamingResponse
+from langchain_core.messages import HumanMessage, RemoveMessage
 from langchain_core.runnables import RunnableConfig
 from loguru import logger
 from pydantic import BaseModel, Field
@@ -14,21 +17,96 @@ from api.routers._chat_shared import (
     extract_chat_messages,
     get_session_or_404,
 )
+from open_notebook.agent.graph import get_agent_graph
 from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.domain.notebook import ChatSession, Notebook
 from open_notebook.exceptions import (
     NotFoundError,
     OpenNotebookError,
 )
-from open_notebook.graphs.chat import graph as chat_graph
 from open_notebook.utils import token_count
 from open_notebook.utils.context_builder import build_notebook_context
-from open_notebook.utils.graph_utils import (
-    get_session_message_count,
-    invoke_chat_turn,
-)
 
 router = APIRouter()
+
+
+async def _thread_messages(session_id: str) -> list:
+    graph = await get_agent_graph()
+    state = await graph.aget_state(
+        RunnableConfig(configurable={"thread_id": session_id})
+    )
+    return list((state.values or {}).get("messages", [])) if state else []
+
+
+async def _message_count(session_id: str) -> int:
+    try:
+        return len(await _thread_messages(session_id))
+    except Exception as e:
+        logger.warning(f"Could not fetch message count for session {session_id}: {e}")
+        return 0
+
+
+async def _discard_unanswered(session_id: str, message: HumanMessage) -> None:
+    """Drop a question whose turn failed, so a retry doesn't add it twice. Never raises."""
+    try:
+        graph = await get_agent_graph()
+        config = RunnableConfig(configurable={"thread_id": session_id})
+        if any(
+            getattr(m, "id", None) == message.id
+            for m in await _thread_messages(session_id)
+        ):
+            await graph.aupdate_state(
+                config, {"messages": [RemoveMessage(id=message.id or "")]}
+            )
+    except Exception:
+        logger.exception(f"Could not discard unanswered message in {session_id}")
+
+
+def _scope_from_request(
+    request: "ExecuteChatRequest",
+) -> Tuple[Optional[List[str]], Optional[List[str]]]:
+    """Explicit ids win; otherwise the ids of the sources/notes the UI put in context."""
+    sources, notes = request.source_ids, request.note_ids
+    context = request.context or {}
+    if sources is None and isinstance(context.get("sources"), list):
+        sources = [
+            s["id"] for s in context["sources"] if isinstance(s, dict) and s.get("id")
+        ]
+    if notes is None and isinstance(context.get("notes"), list):
+        notes = [
+            n["id"] for n in context["notes"] if isinstance(n, dict) and n.get("id")
+        ]
+    return sources, notes
+
+
+async def _prepare_turn(request: "ExecuteChatRequest"):
+    """Session, notebook, model and the graph input for one chat turn."""
+    full_session_id, session = await get_session_or_404(request.session_id)
+    notebook_query = await repo_query(
+        "SELECT out FROM refers_to WHERE in = $session_id",
+        {"session_id": ensure_record_id(full_session_id)},
+    )
+    notebook_id = str(notebook_query[0]["out"]) if notebook_query else None
+    model_override = (
+        request.model_override
+        if request.model_override is not None
+        else getattr(session, "model_override", None)
+    )
+    source_ids, note_ids = _scope_from_request(request)
+    # Explicit id so a failed turn can remove it from the checkpoint.
+    user_message = HumanMessage(content=request.message, id=str(uuid4()))
+    state = {
+        "messages": [user_message],
+        "notebook_id": notebook_id,
+        "source_ids": source_ids,
+        "note_ids": note_ids,
+        "model_override": model_override,
+        "effort": request.effort,
+    }
+    config = RunnableConfig(
+        configurable={"thread_id": full_session_id, "model_id": model_override}
+    )
+    return full_session_id, session, user_message, state, config
 
 
 # Request/Response models
@@ -76,6 +154,16 @@ class ExecuteChatRequest(BaseModel):
     model_override: Optional[str] = Field(
         None, description="Optional model override for this message"
     )
+    effort: Optional[Literal["quick", "standard", "deep"]] = Field(
+        None, description="How much research the agent may do (default: standard)"
+    )
+    source_ids: Optional[List[str]] = Field(
+        None,
+        description="Sources the agent may search; defaults to the sources in `context`, else the whole notebook",
+    )
+    note_ids: Optional[List[str]] = Field(
+        None, description="Notes the agent may search; same defaults as source_ids"
+    )
 
 
 class ExecuteChatResponse(BaseModel):
@@ -111,7 +199,7 @@ async def get_sessions(notebook_id: str = Query(..., description="Notebook ID"))
             session_id = str(session.id)
 
             # Get message count from LangGraph state
-            msg_count = await get_session_message_count(chat_graph, session_id)
+            msg_count = await _message_count(session_id)
 
             results.append(
                 ChatSessionResponse(
@@ -190,17 +278,9 @@ async def get_session(session_id: str):
         # Get session (normalizes the ID and 404s if missing)
         full_session_id, session = await get_session_or_404(session_id)
 
-        # Get session state from LangGraph to retrieve messages
-        # Use sync get_state() in a thread since SqliteSaver doesn't support async
-        thread_state = await asyncio.to_thread(
-            chat_graph.get_state,
-            config=RunnableConfig(configurable={"thread_id": full_session_id}),
+        messages: list[ChatMessage] = extract_chat_messages(
+            await _thread_messages(full_session_id)
         )
-
-        # Extract messages from state
-        messages: list[ChatMessage] = []
-        if thread_state and thread_state.values and "messages" in thread_state.values:
-            messages = extract_chat_messages(thread_state.values["messages"])
 
         # Find notebook_id (we need to query the relationship)
         notebook_query = await repo_query(
@@ -262,7 +342,7 @@ async def update_session(session_id: str, request: UpdateSessionRequest):
         notebook_id = notebook_query[0]["out"] if notebook_query else None
 
         # Get message count from LangGraph state
-        msg_count = await get_session_message_count(chat_graph, full_session_id)
+        msg_count = await _message_count(full_session_id)
 
         return ChatSessionResponse(
             id=session.id or "",
@@ -307,74 +387,22 @@ async def delete_session(session_id: str):
 
 @router.post("/chat/execute", response_model=ExecuteChatResponse)
 async def execute_chat(request: ExecuteChatRequest):
-    """Execute a chat request and get AI response."""
+    """Run one agent turn and return the updated conversation (non-streaming)."""
     try:
-        # Verify session exists (normalizes the ID and 404s if missing)
-        full_session_id, session = await get_session_or_404(request.session_id)
-
-        # Fetch notebook linked to this session
-        notebook_query = await repo_query(
-            "SELECT out FROM refers_to WHERE in = $session_id",
-            {"session_id": ensure_record_id(full_session_id)},
+        full_session_id, session, user_message, state, config = await _prepare_turn(
+            request
         )
-        notebook = None
-        if notebook_query:
-            notebook = await Notebook.get(notebook_query[0]["out"])
-
-        # Determine model override (per-request override takes precedence over session-level)
-        model_override = (
-            request.model_override
-            if request.model_override is not None
-            else getattr(session, "model_override", None)
+        graph = await get_agent_graph()
+        try:
+            result = await graph.ainvoke(state, config)  # type: ignore[arg-type]
+        except BaseException:
+            await _discard_unanswered(full_session_id, user_message)
+            raise
+        await session.save()  # bump the session timestamp
+        return ExecuteChatResponse(
+            session_id=request.session_id,
+            messages=extract_chat_messages(result.get("messages", [])),
         )
-
-        # Get current state
-        # Use sync get_state() in a thread since SqliteSaver doesn't support async
-        current_state = await asyncio.to_thread(
-            chat_graph.get_state,
-            config=RunnableConfig(configurable={"thread_id": full_session_id}),
-        )
-
-        # Prepare state for execution
-        state_values = current_state.values if current_state else {}
-        state_values["messages"] = state_values.get("messages", [])
-        state_values["context"] = request.context
-        state_values["notebook"] = notebook
-        state_values["model_override"] = model_override
-
-        # Add user message to state
-        from langchain_core.messages import HumanMessage
-
-        # Explicit id so a failed turn can remove it from the checkpoint.
-        user_message = HumanMessage(content=request.message, id=str(uuid4()))
-        state_values["messages"].append(user_message)
-
-        # Execute chat graph in a thread so the synchronous LangGraph invoke
-        # (SqliteSaver checkpoints are sync) doesn't block the event loop and
-        # freeze the rest of the API while the LLM responds. Mirrors the
-        # get_state() calls above.
-        # invoke_chat_turn also drops the question from the checkpoint when the
-        # turn fails, so a retry doesn't add it twice.
-        result = await asyncio.to_thread(
-            invoke_chat_turn,
-            chat_graph,
-            state_values,
-            RunnableConfig(
-                configurable={
-                    "thread_id": full_session_id,
-                    "model_id": model_override,
-                }
-            ),
-            user_message,
-        )
-
-        # Update session timestamp
-        await session.save()
-
-        # Convert messages to response format
-        messages = extract_chat_messages(result.get("messages", []))
-
-        return ExecuteChatResponse(session_id=request.session_id, messages=messages)
     except NotFoundError:
         raise HTTPException(status_code=404, detail="Session not found")
     except HTTPException:
@@ -382,14 +410,76 @@ async def execute_chat(request: ExecuteChatRequest):
     except OpenNotebookError:
         raise
     except Exception as e:
-        # Log detailed error with context for debugging
         logger.error(
             f"Error executing chat: {str(e)}\n"
             f"  Session ID: {request.session_id}\n"
-            f"  Model override: {request.model_override}\n"
             f"  Traceback:\n{traceback.format_exc()}"
         )
         raise HTTPException(status_code=500, detail=f"Error executing chat: {str(e)}")
+
+
+def _sse(event: Dict[str, Any]) -> str:
+    return f"data: {json.dumps(event, default=str)}\n\n"
+
+
+async def _stream_turn(
+    full_session_id: str,
+    session: Any,
+    user_message: HumanMessage,
+    state: dict,
+    config: RunnableConfig,
+) -> AsyncIterator[str]:
+    answered = False
+    try:
+        graph = await get_agent_graph()
+        final: Dict[str, Any] = {}
+        async for mode, chunk in graph.astream(  # type: ignore[call-overload]
+            state, config, stream_mode=["custom", "values"]
+        ):
+            if mode == "custom":
+                yield _sse(chunk)
+            else:
+                final = chunk
+        messages = extract_chat_messages(final.get("messages", []))
+        answered = bool(messages) and messages[-1].type == "ai"
+        if answered:
+            yield _sse({"type": "ai_message", "message": messages[-1].model_dump()})
+        await session.save()
+        yield _sse({"type": "complete"})
+    except Exception as e:
+        from open_notebook.utils.error_classifier import classify_error
+
+        message = str(e) if isinstance(e, OpenNotebookError) else classify_error(e)[1]
+        logger.error(f"Error in agent chat stream: {e}")
+        yield _sse({"type": "error", "message": message})
+    finally:
+        # Also covers a client disconnect (the generator is closed mid-turn).
+        if not answered:
+            await _discard_unanswered(full_session_id, user_message)
+
+
+@router.post("/chat/execute/stream")
+async def execute_chat_stream(request: ExecuteChatRequest):
+    """Run one agent turn, streaming its steps and answer as server-sent events.
+
+    Events: step {step, tool, args}, step_result {step, tool, summary},
+    text_delta {step, text}, ai_message {message}, complete, error {message}.
+    """
+    try:
+        full_session_id, session, user_message, state, config = await _prepare_turn(
+            request
+        )
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return StreamingResponse(
+        _stream_turn(full_session_id, session, user_message, state, config),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.post("/chat/context", response_model=BuildContextResponse)
