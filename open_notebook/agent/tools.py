@@ -449,6 +449,9 @@ async def tool_graph(
     except Exception as e:
         logger.warning(f"Concept lookup without vectors: {e}")
     matches = retrieval.match_concepts(concepts, concept, embed, 4)
+    aliased = await retrieval.concept_for_name(concept)
+    if aliased in concepts:  # an exact name or abbreviation wins
+        matches = [aliased] + [m for m in matches if m != aliased][:3]
     if not matches:
         return f"No concept like {concept!r} in the graph. Try search or grep."
     best = matches[0]

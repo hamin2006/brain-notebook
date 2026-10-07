@@ -42,6 +42,25 @@ def concept_key(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", name.lower()).strip()
 
 
+_PARENTHESIZED = re.compile(r"^(.*?)\s*\(([^()]{1,40})\)\s*$")
+
+
+def concept_names(name: str) -> List[str]:
+    """The names a concept goes by: "Rectified linear unit (ReLU)" ->
+    ["Rectified linear unit", "ReLU"]; a plain name -> [name]. The first is the
+    display name."""
+    name = " ".join(name.split())
+    match = _PARENTHESIZED.match(name)
+    if match and match.group(1).strip():
+        return [match.group(1).strip(), match.group(2).strip()]
+    return [name] if name else []
+
+
+def alias_id(key: str) -> str:
+    """The concept_alias record id for a normalized name."""
+    return "concept_alias:a" + hashlib.sha1(key.encode()).hexdigest()[:20]
+
+
 def concept_id(key: str) -> str:
     """The concept record id for a normalized key (stable across jobs)."""
     return "concept:c" + hashlib.sha1(key.encode()).hexdigest()[:20]

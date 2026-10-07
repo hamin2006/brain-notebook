@@ -21,8 +21,12 @@ export const agentApi = {
     await apiClient.delete(`/agent/memories/${encodeURIComponent(id)}`)
   },
 
+  // Concepts are rebuilt from scratch (reset) so merged names and prompt changes apply everywhere
   rebuild: async (what: 'page_embeddings' | 'concepts') => {
-    const response = await apiClient.post<RebuildAgentDataResponse>('/agent/rebuild', { what })
+    const response = await apiClient.post<RebuildAgentDataResponse>('/agent/rebuild', {
+      what,
+      ...(what === 'concepts' ? { reset: true } : {}),
+    })
     return response.data
   },
 }

@@ -75,6 +75,7 @@ async def test_graph_concept_shows_mentions_and_relations_with_addresses():
         patch.object(retrieval, "concept_mentions", new=AsyncMock(return_value=mentions)),
         patch.object(retrieval, "concept_relations", new=AsyncMock(return_value=relations)),
         patch("open_notebook.utils.embedding.generate_embedding", new=AsyncMock(side_effect=RuntimeError("offline"))),
+        patch.object(retrieval, "concept_for_name", new=AsyncMock(return_value=None)),
     ):  # fmt: skip
         out = await tool_graph(SCOPE, concept="batch normalization")
     assert out.startswith('Concept "Batch normalization"')
@@ -114,6 +115,7 @@ async def test_extract_concepts_writes_mentions_and_relations():
     model = MagicMock()
     model.ainvoke = AsyncMock(return_value=AIMessage(content=json.dumps(extraction)))
     upserts: list = []
+    aliases: dict = {}
     inserted: dict = {}
 
     async def fake_query(sql, params=None):
@@ -131,10 +133,12 @@ async def test_extract_concepts_writes_mentions_and_relations():
                 {"page": p, "text": f"page {p} text", "caption": None}
                 for p in range(96, 109)
             ]
-        if sql.startswith("SELECT VALUE id"):
+        if sql.startswith("SELECT"):  # aliases, existing concepts: none yet
             return []
-        if sql.startswith("UPSERT"):
+        if sql.startswith("UPSERT") and "name" in params:
             upserts.append(params["key"])
+        elif sql.startswith("UPSERT"):
+            aliases[params["key"]] = str(params["concept"])
         return []
 
     with (
@@ -151,6 +155,7 @@ async def test_extract_concepts_writes_mentions_and_relations():
         )
 
     assert sorted(upserts) == ["batch normalization", "internal covariate shift"]
+    assert aliases["internal covariate shift"] == concept_id("internal covariate shift")
     mentions = inserted["concept_mention"]
     assert [(str(m["concept"]), m["page_start"], m["page_end"]) for m in mentions] == [
         (concept_id("batch normalization"), 97, 97),
@@ -192,3 +197,65 @@ def test_parse_extraction_tolerates_fences_prose_and_latex():
     )
     with pytest.raises(ValueError):
         parse_extraction("no json here")
+
+
+def test_concept_names_split_abbreviations():
+    from open_notebook.utils.concepts import concept_names
+
+    assert concept_names("Rectified linear unit (ReLU)") == [
+        "Rectified linear unit",
+        "ReLU",
+    ]
+    assert concept_names("  Dropout ") == ["Dropout"]
+    assert concept_names("(odd)") == ["(odd)"]
+
+
+@pytest.mark.asyncio
+async def test_names_resolve_through_existing_aliases():
+    from commands import concept_commands as cmd
+    from open_notebook.utils.concepts import alias_id
+
+    relu = concept_id("relu")  # created earlier from another lecture's "ReLU"
+    created, aliases = [], {}
+
+    async def fake_query(sql, params=None):
+        if sql.startswith("SELECT key, concept"):
+            wanted = {str(r) for r in params["records"]}
+            return (
+                [{"key": "relu", "concept": relu}] if alias_id("relu") in wanted else []
+            )
+        if sql.startswith("SELECT VALUE id"):
+            return []
+        if sql.startswith("UPSERT") and "name" in params:
+            created.append(params["key"])
+        elif sql.startswith("UPSERT"):
+            aliases[params["key"]] = str(params["concept"])
+        return []
+
+    with (
+        patch.object(cmd, "repo_query", new=fake_query),
+        patch.object(cmd, "generate_embeddings", new=AsyncMock(return_value=[[0.1]])),
+    ):
+        resolved = await cmd._resolve_concepts(
+            ["Rectified linear unit (ReLU)", "Rectified Linear Unit", "Sigmoid"]
+        )
+    assert resolved["rectified linear unit"] == relu  # via its abbreviation
+    assert resolved["sigmoid"] == concept_id("sigmoid")
+    assert created == ["sigmoid"]
+    assert aliases == {
+        "rectified linear unit": relu,
+        "sigmoid": concept_id("sigmoid"),
+    }
+
+
+@pytest.mark.asyncio
+async def test_graph_lookup_by_abbreviation_uses_the_alias():
+    with (
+        patch.object(retrieval, "scoped_concepts", new=AsyncMock(return_value=CONCEPTS)),
+        patch.object(retrieval, "concept_for_name", new=AsyncMock(return_value="concept:ln")),
+        patch.object(retrieval, "concept_mentions", new=AsyncMock(return_value=[])),
+        patch.object(retrieval, "concept_relations", new=AsyncMock(return_value=[])),
+        patch("open_notebook.utils.embedding.generate_embedding", new=AsyncMock(return_value=[1.0, 0.0])),
+    ):  # fmt: skip
+        out = await tool_graph(SCOPE, concept="LN")
+    assert out.startswith('Concept "Layer normalization"')

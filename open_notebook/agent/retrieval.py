@@ -457,6 +457,19 @@ def match_concepts(
     return (exact + partial + similar)[:k]
 
 
+async def concept_for_name(name: str) -> Optional[str]:
+    """The concept a name is an alias of, if any ("relu" -> the ReLU concept)."""
+    from open_notebook.utils.concepts import alias_id, concept_key
+
+    key = concept_key(name)
+    if not key:
+        return None
+    rows = await repo_query(
+        "SELECT VALUE concept FROM $alias", {"alias": ensure_record_id(alias_id(key))}
+    )
+    return str(rows[0]) if rows and rows[0] else None
+
+
 async def concept_mentions(concept_id: str, scope: AgentScope) -> List[Dict[str, Any]]:
     rows = await repo_query(
         """

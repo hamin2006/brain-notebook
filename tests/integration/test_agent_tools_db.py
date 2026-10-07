@@ -400,3 +400,57 @@ async def test_rebuild_endpoint_finds_sources_with_pages(corpus):
         corpus["l4"],
         corpus["l6"],
     }
+
+
+@pytest.mark.asyncio
+async def test_concept_aliases_merge_names_across_documents(corpus):
+    import json
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    from langchain_core.messages import AIMessage
+
+    from api.routers.agent import RebuildAgentDataRequest, rebuild_agent_data
+    from commands import concept_commands as cmd
+    from open_notebook.database.repository import repo_query
+
+    replies = {
+        "Regularization": {"concepts": [{"name": "Rectified linear unit (ReLU)", "page": 1}], "relations": []},
+        "Optimizers": {"concepts": [], "relations": []},
+        "Residual networks": {"concepts": [{"name": "ReLU", "page": 1}, {"name": "Rectified Linear Unit", "page": 2}], "relations": []},
+    }  # fmt: skip
+    model = MagicMock()
+
+    async def answer(prompt):
+        section = next(title for title in replies if f'section "{title}"' in prompt)
+        return AIMessage(content=json.dumps(replies[section]))
+
+    model.ainvoke = answer
+    with (
+        patch.object(cmd.AgentSettings, "load", new=AsyncMock(return_value=SimpleNamespace(knowledge_graph=True))),
+        patch.object(cmd, "provision_langchain_model", new=AsyncMock(return_value=model)),
+        patch.object(cmd, "limit_reasoning", side_effect=lambda m: m),
+        patch.object(cmd, "generate_embeddings", side_effect=lambda texts: [[0.1, 0.2, 0.3]] * len(texts)),
+    ):  # fmt: skip
+        for source in (corpus["l4"], corpus["l6"]):
+            await cmd.extract_concepts_command(
+                cmd.ExtractConceptsInput(source_id=source)
+            )
+
+    concepts = await repo_query("SELECT name FROM concept")
+    assert [c["name"] for c in concepts] == ["Rectified linear unit"]
+    assert len(await repo_query("SELECT * FROM concept_alias")) == 2
+    with patch(
+        "open_notebook.utils.embedding.generate_embedding",
+        new=AsyncMock(return_value=[0.1, 0.2, 0.3]),
+    ):
+        out = await _tools(corpus["scope"])["graph"].ainvoke({"concept": "relu"})
+    assert "Appears in 2 document(s)" in out
+
+    with patch(
+        "api.routers.agent.CommandService.submit_command_job",
+        new=AsyncMock(return_value="command:1"),
+    ):
+        await rebuild_agent_data(RebuildAgentDataRequest(what="concepts", reset=True))
+    for table in ("concept", "concept_alias", "concept_mention"):
+        assert await repo_query(f"SELECT * FROM {table}") == []

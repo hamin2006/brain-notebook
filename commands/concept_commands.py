@@ -26,8 +26,10 @@ from open_notebook.utils.concepts import (
     MAX_CONCEPTS_PER_SECTION,
     MAX_RELATIONS_PER_SECTION,
     ConceptExtraction,
+    alias_id,
     concept_id,
     concept_key,
+    concept_names,
     parse_extraction,
 )
 from open_notebook.utils.embedding import generate_embeddings
@@ -93,38 +95,76 @@ def _page_range(section: Section, page: Optional[int]) -> tuple[int, int]:
     return section.page_start, section.page_end
 
 
-async def _concept_ids(names: Dict[str, str]) -> Dict[str, str]:
-    """Record ids for concept keys, creating (and embedding) the new ones.
+def _keys(name: str) -> List[str]:
+    """Normalized names of a concept: display name first, then aliases."""
+    return [k for k in dict.fromkeys(concept_key(n) for n in concept_names(name)) if k]
 
-    A concept's id is derived from its key, so lookups are direct record fetches
-    and two jobs adding the same concept write the same record."""
-    if not names:
+
+async def _resolve_concepts(raw_names: List[str]) -> Dict[str, str]:
+    """Concept record id for every normalized name of the extracted concepts.
+
+    Names resolve through concept_alias records, so "ReLU", "Rectified linear
+    unit" and "Rectified linear unit (ReLU)" land on one concept wherever each
+    was seen first. New concepts are created (and embedded); every name gets an
+    alias record. Ids derive from names, so lookups are direct record fetches."""
+    groups = [(concept_names(n)[0], _keys(n)) for n in raw_names]
+    groups = [(display, keys) for display, keys in groups if keys]
+    if not groups:
         return {}
-    ids = {key: concept_id(key) for key in names}
-    existing = await repo_query(
-        "SELECT VALUE id FROM $records",
-        {"records": [ensure_record_id(i) for i in ids.values()]},
+    all_keys = list(dict.fromkeys(k for _, keys in groups for k in keys))
+    rows = await repo_query(
+        "SELECT key, concept FROM $records",
+        {"records": [ensure_record_id(alias_id(k)) for k in all_keys]},
     )
-    have = {str(i) for i in existing}
-    new = [k for k in names if ids[k] not in have]
-    if new:
-        vectors: List[Optional[List[float]]]
-        try:
-            vectors = list(await generate_embeddings([names[k] for k in new]))
-        except Exception as e:  # lookup by name still works without vectors
-            logger.warning(f"Concept embeddings failed: {e}")
-            vectors = [None] * len(new)
-        for key, vector in zip(new, vectors):
+    resolved: Dict[str, str] = {r["key"]: str(r["concept"]) for r in rows}
+    new_aliases: Dict[str, str] = {}
+    new_concepts: Dict[str, tuple[str, str]] = {}
+    for display, keys in groups:
+        concept = next((resolved[k] for k in keys if k in resolved), None)
+        if concept is None:
+            concept = concept_id(keys[0])
+            new_concepts.setdefault(concept, (display, keys[0]))
+        for key in keys:
+            if key not in resolved:
+                resolved[key] = concept
+                new_aliases[key] = concept
+
+    if new_concepts:
+        existing = await repo_query(
+            "SELECT VALUE id FROM $records",
+            {"records": [ensure_record_id(c) for c in new_concepts]},
+        )
+        have = {str(i) for i in existing}
+        create = [c for c in new_concepts if c not in have]
+        vectors: List[Optional[List[float]]] = [None] * len(create)
+        if create:
+            try:
+                vectors = list(
+                    await generate_embeddings([new_concepts[c][0] for c in create])
+                )
+            except Exception as e:  # lookup by name still works without vectors
+                logger.warning(f"Concept embeddings failed: {e}")
+        for concept, vector in zip(create, vectors):
+            display, key = new_concepts[concept]
             await repo_query(
                 "UPSERT $id CONTENT {name: $name, key: $key, embedding: $embedding}",
                 {
-                    "id": ensure_record_id(ids[key]),
-                    "name": names[key],
+                    "id": ensure_record_id(concept),
+                    "name": display,
                     "key": key,
                     "embedding": vector,
                 },
             )
-    return ids
+    for key, concept in new_aliases.items():
+        await repo_query(
+            "UPSERT $id CONTENT {concept: $concept, key: $key}",
+            {
+                "id": ensure_record_id(alias_id(key)),
+                "concept": ensure_record_id(concept),
+                "key": key,
+            },
+        )
+    return resolved
 
 
 @command("extract_concepts", app="open_notebook", retry=CONCEPT_RETRY_CONFIG)
@@ -185,27 +225,30 @@ async def extract_concepts_command(
 
     extractions = await asyncio.gather(*(one(s) for s in sections))
 
-    names: Dict[str, str] = {}
-    for extraction in extractions:
-        for c in extraction.concepts[:MAX_CONCEPTS_PER_SECTION]:
-            key = concept_key(c.name)
-            if key:
-                names.setdefault(key, c.name.strip())
-    ids = await _concept_ids(names)
+    resolved = await _resolve_concepts(
+        [
+            c.name
+            for extraction in extractions
+            for c in extraction.concepts[:MAX_CONCEPTS_PER_SECTION]
+        ]
+    )
+
+    def concept_of(name: str) -> Optional[str]:
+        return next((resolved[k] for k in _keys(name) if k in resolved), None)
 
     mentions: List[dict] = []
     relations: List[dict] = []
     for section, extraction in zip(sections, extractions):
         seen = set()
         for c in extraction.concepts[:MAX_CONCEPTS_PER_SECTION]:
-            key = concept_key(c.name)
-            if key not in ids or key in seen:
+            concept = concept_of(c.name)
+            if concept is None or concept in seen:
                 continue
-            seen.add(key)
+            seen.add(concept)
             first, last = _page_range(section, c.page)
             mentions.append(
                 {
-                    "concept": ensure_record_id(ids[key]),
+                    "concept": ensure_record_id(concept),
                     "source": record,
                     "section": section.index,
                     "page_start": first,
@@ -214,14 +257,14 @@ async def extract_concepts_command(
                 }
             )
         for r in extraction.relations[:MAX_RELATIONS_PER_SECTION]:
-            a, b = concept_key(r.source), concept_key(r.target)
-            if a not in ids or b not in ids or a == b or not r.relation.strip():
+            a, b = concept_of(r.source), concept_of(r.target)
+            if a is None or b is None or a == b or not r.relation.strip():
                 continue
             first, last = _page_range(section, r.page)
             relations.append(
                 {
-                    "from_concept": ensure_record_id(ids[a]),
-                    "to_concept": ensure_record_id(ids[b]),
+                    "from_concept": ensure_record_id(a),
+                    "to_concept": ensure_record_id(b),
                     "relation": r.relation.strip()[:60],
                     "source": record,
                     "section": section.index,
@@ -236,8 +279,9 @@ async def extract_concepts_command(
         await repo_insert("concept_mention", mentions)
     if relations:
         await repo_insert("concept_relation", relations)
+    concepts = len({str(m["concept"]) for m in mentions})
     logger.info(
         f"Concept graph for {input_data.source_id}: {len(mentions)} mentions of "
-        f"{len(ids)} concepts, {len(relations)} relations"
+        f"{concepts} concepts, {len(relations)} relations"
     )
-    return result(len(ids), len(relations))
+    return result(concepts, len(relations))

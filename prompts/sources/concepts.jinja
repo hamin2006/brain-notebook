@@ -3,7 +3,7 @@ You are building a concept index for "{{ title }}", section "{{ section_title }}
 Section text (page markers in brackets):
 {{ text }}
 
-List the key technical concepts this section teaches or relies on (at most {{ max_concepts }}): methods, models, architectures, algorithms, math objects, problems, metrics, named results. Skip generic words ("example", "slide", "lecture"), people and logistics. Use canonical singular names a textbook index would use, with common abbreviations spelled out once (e.g. "Rectified linear unit (ReLU)" -> "ReLU"; keep the form the field uses most).
+List the key technical concepts this section teaches or relies on (at most {{ max_concepts }}): methods, models, architectures, algorithms, math objects, problems, metrics, named results. Skip generic words ("example", "slide", "lecture"), people and logistics, and topics that only appear in an agenda, outline, syllabus or "coming up" list. Use canonical singular names a textbook index would use; when a concept has a common abbreviation, write "Full name (ABBR)", e.g. "Rectified linear unit (ReLU)".
 
 Then list relations between those concepts that the section actually states (at most {{ max_relations }}), each as source -relation-> target with a short verb phrase.
 

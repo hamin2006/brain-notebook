@@ -1,0 +1,3 @@
+-- Down migration 29: drop concept aliases.
+
+REMOVE TABLE IF EXISTS concept_alias;

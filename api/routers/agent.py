@@ -43,6 +43,10 @@ class RebuildAgentDataRequest(BaseModel):
         False,
         description="page_embeddings: re-embed pages that already have an embedding (after changing the model)",
     )
+    reset: bool = Field(
+        False,
+        description="concepts: clear the whole concept graph first (a clean rebuild)",
+    )
 
 
 class RebuildAgentDataResponse(BaseModel):
@@ -112,6 +116,14 @@ async def rebuild_agent_data(request: RebuildAgentDataRequest):
     """Run page embedding or concept extraction for every analyzed source, e.g.
     after turning a feature on or changing the page embedding model."""
     table = "source_page" if request.what == "page_embeddings" else "source_section"
+    if request.what == "concepts" and request.reset:
+        for graph_table in (
+            "concept_mention",
+            "concept_relation",
+            "concept_alias",
+            "concept",
+        ):
+            await repo_query(f"DELETE {graph_table}")
     sources: List[Any] = await repo_query("SELECT VALUE id FROM source")
     ids: List[str] = []
     for source_id in sources:

@@ -1,0 +1,7 @@
+-- Migration 29: concept aliases. "Rectified linear unit (ReLU)", "ReLU" and
+-- "Rectified linear unit" name one concept; each normalized name is an alias
+-- record (id derived from the name) pointing at its concept.
+
+DEFINE TABLE IF NOT EXISTS concept_alias SCHEMAFULL;
+DEFINE FIELD IF NOT EXISTS concept ON TABLE concept_alias TYPE record<concept>;
+DEFINE FIELD IF NOT EXISTS key ON TABLE concept_alias TYPE string;
