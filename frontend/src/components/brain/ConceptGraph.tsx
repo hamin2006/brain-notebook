@@ -23,7 +23,7 @@ import { EmptyState } from '@/components/common/EmptyState'
 
 // Document hues: evenly spaced around the wheel from the agent's iris, so neighbouring
 // lectures never share a colour; lightness follows the theme.
-function documentHues(count: number, dark: boolean): string[] {
+export function documentHues(count: number, dark: boolean): string[] {
   const n = Math.max(count, 1)
   return Array.from({ length: n }, (_, i) => {
     const hue = (250 + (i * 360) / n) % 360
@@ -86,7 +86,7 @@ function readPalette(documents: number): Palette {
   }
 }
 
-function withAlpha(hex: string, alpha: number): string {
+export function withAlpha(hex: string, alpha: number): string {
   const m = /^#([0-9a-f]{6})$/i.exec(hex)
   if (!m) return hex
   const n = parseInt(m[1], 16)
@@ -140,7 +140,7 @@ function buildGraph(data: ConceptGraphData) {
  * that introduces them (left to right in course order), stated relations pull
  * hard, shared sections pull gently. Hover to focus, click to open the concept.
  */
-export function ConceptGraph({ notebookId }: { notebookId: string }) {
+export function ConceptGraph2D({ notebookId }: { notebookId: string }) {
   const { t } = useTranslation()
   const { data, isLoading } = useConceptGraph(notebookId)
   const evidence = useWorkspaceStore((s) => s.evidence)
@@ -660,7 +660,7 @@ export function ConceptGraph({ notebookId }: { notebookId: string }) {
 }
 
 /** "AI 360 Lecture 2 - Universality and Backprop (1).pdf" -> "Lecture 2". */
-function shortTitle(doc: GraphDocument): string {
+export function shortTitle(doc: GraphDocument): string {
   const lecture = /(lecture|week|chapter|part|unit)\s*(\d+)/i.exec(doc.title)
   if (lecture) return `${lecture[1][0].toUpperCase()}${lecture[1].slice(1).toLowerCase()} ${lecture[2]}`
   const clean = doc.title.replace(/\.(pdf|pptx?|docx?)$/i, '').replace(/\s*\(\d+\)$/, '')

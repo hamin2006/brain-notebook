@@ -1107,5 +1107,10 @@ export const ptBR = {
     graphClickHint: "Clique para abrir · arraste para mover",
     openGraph: "Abrir o grafo de conceitos",
     openGraphDesc: "Veja como as ideias se conectam entre documentos",
+    graphMode: "Modo do grafo",
+    graph2d: "Mapa",
+    graph3d: "3D",
+    graphOrbit: "Órbita",
+    graph3dHint: "Arraste para girar · role para aproximar · arraste com o botão direito para mover",
   },
 } satisfies TranslationShape;

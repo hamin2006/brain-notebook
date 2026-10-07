@@ -37,7 +37,8 @@ Reusable research UI lives in `components/brain/`:
 | `ResearchTimeline` | `LiveResearch` (live steps, elapsed time) and `ResearchTrace` (folded trace of a saved answer), `traceStats` |
 | `ChatWelcome` | Empty conversation: notebook stats, starter questions from top concepts, key concepts |
 | `EvidencePanel`, `ConceptsPanel` | The evidence pane (pages or concept) and the library's concept list |
-| `ConceptGraph` | The Graph view: d3-force layout on a canvas (columns per document, relation and co-occurrence links, hover focus, search, zoom, legend filter) from `GET /notebooks/{id}/graph` |
+| `ConceptGraphView` | The Graph view's Map / 3D switch; `ConceptGraph3D` (3d-force-graph + three.js, CSS2D labels, bloom in dark) is loaded with `next/dynamic` only when 3D is opened |
+| `ConceptGraph` | `ConceptGraph2D`, the map: d3-force layout on a canvas (columns per document, relation and co-occurrence links, hover focus, search, zoom, legend filter) from `GET /notebooks/{id}/graph` |
 | `SourceStructure` | The source view's Structure tab |
 | `AskBar` | The home page's ask-everywhere box (opens `/search?mode=ask&q=…`) |
 

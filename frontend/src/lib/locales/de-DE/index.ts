@@ -1110,5 +1110,10 @@ export const deDE = {
     graphClickHint: "Klicken zum Öffnen · ziehen zum Verschieben",
     openGraph: "Begriffsgraph öffnen",
     openGraphDesc: "Sieh, wie Ideen dokumentübergreifend zusammenhängen",
+    graphMode: "Graphmodus",
+    graph2d: "Karte",
+    graph3d: "3D",
+    graphOrbit: "Rotieren",
+    graph3dHint: "Ziehen zum Drehen · Scrollen zum Zoomen · Rechtsklick-Ziehen zum Verschieben",
   },
 } satisfies TranslationShape;

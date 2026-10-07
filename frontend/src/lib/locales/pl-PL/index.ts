@@ -1107,5 +1107,10 @@ export const plPL = {
     graphClickHint: "Kliknij, aby otworzyć · przeciągnij, aby przesunąć",
     openGraph: "Otwórz graf pojęć",
     openGraphDesc: "Zobacz, jak idee łączą się między dokumentami",
+    graphMode: "Tryb grafu",
+    graph2d: "Mapa",
+    graph3d: "3D",
+    graphOrbit: "Obrót",
+    graph3dHint: "Przeciągnij, aby obracać · przewiń, aby przybliżyć · prawy przycisk, aby przesunąć",
   },
 } satisfies TranslationShape;

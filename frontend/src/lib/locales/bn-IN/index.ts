@@ -1108,5 +1108,10 @@ export const bnIN = {
     graphClickHint: "খুলতে ক্লিক করুন · সরাতে টানুন",
     openGraph: "ধারণা-গ্রাফ খুলুন",
     openGraphDesc: "ডকুমেন্ট জুড়ে ধারণাগুলো কীভাবে যুক্ত তা দেখুন",
+    graphMode: "গ্রাফ মোড",
+    graph2d: "মানচিত্র",
+    graph3d: "3D",
+    graphOrbit: "ঘোরান",
+    graph3dHint: "ঘোরাতে টানুন · জুম করতে স্ক্রল করুন · সরাতে ডান-ক্লিকে টানুন",
   },
 } satisfies TranslationShape;

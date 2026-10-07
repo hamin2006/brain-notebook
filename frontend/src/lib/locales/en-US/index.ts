@@ -1106,6 +1106,11 @@ export const enUS = {
     graphClickHint: "Click to open · drag to move",
     openGraph: "Open the concept graph",
     openGraphDesc: "See how ideas connect across documents",
+    graphMode: "Graph mode",
+    graph2d: "Map",
+    graph3d: "3D",
+    graphOrbit: "Orbit",
+    graph3dHint: "Drag to orbit · scroll to zoom · right-drag to pan",
   },
 }
 

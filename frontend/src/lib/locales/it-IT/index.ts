@@ -1107,5 +1107,10 @@ export const itIT = {
     graphClickHint: "Clic per aprire · trascina per spostare",
     openGraph: "Apri il grafo dei concetti",
     openGraphDesc: "Guarda come si collegano le idee tra i documenti",
+    graphMode: "Modalità grafo",
+    graph2d: "Mappa",
+    graph3d: "3D",
+    graphOrbit: "Orbita",
+    graph3dHint: "Trascina per ruotare · scorri per zoomare · trascina col destro per spostare",
   },
 } satisfies TranslationShape;

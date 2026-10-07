@@ -86,6 +86,11 @@ summaries, its concepts and every page as a thumbnail.
 </table>
 
 <p align="center">
+  <img src="docs/assets/screenshots/concept-graph-3d.webp" alt="The concept graph in 3D, orbiting, glowing nodes coloured by lecture" width="80%">
+  <br><sub>…or explore it in 3D: an orbiting scene where focusing a concept sends particles along its relations.</sub>
+</p>
+
+<p align="center">
   <img src="docs/assets/screenshots/home.webp" alt="Home: ask across all notebooks, recent items and notebook cards" width="80%">
   <br><sub>Home: ask across every notebook, jump back in, notebooks with their decks as covers. Light and dark themes, 14 languages.</sub>
 </p>

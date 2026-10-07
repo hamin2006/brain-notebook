@@ -1107,5 +1107,10 @@ export const frFR = {
     graphClickHint: "Cliquer pour ouvrir · glisser pour déplacer",
     openGraph: "Ouvrir le graphe de concepts",
     openGraphDesc: "Voir comment les idées se relient entre documents",
+    graphMode: "Mode du graphe",
+    graph2d: "Carte",
+    graph3d: "3D",
+    graphOrbit: "Orbite",
+    graph3dHint: "Glisser pour tourner · défiler pour zoomer · clic droit pour déplacer",
   },
 } satisfies TranslationShape;

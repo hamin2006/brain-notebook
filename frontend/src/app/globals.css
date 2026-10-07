@@ -637,3 +637,57 @@
     animation: none;
   }
 }
+
+/* 3D concept graph tooltip (rendered by 3d-force-graph) */
+.scene-tooltip {
+  font-family: var(--font-geist), system-ui, sans-serif !important;
+}
+
+.graph3d-tip {
+  max-width: 240px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  box-shadow: var(--shadow-pop);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.graph3d-tip b {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.graph3d-tip-sub {
+  margin: 2px 0 6px;
+  color: var(--ink-faint);
+}
+
+.graph3d-label {
+  display: inline-block;
+  pointer-events: none;
+  white-space: nowrap;
+  font-family: var(--font-geist), system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink);
+  text-shadow: 0 0 3px var(--bg), 0 0 6px var(--bg), 0 0 10px var(--bg);
+  transition: opacity var(--motion-base);
+}
+
+.graph3d-label.is-focus {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  background: color-mix(in oklab, var(--surface-raised) 88%, transparent);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-pop);
+  text-shadow: none;
+}
+
+.graph3d-label.is-dim {
+  opacity: 0.3;
+}

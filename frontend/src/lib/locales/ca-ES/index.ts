@@ -1107,5 +1107,10 @@ export const caES = {
     graphClickHint: "Clic per obrir · arrossega per moure",
     openGraph: "Obre el graf de conceptes",
     openGraphDesc: "Mira com es connecten les idees entre documents",
+    graphMode: "Mode del graf",
+    graph2d: "Mapa",
+    graph3d: "3D",
+    graphOrbit: "Òrbita",
+    graph3dHint: "Arrossega per girar · desplaça per ampliar · arrossega amb el dret per moure",
   },
 } satisfies TranslationShape;

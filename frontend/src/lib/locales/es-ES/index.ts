@@ -1108,5 +1108,10 @@ export const esES = {
     graphClickHint: "Clic para abrir · arrastra para mover",
     openGraph: "Abrir el grafo de conceptos",
     openGraphDesc: "Mira cómo se conectan las ideas entre documentos",
+    graphMode: "Modo del grafo",
+    graph2d: "Mapa",
+    graph3d: "3D",
+    graphOrbit: "Órbita",
+    graph3dHint: "Arrastra para girar · desplaza para acercar · arrastre derecho para mover",
   },
 } satisfies TranslationShape;

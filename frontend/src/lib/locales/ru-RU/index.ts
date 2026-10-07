@@ -1107,5 +1107,10 @@ export const ruRU = {
     graphClickHint: "Нажмите, чтобы открыть · перетащите, чтобы сдвинуть",
     openGraph: "Открыть граф понятий",
     openGraphDesc: "Посмотрите, как связаны идеи в разных документах",
+    graphMode: "Режим графа",
+    graph2d: "Карта",
+    graph3d: "3D",
+    graphOrbit: "Вращение",
+    graph3dHint: "Тяните для вращения · прокрутка для масштаба · правая кнопка для сдвига",
   },
 } satisfies TranslationShape;

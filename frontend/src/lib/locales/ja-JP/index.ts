@@ -1107,5 +1107,10 @@ export const jaJP = {
     graphClickHint: "クリックで開く · ドラッグで移動",
     openGraph: "概念グラフを開く",
     openGraphDesc: "ドキュメントをまたいだアイデアのつながりを見る",
+    graphMode: "グラフ表示",
+    graph2d: "マップ",
+    graph3d: "3D",
+    graphOrbit: "回転",
+    graph3dHint: "ドラッグで回転 · スクロールでズーム · 右ドラッグで移動",
   },
 } satisfies TranslationShape;

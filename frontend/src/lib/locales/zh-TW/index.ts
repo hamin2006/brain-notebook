@@ -1107,5 +1107,10 @@ export const zhTW = {
     graphClickHint: "點擊開啟 · 拖曳移動",
     openGraph: "開啟概念圖譜",
     openGraphDesc: "查看各文件間的想法如何連結",
+    graphMode: "圖譜模式",
+    graph2d: "平面",
+    graph3d: "3D",
+    graphOrbit: "旋轉",
+    graph3dHint: "拖曳旋轉 · 捲動縮放 · 右鍵拖曳平移",
   },
 } satisfies TranslationShape;

@@ -131,6 +131,11 @@ a section (**Shared sections** turns them off).
 
 The graph shows the 400 most shared concepts (the count is top right). Asking about a concept switches back to Chat.
 
+**Map / 3D** (top centre) switches to a 3D view of the same graph, still left to right by lecture: it orbits slowly
+until you drag (**Orbit** restarts it), right-drag pans, scroll zooms. Hover or click a concept to light its
+neighbourhood and send particles along its relations; the search box flies the camera to a concept. The map is
+better for reading; 3D is for exploring.
+
 ![A focused concept with its relations, and the concept in the evidence panel](../assets/screenshots/concept-graph-focus.webp)
 
 ### Evidence panel

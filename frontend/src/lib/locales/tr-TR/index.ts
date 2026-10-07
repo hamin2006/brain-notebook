@@ -1107,5 +1107,10 @@ export const trTR = {
     graphClickHint: "Açmak için tıkla · taşımak için sürükle",
     openGraph: "Kavram grafiğini aç",
     openGraphDesc: "Fikirlerin belgeler arasında nasıl bağlandığını gör",
+    graphMode: "Grafik modu",
+    graph2d: "Harita",
+    graph3d: "3B",
+    graphOrbit: "Döndür",
+    graph3dHint: "Döndürmek için sürükle · yakınlaştırmak için kaydır · kaydırmak için sağ tıkla sürükle",
   },
 } satisfies TranslationShape;

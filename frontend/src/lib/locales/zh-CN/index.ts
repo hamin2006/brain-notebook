@@ -1107,5 +1107,10 @@ export const zhCN = {
     graphClickHint: "点击打开 · 拖动移动",
     openGraph: "打开概念图谱",
     openGraphDesc: "查看各文档间的想法如何关联",
+    graphMode: "图谱模式",
+    graph2d: "平面",
+    graph3d: "3D",
+    graphOrbit: "旋转",
+    graph3dHint: "拖动旋转 · 滚动缩放 · 右键拖动平移",
   },
 } satisfies TranslationShape;
