@@ -79,11 +79,12 @@ async def tool_list(
 ) -> str:
     docs = await retrieval.document_rows(scope)
     rows = []
+    other_types: Dict[str, int] = {}  # documents hidden only by the doc_type filter
     for doc in docs:
         src = scope.sources[doc["id"]]
         meta = src.metadata or {}
-        if doc_type and (meta.get("doc_type") or "").lower() != doc_type.lower():
-            continue
+        kind = (meta.get("doc_type") or src.kind).lower()
+        type_mismatch = bool(doc_type) and kind != (doc_type or "").lower()
         if course and course.lower() not in (meta.get("course") or "").lower():
             continue
         if sequence is not None and meta.get("sequence") != sequence:
@@ -92,6 +93,9 @@ async def tool_list(
             title_contains
             and title_contains.lower() not in f"{src.label} {src.title}".lower()
         ):
+            continue
+        if type_mismatch:
+            other_types[kind] = other_types.get(kind, 0) + 1
             continue
         rows.append((src, meta, doc["summary"]))
     keys: Dict[str, Callable[[Any], Any]] = {
@@ -110,7 +114,7 @@ async def tool_list(
         if any((doc_type, course, sequence, title_contains))
         else list(scope.notes.values())
     )
-    if not rows and not notes:
+    if not rows and not notes and not other_types:
         return "No documents match. Call list with no filters to see everything in context."
     lines = [f"{len(rows)} document(s):"]
     for src, meta, summary in rows:
@@ -132,6 +136,12 @@ async def tool_list(
     if notes:
         lines.append(f"{len(notes)} note(s):")
         lines += [f'- {n.id} "{n.title}"' for n in notes]
+    if other_types:
+        hidden = ", ".join(f"{t} ({n})" for t, n in sorted(other_types.items()))
+        lines.append(
+            f"Not shown: {sum(other_types.values())} otherwise matching document(s) of other types: "
+            f"{hidden}. Types are assigned automatically; include them if they may be what you want."
+        )
     return "\n".join(lines)
 
 

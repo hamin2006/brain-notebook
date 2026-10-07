@@ -20,7 +20,7 @@ INDEX_LINE_CHARS = 90
 
 class DocumentMetadata(BaseModel):
     doc_type: str = Field(
-        description="One of: lecture, paper, book, notes, article, slides, report, other"
+        description="One of: lecture (slides or notes for a class session), paper, book, notes, article, report, other"
     )
     title: str = Field(description="Human-readable title, without file extension")
     course: Optional[str] = Field(
