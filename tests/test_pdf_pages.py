@@ -144,3 +144,22 @@ def test_pages_to_full_text_marks_pages_and_skips_empty_ones():
     text = pages_to_full_text([PdfPage(1, "a"), PdfPage(2, ""), PdfPage(3, "c")])
     assert text == "--- Page 1 ---\na\n\n--- Page 3 ---\nc"
     assert not has_page_text([PdfPage(1, "tiny")])
+
+
+def test_concurrent_renders_do_not_crash(tmp_path):
+    """PDFium isn't thread-safe; rendering from many threads must be serialized."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    from open_notebook.utils.pdf_pages import render_page_png
+
+    path = tmp_path / "deck.pdf"
+    Image.new("RGB", (800, 450), "white").save(
+        path, "PDF", save_all=True, append_images=[Image.new("RGB", (800, 450))] * 7
+    )
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        images = list(
+            pool.map(
+                lambda n: render_page_png(str(path), n, 300), list(range(1, 9)) * 4
+            )
+        )
+    assert len(images) == 32 and all(i.startswith(b"\x89PNG") for i in images)

@@ -28,7 +28,7 @@ from open_notebook.domain.notebook import Source
 from open_notebook.exceptions import ConfigurationError
 from open_notebook.utils import clean_thinking_content
 from open_notebook.utils.embedding import generate_embeddings
-from open_notebook.utils.pdf_pages import PdfPage, group_builds
+from open_notebook.utils.pdf_pages import PDFIUM_LOCK, PdfPage, group_builds
 from open_notebook.utils.sections import (
     DocumentMetadata,
     OutlinePlan,
@@ -78,11 +78,12 @@ def _pdf_title(path: Optional[str]) -> Optional[str]:
     try:
         import pypdfium2 as pdfium
 
-        pdf = pdfium.PdfDocument(path)
-        try:
-            return (pdf.get_metadata_dict().get("Title") or "").strip() or None
-        finally:
-            pdf.close()
+        with PDFIUM_LOCK:
+            pdf = pdfium.PdfDocument(path)
+            try:
+                return (pdf.get_metadata_dict().get("Title") or "").strip() or None
+            finally:
+                pdf.close()
     except Exception:
         return None
 

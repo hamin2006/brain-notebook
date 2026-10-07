@@ -115,6 +115,7 @@ async def test_caption_job_survives_a_failing_page(tmp_path):
 
     assert result.success and result.pages_captioned == 1
     source.vectorize.assert_awaited_once()
+    submit.assert_called_once()  # analysis still queued after a failed page
 
 
 @pytest.mark.asyncio

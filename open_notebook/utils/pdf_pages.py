@@ -20,6 +20,7 @@ the previous one) so a chunker can embed the build once with its page range.
 import base64
 import plistlib
 import re
+import threading
 import zlib
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
@@ -36,6 +37,11 @@ _REPEAT = re.compile(r"(\S)\1{2,}")
 _LATEXIT_BLOCK = re.compile(r'<latexit sha1_base64="[^"]*">(.*?)</latexit>', re.S)
 
 BUILD_COVERAGE = 0.9  # share of the previous page a build step must contain
+
+# PDFium (behind pypdfium2) is not thread-safe: concurrent calls from worker
+# threads corrupt its heap and crash the process. Every pypdfium2 call in the
+# app goes through this lock; callers still run it off the event loop.
+PDFIUM_LOCK = threading.Lock()
 
 
 @dataclass
@@ -235,15 +241,16 @@ def render_page_png(path: str, page: int, max_side: int = 1400) -> bytes:
 
     import pypdfium2 as pdfium
 
-    pdf = pdfium.PdfDocument(path)
-    try:
-        if not 1 <= page <= len(pdf):
-            raise ValueError(f"Page {page} is out of range (1-{len(pdf)})")
-        pdf_page = pdf[page - 1]
-        width, height = pdf_page.get_size()
-        image = pdf_page.render(scale=max_side / max(width, height)).to_pil()
-    finally:
-        pdf.close()
+    with PDFIUM_LOCK:
+        pdf = pdfium.PdfDocument(path)
+        try:
+            if not 1 <= page <= len(pdf):
+                raise ValueError(f"Page {page} is out of range (1-{len(pdf)})")
+            pdf_page = pdf[page - 1]
+            width, height = pdf_page.get_size()
+            image = pdf_page.render(scale=max_side / max(width, height)).to_pil()
+        finally:
+            pdf.close()
     buffer = io.BytesIO()
     image.convert("RGB").save(buffer, format="PNG")
     return buffer.getvalue()
