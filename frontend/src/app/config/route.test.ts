@@ -36,6 +36,14 @@ describe('GET /config', () => {
     expect(body.apiUrl).toBe('https://configured.example.com')
   })
 
+  it('returns an empty (same-origin) API URL for API_URL=relative', async () => {
+    process.env.API_URL = 'relative'
+    const response = await GET(makeRequest({ host: 'notebook.example.com' }))
+    const body = await response.json()
+
+    expect(body.apiUrl).toBe('')
+  })
+
   it('auto-detects from a well-formed Host header', async () => {
     const request = makeRequest({ host: 'notebook.example.com', 'x-forwarded-proto': 'https' })
 

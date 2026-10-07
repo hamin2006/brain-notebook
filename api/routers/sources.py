@@ -1,7 +1,7 @@
 import asyncio
 import os
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, List, Literal, Optional
 
 from content_core import check_file_support
 from fastapi import (
@@ -1161,11 +1161,24 @@ async def create_source_insight(source_id: str, request: CreateSourceInsightRequ
         raise HTTPException(status_code=500, detail="Error starting insight generation")
 
 
+def _png_to_jpeg(png: bytes) -> bytes:
+    import io
+
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.open(io.BytesIO(png)).convert("RGB").save(buffer, format="JPEG", quality=82)
+    return buffer.getvalue()
+
+
 @router.get("/sources/{source_id}/pages/{page}/image")
 async def get_source_page_image(
     source_id: str,
     page: int,
     max_side: int = Query(1400, ge=200, le=2400, description="Longest side in pixels"),
+    format: Literal["png", "jpeg"] = Query(
+        "png", description="jpeg is much smaller, for thumbnails"
+    ),
 ):
     """A PDF source's page (1-based) rendered as PNG; image sources return the image.
 
@@ -1202,6 +1215,12 @@ async def get_source_page_image(
             raise HTTPException(status_code=415, detail="This source has no pages")
     except ValueError as e:  # page out of range
         raise HTTPException(status_code=404, detail=str(e))
+    if format == "jpeg":
+        return Response(
+            content=await asyncio.to_thread(_png_to_jpeg, png),
+            media_type="image/jpeg",
+            headers={"Cache-Control": "private, max-age=3600"},
+        )
     return Response(
         content=png,
         media_type="image/png",

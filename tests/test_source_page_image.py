@@ -50,3 +50,17 @@ def test_missing_original_file_is_404(tmp_path):
         response = _client().get("/api/sources/abc/pages/1/image")
     assert response.status_code == 404
     assert "not stored" in response.json()["detail"]
+
+
+def test_renders_a_jpeg_thumbnail(tmp_path):
+    pdf = tmp_path / "deck.pdf"
+    Image.new("RGB", (800, 450), "white").save(pdf, "PDF")
+    with patch(
+        "api.routers.sources.Source.get", new=AsyncMock(return_value=_source(pdf))
+    ):
+        response = _client().get(
+            "/api/sources/abc/pages/1/image?max_side=240&format=jpeg"
+        )
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/jpeg"
+    assert response.content.startswith(b"\xff\xd8")

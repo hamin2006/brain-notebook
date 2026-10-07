@@ -67,6 +67,8 @@ After=brain-api.service
 WorkingDirectory=$REPO/frontend/.next/standalone
 Environment=HOSTNAME=$HOST
 Environment=PORT=$PORT
+# browsers call this server, which proxies /api to the API on 127.0.0.1:5055
+Environment=API_URL=relative
 ExecStart=$NODE server.js
 Restart=on-failure
 RestartSec=5

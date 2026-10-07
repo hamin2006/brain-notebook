@@ -54,6 +54,8 @@ function extractHostname(hostHeader: string): string | null {
  * - INTERNAL_API_URL: Used by Next.js rewrites for server-side proxying, typically http://localhost:5055
  *
  * Auto-detection logic for API_URL:
+ * 0. API_URL=relative: the browser calls this server, which proxies /api/* to
+ *    INTERNAL_API_URL (use when the API port isn't reachable from browsers)
  * 1. If API_URL env var is set, use it (explicit override)
  * 2. Otherwise, detect from incoming HTTP request headers (zero-config)
  * 3. Fallback to localhost:5055 if detection fails
@@ -63,6 +65,10 @@ function extractHostname(hostHeader: string): string | null {
 export async function GET(request: NextRequest) {
   // Priority 1: Check if API_URL is explicitly set
   const envApiUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL
+
+  if (envApiUrl === 'relative') {
+    return NextResponse.json({ apiUrl: '' })
+  }
 
   if (envApiUrl) {
     return NextResponse.json({
