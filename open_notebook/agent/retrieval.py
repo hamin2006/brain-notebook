@@ -6,13 +6,16 @@
 - documents: vector search over "Document Summary" insights, plus keyword overlap
   with titles, metadata and topics
 - `like`: the stored embedding of an address, for "more like this"
+- rerank: optionally reorders fused candidates with a rerank model
 
 Vector similarity is brute force over the scope, which is fine at notebook
 scale (thousands of chunks).
 """
 
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
+
+from loguru import logger
 
 from open_notebook.agent.addresses import Address
 from open_notebook.agent.scope import AgentScope, per_source
@@ -45,6 +48,44 @@ def fuse(rankings: List[List[Dict[str, Any]]], limit: int) -> List[Dict[str, Any
             hits.setdefault(key, hit)
     ordered = sorted(scores, key=lambda k: scores[k], reverse=True)
     return [hits[k] for k in ordered[:limit]]
+
+
+RERANK_CANDIDATES = 24
+RERANK_TEXT_CHARS = 2000
+
+
+async def rerank_model() -> Optional[str]:
+    from open_notebook.domain.agent_settings import AgentSettings
+
+    try:
+        settings = await AgentSettings.load()
+    except Exception as e:
+        logger.warning(f"Could not read agent settings: {e}")
+        return None
+    return (settings.rerank_model or "").strip() or None
+
+
+async def rerank(
+    query: str,
+    hits: List[Dict[str, Any]],
+    text_of: Callable[[Dict[str, Any]], str],
+    limit: int,
+) -> List[Dict[str, Any]]:
+    """The best `limit` hits by the rerank model; the fused order when reranking
+    is off, has nothing to rank, or fails."""
+    model = await rerank_model() if query.strip() and len(hits) > 1 else None
+    if not model:
+        return hits[:limit]
+    from open_notebook.ai.openrouter import rerank as rerank_call
+
+    try:
+        ranked = await rerank_call(
+            model, query, [text_of(h)[:RERANK_TEXT_CHARS] for h in hits], limit
+        )
+    except Exception as e:
+        logger.warning(f"Rerank failed, keeping fused order: {e}")
+        return hits[:limit]
+    return [hits[i] for i, _ in ranked if 0 <= i < len(hits)][:limit]
 
 
 def keyword_rank(

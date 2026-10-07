@@ -256,8 +256,11 @@ async def tool_search(
         ]
         return "\n".join(lines)
 
+    candidates = max(limit * 3, retrieval.RERANK_CANDIDATES)
     if level == "section":
-        hits = await retrieval.section_hits(scope, text_query, embed, limit, only=only)
+        hits = await retrieval.section_hits(
+            scope, text_query, embed, candidates, only=only
+        )
         if like_address and like_address.section is not None:
             hits = [
                 h
@@ -267,6 +270,9 @@ async def tool_search(
                     and h["index"] == like_address.section
                 )
             ]
+        hits = await retrieval.rerank(
+            text_query, hits, lambda h: f"{h['title']}\n{h['summary']}", limit
+        )
         if not hits:
             return "No matching sections (documents may not be analyzed yet; try level=passage)."
         lines = ["Sections (best first):"]
@@ -279,10 +285,12 @@ async def tool_search(
             )
         return "\n".join(lines)
 
-    hits = await retrieval.passage_hits(scope, text_query, embed, limit * 2, only=only)
+    hits = await retrieval.passage_hits(scope, text_query, embed, candidates, only=only)
     if like_address:
         hits = [h for h in hits if _hit_address(h) != str(like_address)]
-    hits = hits[:limit]
+    hits = await retrieval.rerank(
+        text_query, hits, lambda h: _strip_chunk_header(h["content"]), limit
+    )
     if not hits:
         return f"No matches for {query!r}. Try other words, grep for exact terms, or level=section."
     lines = ["Passages (best first):"]
