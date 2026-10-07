@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Document analysis for paged sources.** After pages (and captions) are stored, a background job asks the model for document metadata (type, course, number in the series, topics) and a topic outline with page ranges, summarizes each section, and writes a document summary. Sections and their embedded summaries are stored per source; the summary appears as a "Document Summary" insight. A long deck is never sent to the model in one prompt
 
 ### Changed
+- Each research step of the agent may think for at most 2048 tokens (uncapped steps on Qwen3.7 Flash could reason for ~35 s); the answer writer keeps its full budget
 - **The agent researches on a cheap model and answers on the chat model.** The tool loop (with its sub-agents and reviewer) runs on the default *tools* model; the chat model (or the one picked for the session) writes only the final answer, once, from the gathered evidence. The research model's text is no longer streamed; the answer is.
 - Uploaded files are kept by default (`auto_delete_files` defaults to `no`), so pages can be shown and viewed later
 - `ESPERANTO_EMBEDDING_TIMEOUT` defaults to 180 s (esperanto's 60 s is shorter than one embedding batch on a modest local GPU, so batches timed out and retried forever)
