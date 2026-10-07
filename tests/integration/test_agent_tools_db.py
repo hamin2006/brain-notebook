@@ -102,10 +102,23 @@ async def corpus(tmp_path, monkeypatch):
     )  # fmt: skip
     outside = await make_source("Other notebook doc.pdf", {"doc_type": "paper"})
 
+    notebook = str(
+        (await repo_query("CREATE notebook CONTENT {name: 'AI 360', description: ''}"))[
+            0
+        ]["id"]
+    )
+
     from open_notebook.agent.scope import load_scope
 
-    scope = await load_scope([l4, l6], [note])
-    yield {"scope": scope, "l4": l4, "l6": l6, "note": note, "outside": outside}
+    scope = await load_scope([l4, l6], [note], notebook)
+    yield {
+        "scope": scope,
+        "l4": l4,
+        "l6": l6,
+        "note": note,
+        "outside": outside,
+        "notebook": notebook,
+    }
 
 
 def _tools(scope):
@@ -186,3 +199,25 @@ async def test_scope_is_enforced(corpus):
     assert out.startswith("Error:") and "not a source in this notebook" in out
     bad = await tools["read"].ainvoke({"address": "lecture 4"})
     assert bad.startswith("Error:") and "source:abc#p12" in bad
+
+
+@pytest.mark.asyncio
+async def test_note_saves_into_the_notebook(corpus):
+    from open_notebook.database.repository import ensure_record_id, repo_query
+
+    out = await _tools(corpus["scope"])["note"].ainvoke(
+        {
+            "title": "Dropout summary",
+            "content": "Dropout zeroes units at train time [source:x#p2].",
+        }
+    )
+    assert out.startswith("Saved as note:")
+    note_id = out.split()[2]
+    linked = await repo_query(
+        "SELECT VALUE out FROM artifact WHERE in = $n", {"n": ensure_record_id(note_id)}
+    )
+    assert [str(x) for x in linked] == [corpus["notebook"]]
+    rows = await repo_query(
+        "SELECT note_type, title FROM $n", {"n": ensure_record_id(note_id)}
+    )
+    assert rows[0]["note_type"] == "ai" and rows[0]["title"] == "Dropout summary"

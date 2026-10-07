@@ -76,6 +76,7 @@ class AgentScope:
     sources: Dict[str, ScopedSource]
     notes: Dict[str, ScopedNote]
     pending_images: List[Dict[str, str]] = field(default_factory=list)
+    notebook_id: Optional[str] = None  # where `note` saves
 
     def source(self, record_id: str) -> ScopedSource:
         found = self.sources.get(record_id)
@@ -93,7 +94,9 @@ class AgentScope:
         return found
 
 
-async def load_scope(source_ids: List[str], note_ids: List[str]) -> AgentScope:
+async def load_scope(
+    source_ids: List[str], note_ids: List[str], notebook_id: Optional[str] = None
+) -> AgentScope:
     sources: Dict[str, ScopedSource] = {}
     if source_ids:
         ids = [ensure_record_id(s) for s in source_ids]
@@ -127,4 +130,4 @@ async def load_scope(source_ids: List[str], note_ids: List[str]) -> AgentScope:
             str(r["id"]): ScopedNote(str(r["id"]), r.get("title") or "Untitled note")
             for r in rows
         }
-    return AgentScope(sources=sources, notes=notes)
+    return AgentScope(sources=sources, notes=notes, notebook_id=notebook_id)

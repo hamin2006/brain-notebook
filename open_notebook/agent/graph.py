@@ -172,7 +172,7 @@ async def agent_node(state: AgentState, config: RunnableConfig) -> dict:
             all_sources, all_notes = await notebook_members(notebook_id)
             source_ids = all_sources if source_ids is None else source_ids
             note_ids = all_notes if note_ids is None else note_ids
-        scope = await load_scope(source_ids or [], note_ids or [])
+        scope = await load_scope(source_ids or [], note_ids or [], notebook_id)
         tool_list = build_tools(scope)
         tools = {t.name: t for t in tool_list}
 

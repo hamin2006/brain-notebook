@@ -12,8 +12,10 @@ the model reads. Mistakes in arguments come back as an "Error: ..." the model
 can act on; they never end the turn.
 """
 
+import ast
 import asyncio
 import base64
+import math
 import re
 from typing import Any, Callable, Dict, List, Optional
 
@@ -479,6 +481,92 @@ def _image_png(path: str, max_side: int = 1400) -> bytes:
     return buffer.getvalue()
 
 
+# ---------------------------------------------------------------- note
+async def tool_note(scope: AgentScope, title: str, content: str) -> str:
+    from open_notebook.domain.notebook import Note
+
+    if not scope.notebook_id:
+        raise ToolError("There is no notebook to save a note into.")
+    if not content.strip():
+        raise ToolError("The note needs content.")
+    note = Note(title=title.strip() or "Untitled note", content=content, note_type="ai")
+    await note.save()
+    await note.add_to_notebook(scope.notebook_id)
+    return f'Saved as {note.id} "{note.title}" in the notebook.'
+
+
+# ---------------------------------------------------------------- calculate
+_MATH_NAMES = {
+    name: getattr(math, name)
+    for name in (
+        "sqrt", "exp", "log", "log2", "log10", "sin", "cos", "tan", "floor", "ceil",
+        "pi", "e", "inf",
+    )
+}  # fmt: skip
+_MATH_NAMES.update({"abs": abs, "round": round, "min": min, "max": max, "sum": sum})
+_ALLOWED_NODES = (
+    ast.Expression, ast.BinOp, ast.UnaryOp, ast.Constant, ast.Name, ast.Load,
+    ast.Call, ast.Tuple, ast.List, ast.Add, ast.Sub, ast.Mult, ast.Div,
+    ast.FloorDiv, ast.Mod, ast.Pow, ast.USub, ast.UAdd,
+)  # fmt: skip
+
+
+MAX_EXPONENT = 1000
+
+
+def evaluate(expression: str) -> float:
+    """Evaluate arithmetic safely: numbers, + - * / // % **, and math functions only.
+
+    Model-written input, so: numeric constants only (no strings to multiply into
+    huge objects), exponents must be literal numbers <= MAX_EXPONENT (no 9**9**9),
+    no attribute access, comprehensions or lambdas.
+    """
+    tree = ast.parse(expression, mode="eval")
+    for node in ast.walk(tree):
+        if not isinstance(node, _ALLOWED_NODES):
+            raise ToolError(f"Not allowed in an expression: {type(node).__name__}")
+        if isinstance(node, ast.Constant) and (
+            isinstance(node.value, bool) or not isinstance(node.value, (int, float))
+        ):
+            raise ToolError("Only numbers are allowed as constants.")
+        if isinstance(node, ast.Name) and node.id not in _MATH_NAMES:
+            raise ToolError(
+                f"Unknown name {node.id!r}. Available: {', '.join(sorted(_MATH_NAMES))}"
+            )
+        if isinstance(node, ast.Call) and not isinstance(node.func, ast.Name):
+            raise ToolError("Only plain function calls like sqrt(2) are allowed.")
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Pow):
+            exponent = node.right
+            if isinstance(exponent, ast.UnaryOp) and isinstance(
+                exponent.operand, ast.Constant
+            ):
+                exponent = exponent.operand
+            value = exponent.value if isinstance(exponent, ast.Constant) else None
+            if not (isinstance(value, (int, float)) and abs(value) <= MAX_EXPONENT):
+                raise ToolError(
+                    f"Exponents must be literal numbers up to {MAX_EXPONENT}."
+                )
+    return eval(
+        compile(tree, "<calc>", "eval"), {"__builtins__": {}}, dict(_MATH_NAMES)
+    )
+
+
+async def tool_calculate(scope: AgentScope, expression: str) -> str:
+    try:
+        value = evaluate(expression)
+    except ToolError:
+        raise
+    except Exception as e:
+        raise ToolError(f"Could not evaluate {expression!r}: {e}")
+    if isinstance(value, float) and value.is_integer() and abs(value) < 1e15:
+        value = int(value)
+    return (
+        f"{expression} = {value:,}"
+        if isinstance(value, int)
+        else f"{expression} = {value}"
+    )
+
+
 # ---------------------------------------------------------------- bindings
 class ListArgs(BaseModel):
     doc_type: Optional[str] = Field(None, description="e.g. lecture, paper, notes")
@@ -522,6 +610,17 @@ class ViewArgs(BaseModel):
     address: str = Field(description="A page (source:abc#p12) or an image source")
 
 
+class NoteArgs(BaseModel):
+    title: str = Field(description="Short title")
+    content: str = Field(description="Markdown content, with citations")
+
+
+class CalculateArgs(BaseModel):
+    expression: str = Field(
+        description="Arithmetic, e.g. (32 - 5 + 2*2)/1 + 1 or 7*7*512*4096"
+    )
+
+
 TOOL_SPECS = [
     (
         "list",
@@ -563,6 +662,18 @@ TOOL_SPECS = [
         ViewArgs,
         "Look at a PDF page or image source as a picture. Use it when the answer depends on a diagram, chart, "
         "table layout or equation the text may have lost.",
+    ),
+    (
+        "note",
+        tool_note,
+        NoteArgs,
+        "Save a note into the notebook. Only when the user asks you to save or remember something.",
+    ),
+    (
+        "calculate",
+        tool_calculate,
+        CalculateArgs,
+        "Exact arithmetic (+ - * / // % **, sqrt, log, exp, floor, ceil...). Use it instead of computing in your head.",
     ),
 ]
 
