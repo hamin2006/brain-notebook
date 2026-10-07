@@ -75,7 +75,9 @@ def first_int(value):
 def as_bool(value):
     if isinstance(value, bool):
         return value
-    return {"true": True, "yes": True, "false": False, "no": False}.get(str(value).strip().lower())
+    return {"true": True, "yes": True, "false": False, "no": False}.get(
+        str(value).strip().lower()
+    )
 
 
 def grade(qtype: str, expected, got) -> bool:
@@ -83,7 +85,9 @@ def grade(qtype: str, expected, got) -> bool:
         return False
     if qtype == "paths":
         want = {tuple(p) for p in expected}
-        have = {tuple(norm_op(op) for op in p) for p in got if isinstance(p, (list, tuple))}
+        have = {
+            tuple(norm_op(op) for op in p) for p in got if isinstance(p, (list, tuple))
+        }
         return have == want
     if qtype == "layers":
         return parse_layers(got) == [tuple(x) for x in expected]
@@ -98,28 +102,36 @@ def grade(qtype: str, expected, got) -> bool:
 
 def extract_json(text: str) -> dict:
     fenced = re.search(r"```(?:json)?\s*(\{.*\})\s*```", text, re.S)
-    raw = fenced.group(1) if fenced else text[text.find("{"): text.rfind("}") + 1]
+    raw = fenced.group(1) if fenced else text[text.find("{") : text.rfind("}") + 1]
     return json.loads(raw)
 
 
 def ask(model: str, image: Path, questions: dict, key: str) -> dict:
-    qtext = "\n".join(f'- "{qid}" ({q["type"]}): {q["ask"]}' for qid, q in questions.items())
+    qtext = "\n".join(
+        f'- "{qid}" ({q["type"]}): {q["ask"]}' for qid, q in questions.items()
+    )
     b64 = base64.b64encode(image.read_bytes()).decode()
     body = {
         "model": model,
         "max_tokens": 16000,
         "usage": {"include": True},
         "provider": {"require_parameters": True},
-        "messages": [{
-            "role": "user",
-            "content": [
-                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
-                {"type": "text", "text": PROMPT.format(questions=qtext)},
-            ],
-        }],
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{b64}"},
+                    },
+                    {"type": "text", "text": PROMPT.format(questions=qtext)},
+                ],
+            }
+        ],
     }
     req = urllib.request.Request(
-        URL, data=json.dumps(body).encode(),
+        URL,
+        data=json.dumps(body).encode(),
         headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
     )
     start = time.time()
@@ -127,14 +139,22 @@ def ask(model: str, image: Path, questions: dict, key: str) -> dict:
         with urllib.request.urlopen(req, timeout=300) as resp:
             data = json.load(resp)
     except urllib.error.HTTPError as e:
-        return {"error": f"HTTP {e.code}: {e.read().decode()[:300]}", "seconds": time.time() - start}
+        return {
+            "error": f"HTTP {e.code}: {e.read().decode()[:300]}",
+            "seconds": time.time() - start,
+        }
     except Exception as e:  # network errors, timeouts
         return {"error": repr(e), "seconds": time.time() - start}
 
     text = (data.get("choices") or [{}])[0].get("message", {}).get("content") or ""
     usage = data.get("usage", {})
-    result = {"text": text, "seconds": time.time() - start, "cost": usage.get("cost"),
-              "tokens_in": usage.get("prompt_tokens"), "tokens_out": usage.get("completion_tokens")}
+    result = {
+        "text": text,
+        "seconds": time.time() - start,
+        "cost": usage.get("cost"),
+        "tokens_in": usage.get("prompt_tokens"),
+        "tokens_out": usage.get("completion_tokens"),
+    }
     try:
         result["answers"] = extract_json(text)
     except (json.JSONDecodeError, ValueError) as e:
@@ -164,32 +184,58 @@ def main():
     print(f"{len(jobs)} calls queued -> {outdir}", flush=True)
     summary = {}
     with ThreadPoolExecutor(max_workers=8) as pool:
-        futures = {pool.submit(ask, m, HERE / img, truth[img]["questions"], key): (m, img, run)
-                   for m, img, run in jobs}
+        futures = {
+            pool.submit(ask, m, HERE / img, truth[img]["questions"], key): (m, img, run)
+            for m, img, run in jobs
+        }
         for done, future in enumerate(as_completed(futures), 1):
             model, img, run = futures[future]
             res = future.result()
             qs = truth[img]["questions"]
             answers = res.get("answers", {})
-            checks = {qid: grade(q["type"], q["answer"], answers.get(qid)) for qid, q in qs.items()}
-            status = res.get("error", "")[:80] or f"{sum(checks.values())}/{len(checks)} correct"
-            print(f"[{done:2d}/{len(jobs)}] {model:30s} {Path(img).stem[9:]:20s} run{run} "
-                  f"{res['seconds']:5.1f}s ${res.get('cost') or 0:.4f}  {status}", flush=True)
+            checks = {
+                qid: grade(q["type"], q["answer"], answers.get(qid))
+                for qid, q in qs.items()
+            }
+            status = (
+                res.get("error", "")[:80]
+                or f"{sum(checks.values())}/{len(checks)} correct"
+            )
+            print(
+                f"[{done:2d}/{len(jobs)}] {model:30s} {Path(img).stem[9:]:20s} run{run} "
+                f"{res['seconds']:5.1f}s ${res.get('cost') or 0:.4f}  {status}",
+                flush=True,
+            )
             record(summary, outdir, model, img, run, res, checks)
 
-    rows = sorted(summary.items(), key=lambda kv: (-kv[1]["correct"] / kv[1]["total"], kv[1]["cost"]))
+    rows = sorted(
+        summary.items(),
+        key=lambda kv: (-kv[1]["correct"] / kv[1]["total"], kv[1]["cost"]),
+    )
     print(f"\n{'model':32s} {'score':>9s} {'cost/img':>9s} {'sec/img':>8s} err  missed")
     for model, s in rows:
         n = len(s["seconds"])
         missed = ", ".join(f"{q}x{c}" for q, c in sorted(s["misses"].items()))
-        print(f"{model:32s} {s['correct']:3d}/{s['total']:<3d}  ${s['cost'] / n:8.5f} {sum(s['seconds']) / n:8.1f} {s['errors']:3d}  {missed}")
+        print(
+            f"{model:32s} {s['correct']:3d}/{s['total']:<3d}  ${s['cost'] / n:8.5f} {sum(s['seconds']) / n:8.1f} {s['errors']:3d}  {missed}"
+        )
     (outdir / "summary.json").write_text(json.dumps(summary, indent=2))
     print(f"\nraw responses: {outdir}")
 
 
 def record(summary, outdir, model, img, run, res, checks):
     """Accumulate one call's grades into the per-model summary and save the raw response."""
-    s = summary.setdefault(model, {"correct": 0, "total": 0, "cost": 0.0, "seconds": [], "errors": 0, "misses": {}})
+    s = summary.setdefault(
+        model,
+        {
+            "correct": 0,
+            "total": 0,
+            "cost": 0.0,
+            "seconds": [],
+            "errors": 0,
+            "misses": {},
+        },
+    )
     s["correct"] += sum(checks.values())
     s["total"] += len(checks)
     s["cost"] += res.get("cost") or 0
@@ -200,7 +246,11 @@ def record(summary, outdir, model, img, run, res, checks):
             s["misses"][qid] = s["misses"].get(qid, 0) + 1
     safe = model.replace("/", "__")
     (outdir / f"{safe}__{Path(img).stem}__run{run}.json").write_text(
-        json.dumps({"model": model, "image": img, "run": run, "checks": checks, **res}, indent=2))
+        json.dumps(
+            {"model": model, "image": img, "run": run, "checks": checks, **res},
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

@@ -212,7 +212,11 @@ async def lifespan(app: FastAPI):
     # Yield control to the application
     yield
 
-    # Shutdown: cleanup if needed
+    # Shutdown: close the async chat checkpointer (its aiosqlite thread would
+    # otherwise keep the process alive)
+    from open_notebook.graphs.checkpoint import close_checkpointer
+
+    await close_checkpointer()
     logger.info("API shutdown complete")
 
 

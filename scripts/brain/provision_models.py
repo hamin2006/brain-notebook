@@ -17,14 +17,17 @@ from pathlib import Path
 
 API = "http://127.0.0.1:5055/api"
 CHAT_MODEL = "z-ai/glm-5.3-flash"
-EMBEDDING_MODEL = "qwen3-embedding:4b"
+EMBEDDING_MODEL = "qwen3-embedding:0.6b"
 OLLAMA_URL = "http://localhost:11434"
 
 
 def call(method: str, path: str, body=None):
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(
-        API + path, data=data, method=method, headers={"Content-Type": "application/json"}
+        API + path,
+        data=data,
+        method=method,
+        headers={"Content-Type": "application/json"},
     )
     try:
         with urllib.request.urlopen(req, timeout=60) as resp:
@@ -45,15 +48,27 @@ def ensure_credential(provider: str, name: str, modalities, **fields) -> str:
     for cred in call("GET", f"/credentials/by-provider/{provider}") or []:
         if cred.get("name") == name:
             return cred["id"]
-    created = call("POST", "/credentials", {"name": name, "provider": provider, "modalities": modalities, **fields})
+    created = call(
+        "POST",
+        "/credentials",
+        {"name": name, "provider": provider, "modalities": modalities, **fields},
+    )
     return created["id"]
 
 
 def ensure_model(name: str, provider: str, type_: str, credential: str) -> str:
     for model in call("GET", "/models") or []:
-        if model["name"] == name and model["provider"] == provider and model["type"] == type_:
+        if (
+            model["name"] == name
+            and model["provider"] == provider
+            and model["type"] == type_
+        ):
             return model["id"]
-    created = call("POST", "/models", {"name": name, "provider": provider, "type": type_, "credential": credential})
+    created = call(
+        "POST",
+        "/models",
+        {"name": name, "provider": provider, "type": type_, "credential": credential},
+    )
     return created["id"]
 
 
@@ -62,8 +77,12 @@ def main():
     ap.add_argument("--key-file", required=True)
     args = ap.parse_args()
 
-    openrouter = ensure_credential("openrouter", "brain-openrouter", ["language"], api_key=read_key(args.key_file))
-    ollama = ensure_credential("ollama", "brain-ollama", ["embedding"], base_url=OLLAMA_URL)
+    openrouter = ensure_credential(
+        "openrouter", "brain-openrouter", ["language"], api_key=read_key(args.key_file)
+    )
+    ollama = ensure_credential(
+        "ollama", "brain-ollama", ["embedding"], base_url=OLLAMA_URL
+    )
 
     chat = ensure_model(CHAT_MODEL, "openrouter", "language", openrouter)
     embedding = ensure_model(EMBEDDING_MODEL, "ollama", "embedding", ollama)
@@ -80,7 +99,9 @@ def main():
 
     for model_id, label in ((chat, CHAT_MODEL), (embedding, EMBEDDING_MODEL)):
         result = call("POST", f"/models/{model_id}/test")
-        print(f"{label}: {'ok' if result.get('success') else 'FAILED'} - {str(result.get('message', ''))[:120]}")
+        print(
+            f"{label}: {'ok' if result.get('success') else 'FAILED'} - {str(result.get('message', ''))[:120]}"
+        )
 
 
 if __name__ == "__main__":

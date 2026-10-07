@@ -44,4 +44,21 @@ def ensure_llm_timeout_default(environ: MutableMapping[str, str] = os.environ) -
         environ["ESPERANTO_LLM_TIMEOUT"] = str(DEFAULT_LLM_TIMEOUT_SECONDS)
 
 
+# EMBEDDING TIMEOUT
+# Same problem for embeddings: esperanto's 60 s default is shorter than one batch
+# takes on a modest local GPU (a 4B embedding model on a GTX 1660 needs ~80 s for
+# 50 chunks), so every batch timed out and retried forever. 180 s gives local
+# embedding models room; an explicit value always wins.
+DEFAULT_EMBEDDING_TIMEOUT_SECONDS = 180
+
+
+def ensure_embedding_timeout_default(
+    environ: MutableMapping[str, str] = os.environ,
+) -> None:
+    """Set ESPERANTO_EMBEDDING_TIMEOUT to Open Notebook's default when unset or blank."""
+    if not environ.get("ESPERANTO_EMBEDDING_TIMEOUT", "").strip():
+        environ["ESPERANTO_EMBEDDING_TIMEOUT"] = str(DEFAULT_EMBEDDING_TIMEOUT_SECONDS)
+
+
 ensure_llm_timeout_default()
+ensure_embedding_timeout_default()

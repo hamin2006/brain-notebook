@@ -28,17 +28,27 @@ def main():
     notebooks = client.get("/notebooks").raise_for_status().json()
     notebook = next((n for n in notebooks if n["name"] == args.notebook), None)
     if notebook is None:
-        notebook = client.post(
-            "/notebooks", json={"name": args.notebook, "description": args.description}
-        ).raise_for_status().json()
+        notebook = (
+            client.post(
+                "/notebooks",
+                json={"name": args.notebook, "description": args.description},
+            )
+            .raise_for_status()
+            .json()
+        )
         print(f"created {notebook['id']}")
     nb_id = notebook["id"]
 
     defaults = [
-        t["id"] for t in client.get("/transformations").raise_for_status().json() if t.get("apply_default")
+        t["id"]
+        for t in client.get("/transformations").raise_for_status().json()
+        if t.get("apply_default")
     ]
     existing = {
-        s.get("title") for s in client.get("/sources", params={"notebook_id": nb_id}).raise_for_status().json()
+        s.get("title")
+        for s in client.get("/sources", params={"notebook_id": nb_id})
+        .raise_for_status()
+        .json()
     }
 
     for pdf in sorted(Path(args.folder).expanduser().glob("*.pdf")):
