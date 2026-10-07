@@ -288,3 +288,25 @@ async def test_delegate_runs_one_scoped_subagent_per_document():
     assert seen_scopes == [{"source:l3"}, {"source:l4"}]
     assert '### source:l3 "Lecture 3"' in out and "[source:l4#p61]" in out
     assert "### source:nope\nError:" in out
+
+
+@pytest.mark.asyncio
+async def test_final_answer_falls_back_when_tool_choice_none_is_rejected():
+    async def search(query: str = ""):
+        return f"result for {query}"
+
+    class PickyModel(ScriptedModel):
+        def bind_tools(self, tools, tool_choice=None):
+            if tool_choice == "none":
+                raise ValueError("tool_choice none not supported")
+            return super().bind_tools(tools, tool_choice)
+
+    model = PickyModel(
+        [{"tools": [("search", {"query": f"q{i}"})]} for i in range(4)]
+        + [{"text": "Answer from evidence."}]
+    )
+    _, final = await _run(model, [_tool("search", search)], effort="quick")
+    assert final["messages"][-1].content == "Answer from evidence."
+    flattened = model.calls[-1]
+    assert not any(getattr(m, "tool_calls", None) for m in flattened)
+    assert any("[Result of search]" in str(m.content) for m in flattened)

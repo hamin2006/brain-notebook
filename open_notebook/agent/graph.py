@@ -242,10 +242,48 @@ async def run_loop(
             "citing addresses, and say briefly what you could not verify."
         )
     )
-    final = await _stream_step(
-        model.bind_tools(tool_list, tool_choice="none"), working, writer, max_steps + 1
-    )
+    try:
+        final = await _stream_step(
+            model.bind_tools(tool_list, tool_choice="none"),
+            working,
+            writer,
+            max_steps + 1,
+        )
+    except Exception as e:
+        # Some providers reject tool_choice="none"; answer from flattened evidence.
+        logger.warning(
+            f"Final answer with tool_choice=none failed ({e}); retrying without tools"
+        )
+        final = await _stream_step(
+            model, _flatten_tool_messages(working), writer, max_steps + 1
+        )
     return extract_text_content(final.content), trace
+
+
+def _flatten_tool_messages(messages: List[BaseMessage]) -> List[BaseMessage]:
+    """The conversation with tool calls and results rewritten as plain text.
+
+    For a model call made without tools, where providers reject messages that
+    reference tool calls.
+    """
+    flat: List[BaseMessage] = []
+    for message in messages:
+        if isinstance(message, ToolMessage):
+            flat.append(
+                HumanMessage(content=f"[Result of {message.name}]\n{message.content}")
+            )
+        elif isinstance(message, AIMessage) and message.tool_calls:
+            calls = "; ".join(
+                f"{c['name']}({json.dumps(c.get('args') or {})})"
+                for c in message.tool_calls
+            )
+            text = extract_text_content(message.content)
+            flat.append(
+                AIMessage(content=(text + "\n" if text else "") + f"[Called: {calls}]")
+            )
+        else:
+            flat.append(message)
+    return flat
 
 
 async def review_answer(model, question: str, draft: str) -> List[str]:
