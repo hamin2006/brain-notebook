@@ -62,3 +62,7 @@ def ensure_embedding_timeout_default(
 
 ensure_llm_timeout_default()
 ensure_embedding_timeout_default()
+
+# Where this app (Brain Notebook, a fork of Open Notebook) lives; the version check
+# compares against this repository, not upstream.
+PROJECT_REPO_URL = "https://github.com/hamin2006/brain-notebook"

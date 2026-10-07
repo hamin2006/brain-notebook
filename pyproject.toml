@@ -1,7 +1,7 @@
 [project]
 name = "open-notebook"
-version = "1.15.0"
-description = "An open source implementation of a research assistant, inspired by Google Notebook LM"
+version = "2.0.0"
+description = "Brain Notebook: a self-hosted research notebook with an agentic RAG over your documents (fork of Open Notebook)"
 authors = [
     {name = "Luis Novo", email = "lfnovo@gmail.com"}
 ]

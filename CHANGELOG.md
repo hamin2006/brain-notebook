@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-10-07 — Brain Notebook
+
+First release as **Brain Notebook**, a fork of Open Notebook 1.15.0 rebuilt around a research agent: chat, Ask and source chat no longer paste documents into a prompt but research the notebook with tools (page-level search, grep, outlines, reading and *looking at* pages, a concept graph, sub-agents, optional web search) and answer with page citations. PDFs are ingested page by page with equation recovery, vision captions, outlines, summaries and metadata. The app is also an MCP server. Deployment builds this repository (the upstream images do not include any of it). Code identifiers (`open_notebook` package, `OPEN_NOTEBOOK_*` variables) keep their names so upstream changes can still be merged.
+
 ### Added
 - **Web search without an API key.** In notebooks whose answers may add general knowledge, the agent can use `web_search` (a self-hosted SearXNG, `SEARXNG_URL`, default `http://127.0.0.1:8888`; compose file in `scripts/brain/searxng/`) and `web_read` (fetches a page or online PDF and keeps its main text). Fetching only reaches public addresses, re-checks every redirect and pins the vetted IP; page text is marked untrusted and web facts are cited as links. Off by default: Settings → Research agent → Web search
 - Research steps in chat now have readable labels for every tool (delegate, note, calculate, review, graph, remember, forget, web search, web read)

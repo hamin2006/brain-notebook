@@ -19,6 +19,7 @@ import {
   MigrationBanner,
   ProviderSection,
 } from '@/components/settings'
+import { PROJECT_DOCS_URL } from '@/lib/project'
 
 export default function ApiKeysPage() {
   const { t } = useTranslation()
@@ -145,7 +146,7 @@ export default function ApiKeysPage() {
           {/* Help link */}
           <div className="border-t pt-4">
             <a
-              href="https://github.com/lfnovo/open-notebook/blob/main/docs/5-CONFIGURATION/ai-providers.md"
+              href={`${PROJECT_DOCS_URL}/5-CONFIGURATION/ai-providers.md`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-sm text-primary hover:underline"
