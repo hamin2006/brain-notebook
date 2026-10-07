@@ -19,9 +19,10 @@ This fork's API serves its own MCP endpoint at `/mcp` (streamable HTTP), with th
 claude mcp add --transport http brain http://localhost:5055/mcp
 ```
 
-From another machine (e.g. over Tailscale), use the API host's address and list it in
-`OPEN_NOTEBOOK_MCP_ALLOWED_HOSTS` on the API (comma-separated `host:port` patterns, e.g.
-`100.120.164.122:*`); requests for other hosts are rejected (DNS-rebinding protection).
+The frontend proxies `/mcp` to the API like `/api`, so from another machine (e.g. over Tailscale)
+use the UI's address — `claude mcp add --transport http brain http://100.120.164.122:3000/mcp` — and
+list that host in `OPEN_NOTEBOOK_MCP_ALLOWED_HOSTS` on the API (comma-separated `host:port` patterns,
+e.g. `100.120.164.122:*`); requests for other hosts are rejected (DNS-rebinding protection).
 If `OPEN_NOTEBOOK_PASSWORD` is set, add `--header "Authorization: Bearer <password>"`.
 
 The community `open-notebook-mcp` package described below wraps the REST API instead and works
