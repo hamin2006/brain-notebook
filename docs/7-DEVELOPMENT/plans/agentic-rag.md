@@ -204,6 +204,21 @@ rewrite (resolve follow-ups using history; skip on first turn)
 | **PDFium is not thread-safe** | Heap corruption crash when captioning 4 pages at once | `PDFIUM_LOCK` |
 | SurrealDB v2: `WHERE source IN $ids` returns **no rows** on tables with a composite unique index on `(source, ...)` | grep/section search silently empty | Per-source equality queries (`agent/scope.py: per_source`) |
 | Reasoning models sometimes return an **empty** summary | Empty section summary | Retry with more room, then text extract |
+| GLM-5.3-flash's reasoning is **mandatory** and can use the whole `max_tokens` budget (4096 reasoning tokens, empty reply) | Every outline fell back to page windows; 2 of 35 eval answers came back empty | `limit_reasoning()` (OpenRouter `reasoning.effort=low`) for analysis/captions; the answer writer retries once with it |
+| Qwen3.7 Flash sends list arguments as **JSON strings** (`'["source:a"]'`) | 40 failed tool calls in one eval run | `AddressList` accepts string forms |
+
+### Eval results (35 questions, notebook "AI 360 Deep Learning")
+
+| | Old chat (whole sources in the prompt) | Agent (Qwen3.7 Flash researches, GLM-5.3-flash writes) |
+|---|---|---|
+| Passed | 27/35 (inflated by the model's own knowledge) | 29/35; the 6 misses re-run after fixes: 6/6 |
+| Right page cited | 1/30 | 25/30 (re-run: 5/5) |
+| Image-only facts | 2/6 | 5/6 |
+| Cites the right document by id | 32/34 | 31/34 |
+| Median latency | 30 s | 33 s |
+| OpenRouter spend | $0.34 | ~$0.10 |
+
+Of the 6 misses, 2 were grader bugs (LaTeX `\times` / `10^{-8}` not matched; note bodies missing from the notes list), 2 were empty writer replies, 1 an uncited calculation and 1 the note check. Results: `evals/agent/results/agent-20261006-234240` on the PC.
 
 ## 8. Decisions
 
@@ -213,3 +228,4 @@ rewrite (resolve follow-ups using history; skip on first turn)
 | 2 | **Personal fork.** Upstream conventions are kept where they protect quality (tests, CI, typed errors, ADRs), but provider-specific features are allowed (e.g. OpenRouter routing/fallbacks), and new UI strings may ship English-only in non-en-US locales (still required by the locale parity check). | 2026-10-06 |
 | 3 | **Classic chat is removed, with no fallback.** No mode pastes whole files into the prompt, including "pinned" sources. The sidebar selection only sets the agent's search scope; whole-document questions go through stored summaries (§3.4), never full-text loading. | 2026-10-06 |
 | 4 | **OpenRouter credits** topped up. A capped, project-specific key is still recommended. | 2026-10-06 |
+| 5 | **Two models per turn.** The research loop (tool calls, sub-agents, reviewer) re-sends a growing transcript every step, so it runs on the default *tools* model, `qwen/qwen3.7-flash` ($0.03/$0.13 per M, tool calling and vision). The chat model, `z-ai/glm-5.3-flash` ($0.15/$0.50), writes only the final answer, once, from the flattened evidence. | 2026-10-06 |
