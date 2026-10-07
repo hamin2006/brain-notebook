@@ -610,7 +610,8 @@ class TestContentSettings:
         assert settings.record_id == "open_notebook:content_settings"
         assert settings.default_content_processing_engine_doc == "auto"
         assert settings.default_embedding_option == "ask"
-        assert settings.auto_delete_files == "yes"
+        # Fork default: keep originals so the agent can view pages.
+        assert settings.auto_delete_files == "no"
         assert settings.youtube_preferred_languages is not None
         assert len(settings.youtube_preferred_languages) > 0
 

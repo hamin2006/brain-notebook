@@ -23,7 +23,7 @@ import re
 import zlib
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
-from typing import List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 
 from loguru import logger
 
@@ -157,3 +157,55 @@ def group_builds(pages: List[PdfPage]) -> List[PageGroup]:
         else:
             groups.append(PageGroup(page.number, page.number, page.text))
     return groups
+
+
+MIN_PAGE_TEXT_CHARS = 200
+
+
+def has_page_text(pages: List[PdfPage]) -> bool:
+    """True when the PDF has a usable text layer (scanned PDFs have none)."""
+    return sum(len(page.text) for page in pages) >= MIN_PAGE_TEXT_CHARS
+
+
+def pages_to_full_text(pages: List[PdfPage]) -> str:
+    """Join page texts with page markers, skipping empty pages."""
+    return "\n\n".join(
+        f"--- Page {page.number} ---\n{page.text}" for page in pages if page.text
+    )
+
+
+@dataclass
+class PageChunk:
+    text: str
+    page_start: int
+    page_end: int
+
+
+def page_chunks(
+    title: str,
+    pages: List[PdfPage],
+    split: Callable[[str], List[str]],
+    max_chars: int,
+) -> List[PageChunk]:
+    """Chunks for a paged source: one per page group, split only when too long.
+
+    Each chunk starts with "<title> — p. N" (or "pp. N–M") so lexical and vector
+    search see which document and pages it belongs to.
+    """
+    chunks: List[PageChunk] = []
+    for group in group_builds(pages):
+        if not group.text.strip():
+            continue
+        where = (
+            f"p. {group.start}"
+            if group.start == group.end
+            else f"pp. {group.start}–{group.end}"
+        )
+        header = f"{title} — {where}\n"
+        pieces = [group.text] if len(group.text) <= max_chars else split(group.text)
+        chunks.extend(
+            PageChunk(header + piece, group.start, group.end)
+            for piece in pieces
+            if piece.strip()
+        )
+    return chunks

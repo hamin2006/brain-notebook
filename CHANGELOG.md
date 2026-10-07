@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Page-aware PDF sources (Brain fork).** PDFs with a text layer are extracted page by page: each page is stored (`source_page`), the source text carries `--- Page N ---` markers, and chunks record the page range they came from, with a `Title — pp. N–M` header. Animation-build slides are embedded once as a group. Scanned PDFs still go through content-core (OCR)
+- **LaTeXiT equations become LaTeX.** Keynote/LaTeXiT decks hide each equation's source as invisible, 4x-repeated text; it used to make up ~70% of the extracted text of such decks (one 96-page lecture extracted to 618k characters, ~25k of real text). It is now decoded and kept as `$...$`
+
+### Changed
+- Uploaded files are kept by default (`auto_delete_files` defaults to `no`), so pages can be shown and viewed later
+- `ESPERANTO_EMBEDDING_TIMEOUT` defaults to 180 s (esperanto's 60 s is shorter than one embedding batch on a modest local GPU, so batches timed out and retried forever)
+
 ### Changed
 - **Documentation rewritten against the code.** Every page under `docs/` was checked against v1.15.0 and rewritten where it described an older or imagined product (#1458, #1459, #1460, #1461):
   - **Install:** one canonical path built on the shipped `docker-compose.yml`, with small override files for the Ollama and LM Studio variants. The network-exposure warning (bind ports to `127.0.0.1` or set a password) comes before the first `docker compose up -d`. Example encryption keys are generated, never copied. First-run setup lives in one place, [Connect a provider](docs/4-AI-PROVIDERS/index.md#connect-a-provider), and ends in a working chat via **Auto-assign Defaults**. The provider table is built from the provider registry: 24 providers, with the model types each one offers
@@ -15,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Development:** `architecture.md`, `testing.md`, `api-reference.md` and `code-standards.md` are rewritten from the code. A new playbook covers adding an AI provider. Dev setup lives on one page. The AGENTS files agree with the docs. Contributor conventions (Conventional Commits, CHANGELOG sections, pre-PR checks that match CI) are documented
 
 ### Fixed
+- **A failed transformation no longer fails the source.** When the model can't finish an insight (output limit, context too long, misconfigured model), the document is still saved and embedded and the error is logged; rate limits and network errors still retry the job
 - **Docs no longer recommend settings that do nothing.** `API_CLIENT_TIMEOUT` was never read by Open Notebook; the timeout guidance now covers what actually applies: `ESPERANTO_LLM_TIMEOUT` per model call (keep it below 600) and the web UI's 10-minute request limit (`NEXT_PUBLIC_API_TIMEOUT_MS`, build time only). Remaining `SURREAL_COMMANDS_MAX_TASKS` advice now uses `OPEN_NOTEBOOK_WORKER_MAX_TASKS`. Docker instructions no longer say to edit `.env` and `docker compose restart`: the shipped compose file doesn't load `.env` into the container and `restart` doesn't reload environment changes, so they now point to the `open_notebook` service's `environment:` block and `docker compose up -d`
 - **Timeouts no longer read as connection failures.** A model that doesn't answer within `ESPERANTO_LLM_TIMEOUT` used to report "Could not connect to the AI provider"; it now says the provider took too long and how to raise the limit. Connection failures (including connect timeouts) keep the old message
 - Error hints point to screens that exist: an authentication failure sends you to Manage → Models (not "Settings → Credentials"), and an unsupported podcast voice to Podcasts → Profiles. The empty Podcasts page points to the Generate Podcast button instead of chat screens that can't start a podcast

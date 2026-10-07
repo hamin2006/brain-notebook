@@ -16,8 +16,9 @@ class ContentSettings(RecordModel):
     default_embedding_option: Optional[Literal["ask", "always", "never"]] = Field(
         "ask", description="Default Embedding Option for Vector Search"
     )
+    # Fork default "no": the agent's view tool renders pages of the original file.
     auto_delete_files: Optional[Literal["yes", "no"]] = Field(
-        "yes", description="Auto Delete Uploaded Files"
+        "no", description="Auto Delete Uploaded Files"
     )
     docling_ocr: Optional[bool] = Field(
         True,

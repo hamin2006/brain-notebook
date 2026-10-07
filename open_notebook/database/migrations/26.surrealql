@@ -1,0 +1,25 @@
+-- Migration 26: page-aware sources (agentic RAG plan, docs/7-DEVELOPMENT/plans/agentic-rag.md §3).
+-- source_page holds each PDF page's cleaned text (and later a vision caption for
+-- image-only pages); chunks record the page range they came from; sources get a
+-- flexible metadata object (doc type, course, sequence number, ...).
+
+DEFINE TABLE IF NOT EXISTS source_page SCHEMAFULL;
+DEFINE FIELD IF NOT EXISTS source ON TABLE source_page TYPE record<source>;
+DEFINE FIELD IF NOT EXISTS page ON TABLE source_page TYPE int;
+DEFINE FIELD IF NOT EXISTS text ON TABLE source_page TYPE string;
+DEFINE FIELD IF NOT EXISTS equations ON TABLE source_page TYPE array<string> DEFAULT [];
+DEFINE FIELD IF NOT EXISTS image_ratio ON TABLE source_page TYPE float DEFAULT 0.0;
+DEFINE FIELD IF NOT EXISTS caption ON TABLE source_page TYPE option<string>;
+DEFINE INDEX IF NOT EXISTS idx_source_page_source_page ON TABLE source_page COLUMNS source, page UNIQUE;
+
+DEFINE FIELD IF NOT EXISTS page_start ON TABLE source_embedding TYPE option<int>;
+DEFINE FIELD IF NOT EXISTS page_end ON TABLE source_embedding TYPE option<int>;
+
+DEFINE FIELD IF NOT EXISTS metadata ON TABLE source FLEXIBLE TYPE option<object>;
+
+-- Pages go with their source, like chunks and insights.
+DEFINE EVENT OVERWRITE source_delete ON TABLE source WHEN ($after == NONE) THEN {
+    delete source_embedding where source == $before.id;
+    delete source_insight where source == $before.id;
+    delete source_page where source == $before.id;
+};

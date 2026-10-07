@@ -182,7 +182,7 @@ def main():
     outdir.mkdir(parents=True)
     jobs = [(m, img, run) for m in models for img in truth for run in range(args.runs)]
     print(f"{len(jobs)} calls queued -> {outdir}", flush=True)
-    summary = {}
+    summary: dict = {}
     with ThreadPoolExecutor(max_workers=8) as pool:
         futures = {
             pool.submit(ask, m, HERE / img, truth[img]["questions"], key): (m, img, run)

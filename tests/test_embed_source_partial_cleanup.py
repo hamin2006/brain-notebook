@@ -17,6 +17,7 @@ OTHER_SOURCE_ID = "source:other"
 
 
 class _FakeSource:
+    title = "Test Source"
     full_text = "some text " * 200
     asset = None
 
@@ -30,6 +31,8 @@ class _FakeEmbeddingTable:
         self.fail_on_batch = fail_on_batch
 
     async def repo_query(self, query, params=None):
+        if query.startswith("SELECT page, text, caption FROM source_page"):
+            return []  # not a paged source: chunk full_text as before
         # Only honour the scoped form; an unscoped DELETE would fail here.
         assert query == "DELETE source_embedding WHERE source = $source_id"
         target = str(params["source_id"])
@@ -88,8 +91,9 @@ async def test_original_error_is_reraised_when_cleanup_also_fails():
     original_query = table.repo_query
 
     async def flaky_query(query, params=None):
-        calls["n"] += 1
-        if calls["n"] == 2:  # the cleanup DELETE
+        if query.startswith("DELETE"):
+            calls["n"] += 1
+        if calls["n"] == 2:  # the cleanup DELETE (the first DELETE clears old rows)
             raise RuntimeError("cleanup failed")
         return await original_query(query, params)
 

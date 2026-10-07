@@ -21,8 +21,14 @@ from open_notebook.exceptions import (
     ContextLengthExceededError,
     NotFoundError,
 )
-from open_notebook.utils.chunking import ContentType, chunk_text, detect_content_type
+from open_notebook.utils.chunking import (
+    CHUNK_SIZE,
+    ContentType,
+    chunk_text,
+    detect_content_type,
+)
 from open_notebook.utils.embedding import generate_embedding, generate_embeddings
+from open_notebook.utils.pdf_pages import PdfPage, page_chunks
 
 # NOTE: `stop_on` below can never trigger in practice — each command catches
 # ValueError (and NotFoundError) internally and returns success=False instead
@@ -310,6 +316,32 @@ async def embed_insight_command(input_data: EmbedInsightInput) -> EmbedInsightOu
     )
 
 
+async def _paged_chunks(source_id: str, title: str):
+    """Page-group chunks for a source with stored pages, or [] when it has none."""
+    rows = await repo_query(
+        "SELECT page, text, caption FROM source_page WHERE source = $source ORDER BY page",
+        {"source": ensure_record_id(source_id)},
+    )
+    if not rows:
+        return []
+    pages = [
+        PdfPage(
+            number=row["page"],
+            # A vision caption stands in for image-only pages' missing text.
+            text="\n".join(
+                part for part in (row.get("text"), row.get("caption")) if part
+            ),
+        )
+        for row in rows
+    ]
+    return page_chunks(
+        title,
+        pages,
+        split=lambda text: chunk_text(text, content_type=ContentType.PLAIN),
+        max_chars=CHUNK_SIZE * 4,  # CHUNK_SIZE is in tokens; ~4 chars per token
+    )
+
+
 @command("embed_source", app="open_notebook", retry=EMBED_RETRY_CONFIG)
 async def embed_source_command(input_data: EmbedSourceInput) -> EmbedSourceOutput:
     """
@@ -349,13 +381,19 @@ async def embed_source_command(input_data: EmbedSourceInput) -> EmbedSourceOutpu
             {"source_id": ensure_record_id(input_data.source_id)},
         )
 
-        # 3. Detect content type from file path if available
+        # 3-4. Chunk: by page group when the source has pages (PDFs), otherwise
+        # with the content-type splitter over full_text.
         file_path = source.asset.file_path if source.asset else None
-        content_type = detect_content_type(source.full_text, file_path)
-        logger.debug(f"Detected content type: {content_type.value}")
-
-        # 4. Chunk text using appropriate splitter
-        chunks = chunk_text(source.full_text, content_type=content_type)
+        page_ranges: List[Tuple[Optional[int], Optional[int]]]
+        paged = await _paged_chunks(input_data.source_id, source.title or "Untitled")
+        if paged:
+            chunks = [c.text for c in paged]
+            page_ranges = [(c.page_start, c.page_end) for c in paged]
+        else:
+            content_type = detect_content_type(source.full_text, file_path)
+            logger.debug(f"Detected content type: {content_type.value}")
+            chunks = chunk_text(source.full_text, content_type=content_type)
+            page_ranges = [(None, None)] * len(chunks)
         total_chunks = len(chunks)
 
         # Log chunk statistics for debugging
@@ -389,8 +427,12 @@ async def embed_source_command(input_data: EmbedSourceInput) -> EmbedSourceOutpu
                 "order": idx,
                 "content": chunk,
                 "embedding": embedding,
+                "page_start": start,
+                "page_end": end,
             }
-            for idx, (chunk, embedding) in enumerate(zip(chunks, embeddings))
+            for idx, (chunk, embedding, (start, end)) in enumerate(
+                zip(chunks, embeddings, page_ranges)
+            )
         ]
 
         logger.debug(f"Inserting {len(records)} source_embedding records")

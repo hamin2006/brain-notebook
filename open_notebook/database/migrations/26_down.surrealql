@@ -1,0 +1,11 @@
+-- Down migration 26: drop page-aware storage, restore the original delete event.
+
+DEFINE EVENT OVERWRITE source_delete ON TABLE source WHEN ($after == NONE) THEN {
+    delete source_embedding where source == $before.id;
+    delete source_insight where source == $before.id;
+};
+
+REMOVE FIELD IF EXISTS metadata ON TABLE source;
+REMOVE FIELD IF EXISTS page_end ON TABLE source_embedding;
+REMOVE FIELD IF EXISTS page_start ON TABLE source_embedding;
+REMOVE TABLE IF EXISTS source_page;

@@ -12,7 +12,10 @@ from open_notebook.utils.pdf_pages import (
     clean_page_text,
     extract_pdf_pages,
     group_builds,
+    has_page_text,
     latexit_source,
+    page_chunks,
+    pages_to_full_text,
 )
 
 
@@ -114,3 +117,30 @@ def test_extract_pdf_pages_reports_image_only_pages(tmp_path):
     assert [p.number for p in pages] == [1, 2]
     assert all(p.text == "" for p in pages)
     assert all(p.image_ratio > 0.9 for p in pages)
+
+
+def test_page_chunks_one_per_group_with_page_headers():
+    pages = [
+        PdfPage(1, "Optimization"),
+        PdfPage(2, "Momentum\n- heavy ball"),
+        PdfPage(3, "Momentum\n- heavy ball\n- gains speed"),
+        PdfPage(4, ""),  # image-only page without a caption
+        PdfPage(5, "Adam\ncombines momentum and RMSProp"),
+    ]
+    chunks = page_chunks("Lecture 4", pages, split=lambda t: [t], max_chars=1000)
+    assert [(c.page_start, c.page_end) for c in chunks] == [(1, 1), (2, 3), (5, 5)]
+    assert chunks[1].text.startswith("Lecture 4 — pp. 2–3\n")
+    assert chunks[2].text.startswith("Lecture 4 — p. 5\n")
+
+
+def test_page_chunks_splits_only_oversized_groups():
+    pages = [PdfPage(1, "short"), PdfPage(2, "x" * 50 + " " + "y" * 50)]
+    chunks = page_chunks("Doc", pages, split=lambda t: t.split(" "), max_chars=60)
+    assert [(c.page_start, c.page_end) for c in chunks] == [(1, 1), (2, 2), (2, 2)]
+    assert chunks[1].text.endswith("x" * 50) and chunks[2].text.endswith("y" * 50)
+
+
+def test_pages_to_full_text_marks_pages_and_skips_empty_ones():
+    text = pages_to_full_text([PdfPage(1, "a"), PdfPage(2, ""), PdfPage(3, "c")])
+    assert text == "--- Page 1 ---\na\n\n--- Page 3 ---\nc"
+    assert not has_page_text([PdfPage(1, "tiny")])

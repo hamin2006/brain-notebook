@@ -1,3 +1,4 @@
+import asyncio
 import operator
 import os
 from typing import Any, Dict, List, Optional
@@ -13,10 +14,23 @@ from loguru import logger
 from typing_extensions import Annotated, TypedDict
 
 from open_notebook.ai.models import Model, ModelManager
+from open_notebook.database.repository import ensure_record_id, repo_insert, repo_query
 from open_notebook.domain.content_settings import ContentSettings
 from open_notebook.domain.notebook import Asset, Source
 from open_notebook.domain.transformation import Transformation
+from open_notebook.exceptions import (
+    ConfigurationError,
+    ContextLengthExceededError,
+    IncompleteGenerationError,
+    InvalidInputError,
+)
 from open_notebook.graphs.transformation import graph as transform_graph
+from open_notebook.utils.pdf_pages import (
+    PdfPage,
+    extract_pdf_pages,
+    has_page_text,
+    pages_to_full_text,
+)
 from open_notebook.utils.runtime_capabilities import engine_runtime_missing
 
 # content-core >= 2.1 disables its own Loguru logging for library consumers.
@@ -43,11 +57,22 @@ YOUTUBE_PREFERRED_LANGUAGES = [
 ]
 
 
+# Transformation failures that retrying won't fix.
+PERMANENT_GENERATION_ERRORS = (
+    IncompleteGenerationError,
+    ContextLengthExceededError,
+    ConfigurationError,
+    InvalidInputError,
+)
+
+
 class SourceState(TypedDict):
     # Input describing what to extract: url / file_path / content / delete_source.
     content_state: Dict[str, Any]
     # Result of content-core extraction (does NOT echo url/file_path back).
     extraction: ExtractionOutput
+    # Per-page text for PDFs (empty for other sources); stored as source_page rows.
+    pages: List[PdfPage]
     apply_transformations: List[Transformation]
     source_id: str
     notebook_ids: List[str]
@@ -231,16 +256,33 @@ async def content_process(state: SourceState) -> dict:
     )
 
     url = content_state.get("url") or ""
-    try:
-        processed = await extract_content(
-            url=content_state.get("url"),
-            file_path=content_state.get("file_path"),
-            content=content_state.get("content"),
-            config=config,
+    file_path = content_state.get("file_path")
+    pages: List[PdfPage] = []
+    if file_path and file_path.lower().endswith(".pdf"):
+        pages = await _extract_pages(file_path)
+
+    if pages and has_page_text(pages):
+        # Page-aware text (keeps page numbers, decodes LaTeXiT equations) instead
+        # of content-core's single string. Scanned PDFs without a text layer fall
+        # through to content-core, which can OCR them.
+        processed = ExtractionOutput(
+            content=pages_to_full_text(pages),
+            title=os.path.basename(file_path or ""),
+            source_type="file",
+            identified_type="application/pdf",
         )
-    except cc.ContentCoreError as e:
-        logger.warning(f"content-core extraction failed ({type(e).__name__}): {e}")
-        raise _extraction_error(e, url) from e
+        logger.info(f"Extracted {len(pages)} PDF pages from {file_path}")
+    else:
+        try:
+            processed = await extract_content(
+                url=content_state.get("url"),
+                file_path=file_path,
+                content=content_state.get("content"),
+                config=config,
+            )
+        except cc.ContentCoreError as e:
+            logger.warning(f"content-core extraction failed ({type(e).__name__}): {e}")
+            raise _extraction_error(e, url) from e
 
     # Since content-core 2.2, empty content means the source was genuinely
     # empty; extraction failures raise (handled above).
@@ -264,7 +306,37 @@ async def content_process(state: SourceState) -> dict:
         except Exception as e:
             logger.warning(f"Failed to delete source file {file_path}: {e}")
 
-    return {"extraction": processed}
+    return {"extraction": processed, "pages": pages}
+
+
+async def _extract_pages(file_path: str) -> List[PdfPage]:
+    """Per-page PDF text, or [] when the PDF can't be read page by page."""
+    try:
+        return await asyncio.to_thread(extract_pdf_pages, file_path)
+    except Exception as e:
+        logger.warning(
+            f"Page extraction failed for {file_path}, using content-core: {e}"
+        )
+        return []
+
+
+async def _store_pages(source_id: str, pages: List[PdfPage]) -> None:
+    """Replace the source's source_page rows (idempotent under retries)."""
+    record = ensure_record_id(source_id)
+    await repo_query("DELETE source_page WHERE source = $source", {"source": record})
+    await repo_insert(
+        "source_page",
+        [
+            {
+                "source": record,
+                "page": page.number,
+                "text": page.text,
+                "equations": page.equations,
+                "image_ratio": page.image_ratio,
+            }
+            for page in pages
+        ],
+    )
 
 
 async def save_source(state: SourceState) -> dict:
@@ -288,6 +360,10 @@ async def save_source(state: SourceState) -> dict:
         source.title = extraction.title
 
     await source.save()
+
+    # Pages must exist before embedding: the embed job chunks by page when they do.
+    if state.get("pages"):
+        await _store_pages(str(source.id), state["pages"])
 
     # NOTE: Notebook associations are created by the API immediately for UI responsiveness
     # No need to create them here to avoid duplicate edges
@@ -333,12 +409,22 @@ async def transform_content(state: TransformationState) -> Optional[dict]:
     transformation: Transformation = state["transformation"]
 
     logger.debug(f"Applying transformation {transformation.name}")
-    # LangGraph accepts a partial state dict at runtime, but its typed
-    # overloads require the full state type (langgraph typing limitation).
-    result = await transform_graph.ainvoke(  # type: ignore[call-overload]
-        dict(input_text=content, transformation=transformation),
-        config=RunnableConfig(configurable={"model_id": transformation.model_id}),
-    )
+    try:
+        # LangGraph accepts a partial state dict at runtime, but its typed
+        # overloads require the full state type (langgraph typing limitation).
+        result = await transform_graph.ainvoke(  # type: ignore[call-overload]
+            dict(input_text=content, transformation=transformation),
+            config=RunnableConfig(configurable={"model_id": transformation.model_id}),
+        )
+    except PERMANENT_GENERATION_ERRORS as e:
+        # A transformation the model can't complete (output limit, context too
+        # long, misconfigured model) must not fail the source: the document is
+        # already extracted, saved and queued for embedding. Transient errors
+        # (rate limits, network) still propagate so the job retries.
+        logger.error(
+            f"Transformation '{transformation.name}' failed for source {source.id}: {e}"
+        )
+        return None
     await source.add_insight(transformation.title, result["output"])
     return {
         "transformation": [

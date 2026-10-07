@@ -253,11 +253,13 @@ def main():
             else:
                 answer = run_chat(client, notebook["id"], corpus, q, effort=args.effort)
             error = None
-        except httpx.HTTPError as e:
+        except httpx.HTTPStatusError as e:
             answer, error = (
                 "",
-                f"{type(e).__name__}: {getattr(e, 'response', None) and e.response.text[:200]}",
+                f"HTTP {e.response.status_code}: {e.response.text[:200]}",
             )
+        except httpx.HTTPError as e:
+            answer, error = "", f"{type(e).__name__}: {e}"
         seconds = time.time() - start
         notes_after = (
             client.get("/notes", params={"notebook_id": notebook["id"]}).json()
