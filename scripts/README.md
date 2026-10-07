@@ -1,5 +1,18 @@
 # Scripts Documentation
 
+## brain/ (Brain Notebook deployment and setup)
+
+| Script | What it does |
+|---|---|
+| `provision_models.py` | Connects OpenRouter through the API and sets the recommended default models (`OPENROUTER_API_KEY=… python3 scripts/brain/provision_models.py`) |
+| `build_frontend.sh` | Production build of the UI (standalone server + assets) |
+| `install_services.sh` | Installs `brain-api`, `brain-worker`, `brain-frontend` as systemd user services for this checkout (`--host`, `--port`) |
+| `deploy_pc.sh` | Updates such an install: pull, `uv sync`, rebuild the UI if it changed, restart, wait for the API |
+| `ingest_folder.py` | Uploads every PDF in a folder into a notebook (created if missing) through the API; skips titles already there (`--notebook "My Course" path/to/pdfs`) |
+| `searxng/` | Compose file and settings for the self-hosted SearXNG behind web search |
+
+See [From source installation](../docs/1-INSTALLATION/from-source.md).
+
 ## export_docs.py
 
 Consolidates markdown documentation files for use with ChatGPT or other platforms with file upload limits.

@@ -4,8 +4,8 @@ Uses the transformations that are marked "apply by default", mirroring what the
 UI pre-selects for a new upload, and embeds each source. Skips files whose title
 already exists in the notebook, so it is safe to re-run.
 
-Usage (on the PC):
-  uv run python scripts/brain/ingest_folder.py --notebook "AI 360 Deep Learning" ~/workplace/Brain/corpus/dl-notes
+Usage (on the machine running the API):
+  uv run python scripts/brain/ingest_folder.py --notebook "My Course" path/to/pdfs
 """
 
 import argparse

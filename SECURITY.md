@@ -2,13 +2,13 @@
 
 ## Supported Versions
 
-Open Notebook is an actively developed project. Security fixes are applied to the
-**latest released version** only; there are no long-term support branches.
+Brain Notebook is a personal fork of Brain Notebook. Security fixes go to `main` only;
+there are no release branches.
 
 | Version | Supported          |
 | ------- | ------------------ |
-| Latest release (`1.x`, current minor) | :white_check_mark: |
-| Older releases | :x: |
+| `main` (2.x) | :white_check_mark: |
+| Older commits | :x: |
 
 If you are running an older version, please upgrade to the latest release before
 reporting an issue — the problem may already be fixed.
@@ -21,7 +21,7 @@ discussions, or pull requests.**
 Instead, report them privately through GitHub's built-in **private vulnerability
 reporting**:
 
-1. Go to the [Security tab](https://github.com/lfnovo/open-notebook/security) of
+1. Go to the [Security tab](https://github.com/hamin2006/brain-notebook/security) of
    the repository.
 2. Click **"Report a vulnerability"**.
 3. Fill out the form with as much detail as you can.
@@ -34,7 +34,7 @@ When reporting, please include where relevant:
 - A description of the vulnerability and its impact.
 - Steps to reproduce (a proof of concept, affected endpoint/component, or sample
   configuration).
-- The Open Notebook version and how you are running it (Docker Compose,
+- The Brain Notebook version (or commit) and how you are running it (Docker Compose,
   single-container, from source).
 - Any suggested remediation, if you have one.
 
@@ -49,7 +49,7 @@ When reporting, please include where relevant:
 
 ## Scope
 
-Open Notebook is **self-hosted**: you run the API, frontend, and SurrealDB
+Brain Notebook is **self-hosted**: you run the API, frontend, and SurrealDB
 yourself, and you control the AI provider credentials. Please keep in mind:
 
 - The built-in password middleware (`OPEN_NOTEBOOK_PASSWORD`) is a basic access
@@ -62,4 +62,12 @@ yourself, and you control the AI provider credentials. Please keep in mind:
   in the project — though we welcome reports where the defaults or docs actively
   steer users toward an insecure setup.
 
-Thank you for helping keep Open Notebook and its users safe.
+Thank you for helping keep Brain Notebook and its users safe.
+
+## Issues in upstream code
+
+If the vulnerability is in code Brain Notebook inherits unchanged from
+[Open Notebook](https://github.com/lfnovo/open-notebook) (providers, extraction, credentials, podcasts), please
+also report it to upstream through their [security tab](https://github.com/lfnovo/open-notebook/security), so it's
+fixed for everyone. Areas specific to this fork: the research agent (`open_notebook/agent/`), web search and
+fetching, the MCP endpoint, and the page-aware ingestion pipeline.

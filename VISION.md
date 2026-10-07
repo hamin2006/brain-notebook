@@ -1,79 +1,74 @@
-# Open Notebook — Vision & Principles
+# Brain Notebook — Vision & Principles
 
-This document is the product's source of truth in two layers with different lifespans: **Identity** (durable — what Open Notebook is and refuses to be) and **Current Posture** (temporal — where we are in the journey and what's on the horizon). Triage and design decisions are evaluated against this document; the reasoning behind each rule lives in the [decision records](docs/7-DEVELOPMENT/decisions/README.md).
+What Brain Notebook is, what it refuses to be, and where it's heading. Design decisions are checked against this
+document; the reasoning behind each rule lives in the [decision records](docs/7-DEVELOPMENT/decisions/README.md).
 
 ---
 
 ## Identity
 
-Open Notebook is a **privacy-focused, self-hosted alternative to Google's Notebook LM** that empowers users to:
+Brain Notebook is a **self-hosted research notebook whose answers are researched, not retrieved**: an agent works
+through your documents the way a careful reader would and shows exactly where every claim comes from. It is a fork
+of [Open Notebook](https://github.com/lfnovo/open-notebook) and keeps its foundations: your data in your own
+deployment, any AI provider, notebooks/sources/notes, transformations and podcasts.
 
-1. **Own their research data** — full control over where data lives and who can access it
-2. **Choose their AI providers** — any provider, or fully local models
-3. **Customize their workflows** — adapt the tool to different research needs
-4. **Access their work anywhere** — web UI, API, or integrations
+It aims to be better than NotebookLM at the thing NotebookLM is for, studying and researching from a body of
+documents:
 
-### What Open Notebook IS
+1. **Grounded**: every claim cites the page it came from; "the notebook doesn't cover this" is a valid answer.
+2. **Thorough**: questions that span documents, need every mention, or hide in a diagram get investigated, not
+   approximated from a few retrieved chunks.
+3. **Yours**: self-hosted, cheap to run, inspectable (the research steps are visible), usable from other agents (MCP).
 
-- A **research assistant** for managing and understanding content
-- A **platform** that connects various AI providers
-- A **privacy-first** tool that keeps your data under your control
-- An **extensible system** with APIs and customization options
+### What Brain Notebook IS
 
-### What Open Notebook IS NOT
+- A research assistant over a personal library: lecture decks, papers, books, notes
+- An agent with general tools (list, grep, search, read, view, graph, delegate), not a pipeline tuned to one kind of question
+- A research memory other agents can use through MCP
 
-- A document editor (use Google Docs, Notion, etc.)
-- A file storage system (use Dropbox, S3, etc.)
-- A general-purpose chatbot (use ChatGPT, Claude, etc.)
-- A replacement for your entire workflow (it's one tool in your toolkit)
+### What Brain Notebook IS NOT
+
+- A chat-with-a-pasted-document tool: no mode stuffs whole documents into a prompt
+- A general-purpose chatbot or web search engine (the web supplements the notebook, it doesn't replace it)
+- A multi-user collaboration platform (single user first)
+- A document editor or file storage system
 
 ### Principles
 
-Durable, normative rules. Each links to the decision record that established it.
-
 | Principle | Rule |
 |---|---|
-| **Privacy first** | User data stays under user control by default. Self-hosted is the primary use case; no telemetry without opt-in; no hard dependency on specific cloud services. |
-| **Provider-agnostic core** | The default is portable: features must work across the provider matrix. Adopting a provider-exclusive capability is allowed but is a deliberate decision that requires a [PDR](docs/7-DEVELOPMENT/decisions/README.md) ([PDR-002](docs/7-DEVELOPMENT/decisions/PDR-002-provider-agnostic-core.md)). |
-| **Simplicity over features** | Easy to understand and use, even if it means fewer features. Sensible defaults; advanced options behind progressive disclosure. |
-| **API-first** | Every capability is accessible via the REST API — the UI is a client, never the only door ([ADR-003](docs/7-DEVELOPMENT/decisions/ADR-003-streamlit-to-nextjs.md)). |
-| **Extensibility through standards** | Extension happens through well-defined interfaces (transformations, commands, prompt templates), not forks. |
-| **Async-first** | Long-running operations never block the UI or the API ([ADR-004](docs/7-DEVELOPMENT/decisions/ADR-004-background-workers.md)). |
-
-### How we evaluate requests
-
-A feature request that conflicts with the IS NOT list or a principle gets closed with a pointer here — kindly, and with the reasoning. A "no" protects the core value proposition; it's not a judgment of the idea. If a request keeps coming back and the principle starts to feel wrong, that's a signal to revisit the principle through a decision record — not to make a quiet exception.
+| **Evidence first** | Answers come from what the agent read, with the most specific address; strict grounding is the default ([ADR-014](docs/7-DEVELOPMENT/decisions/ADR-014-agentic-notebook-chat.md)). |
+| **Primitives, not shortcuts** | New capabilities are general tools that compose; a tool shaped around one example question is a smell. |
+| **Structure at ingestion** | Pages, outlines, summaries, metadata and the concept graph are built once when a document arrives, so questions never need the whole document in a prompt ([ADR-015](docs/7-DEVELOPMENT/decisions/ADR-015-page-aware-ingestion.md)). |
+| **Cheap by design** | Repeated calls run on the cheapest model that can do them; strong models are used once per answer ([ADR-016](docs/7-DEVELOPMENT/decisions/ADR-016-two-models-per-turn.md)). |
+| **Measured** | Changes to the agent or ingestion are checked against the eval set before and after; regressions block. |
+| **Privacy and control** | Self-hosted; optional features that call out (rerank, page embeddings, web search) are visible switches ([ADR-017](docs/7-DEVELOPMENT/decisions/ADR-017-agent-extensions.md)). |
+| **Provider-agnostic core** | Chat and embeddings work with any provider; provider-specific extras degrade gracefully ([PDR-002](docs/7-DEVELOPMENT/decisions/PDR-002-provider-agnostic-core.md), [PDR-003](docs/7-DEVELOPMENT/decisions/PDR-003-personal-fork.md)). |
+| **Async-first** | Long work runs on the worker; the UI streams progress ([ADR-004](docs/7-DEVELOPMENT/decisions/ADR-004-background-workers.md)). |
 
 ---
 
 ## Current Posture
 
-> **Reviewed: 2026-07.** This section is expected to change. Updating it is not a reversal — it's a phase change, recorded with a short PDR and an edit here.
+> **Reviewed: 2026-10** (version 2.0.0).
 
-**The phase we're in: get the basics working well for everyone before expanding.** Priority goes to making the core experience (sources, chat, search, notes, podcasts) solid across the full provider matrix and deployment surface, ahead of new product surfaces.
-
-### Directional constraints
-
-Decisions about the future we haven't made yet — recorded as "which door to keep open":
-
-- **Single-user first, multi-user compatible.** Open Notebook is a single-user tool today, but multi-user is under active consideration ([#712](https://github.com/lfnovo/open-notebook/issues/712)). New features must not gratuitously preclude multi-user (schema, auth, data scoping) ([PDR-001](docs/7-DEVELOPMENT/decisions/PDR-001-single-user-first.md)).
-- **Portable by default.** Provider-exclusive capabilities (including paid-only ones) are on the table for the future — deliberately, via PDR, never by accident ([PDR-002](docs/7-DEVELOPMENT/decisions/PDR-002-provider-agnostic-core.md)).
+The research agent, page-aware ingestion and the Phase 5 extensions (rerank, visual page search, concept graph,
+memory, web search, MCP) are built and pass the 35-question course eval. The phase now is **use it on real coursework
+and fix what that reveals**, before adding surfaces.
 
 ### Horizon
 
-The big clusters under consideration — direction, not roadmap; no dates. Each has an umbrella issue where the thinking happens:
+Directions under consideration, not promises:
 
-| Cluster | What it is | Where |
-|---|---|---|
-| **Platform v-next** | SurrealDB v3 migration, possible frontend/backend Docker image split, possible Surreal Commands → Celery move — evaluated together as one coordinated breaking change | [#372](https://github.com/lfnovo/open-notebook/issues/372) · [#378](https://github.com/lfnovo/open-notebook/issues/378) · [#381](https://github.com/lfnovo/open-notebook/issues/381) |
-| **Multi-user** | Deep platform redesign: auth, data scoping, what "multi-user" means for a self-hosted tool | [#712](https://github.com/lfnovo/open-notebook/issues/712) |
-| **Content modes & artifacts** | The output side: generated artifacts, videos, explainers, presentations, mind maps — as one coherent product surface, not a pile of features | [#203](https://github.com/lfnovo/open-notebook/issues/203) |
-| **Agents operating Open Notebook** | Role inversion via MCP: AI agents use Open Notebook on the user's behalf — the platform becomes the research memory of agents, not just a UI | [#878](https://github.com/lfnovo/open-notebook/issues/878) · [#693](https://github.com/lfnovo/open-notebook/issues/693) · [#973](https://github.com/lfnovo/open-notebook/issues/973) |
+- **More document types with structure**: slides from PPTX directly, books with chapters, scanned PDFs through OCR with pages.
+- **A source view that shows the structure**: outline with page links, metadata editing, the document summary.
+- **Cross-session recall**: summaries of past conversations the agent can search ("what did we conclude last week?").
+- **Study outputs**: quizzes and flashcards generated from the outline, with page citations.
+- **A larger eval** across other courses and paper collections, so improvements aren't tuned to one notebook.
 
 ---
 
 ## How this document changes
 
-- **Identity** changes rarely and deliberately: a decision record marks the old rule as superseded, then this document is updated.
-- **Posture** changes when the phase changes: a short PDR captures the why, the section above is edited, and the "Reviewed" stamp is bumped.
-- Engineering practices (code standards, anti-patterns, decision framework) live in [docs/7-DEVELOPMENT/design-principles.md](docs/7-DEVELOPMENT/design-principles.md).
+Identity changes rarely and through a decision record; the posture section is edited when the phase changes.
+Engineering practices live in [docs/7-DEVELOPMENT/design-principles.md](docs/7-DEVELOPMENT/design-principles.md).

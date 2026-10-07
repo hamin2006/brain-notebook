@@ -24,11 +24,22 @@ Normative rules for working on the Python backend. Architecture and design ratio
 - All LLM calls in graph nodes go through `provision_langchain_model()` — never instantiate provider clients directly. It auto-upgrades to `large_context_model` above 105,000 tokens (hard-coded threshold).
 - Missing/unconfigured model → raise `ConfigurationError` (not `ValueError`) so the API returns 422.
 - Credential-linked models are preferred; `provision_provider_keys()` is the env-var fallback and **mutates `os.environ`** — be aware in tests.
-- `DefaultModels.get_instance()` intentionally bypasses the singleton cache (fresh DB fetch each call).
+- `DefaultModels.get_instance()` intentionally bypasses the singleton cache (fresh DB fetch each call). `AgentSettings.load()` does the same (API and worker are separate processes).
+- Model slots: `tools` = the research agent (cheap, tool calling), `chat` = the answer writer, `transformation` = captions/analysis, `embedding`, `large_context`. Wrap utility calls in `limit_reasoning(model, max_tokens)` (OpenRouter `reasoning.max_tokens`; effort levels are ignored by some models) or reasoning models can return empty replies.
+- Rerank and multimodal (image) embeddings go through `open_notebook/ai/openrouter.py`, not Esperanto.
+
+## The research agent (`open_notebook/agent/`)
+
+- Chat, source chat, Ask and MCP all use `agent/graph.py` (async, `AsyncSqliteSaver` from `graphs/checkpoint.py`). Only the question and answer (+ `agent_trace`) are checkpointed; tool traffic, images and attachments (passed in `config["configurable"]`) are not.
+- Tools return plain text with addresses and raise `ToolError` for fixable mistakes; never let a tool exception end the turn.
+- **SurrealDB quirk:** `WHERE source IN $ids` returns nothing on tables with a composite unique index on `(source, …)` (`source_page`, `source_section`) — use `scope.per_source` (equality per source). Cover new queries with `tests/integration/`.
+- `repo_query` returns record ids as strings: wrap with `ensure_record_id()` before comparing against record fields.
+- Web fetching must go through `agent/web.py` (public IPs only, per-hop checks, IP pinning), never `validate_url()` (which allows private hosts).
+- PDFium (pypdfium2) is not thread-safe: hold `PDFIUM_LOCK` around every call.
 
 ## Graphs (`open_notebook/graphs/`)
 
-- Nodes are `async def` (`ask.py`, `source.py`, `transformation.py`, `prompt.py`). Only the SqliteSaver-checkpointed graphs (`chat.py`, `source_chat.py`) use sync nodes with the `asyncio.new_event_loop()` / ThreadPool workaround, because the checkpointer is sync — fragile; don't copy it into new graphs.
+- Nodes are `async def`. `source.py` is the ingestion graph (page extraction for PDFs, then the job chain caption → embed → analyze → page images + concepts). Upstream's `chat.py`, `source_chat.py` and `ask.py` (sync, SqliteSaver) are no longer used by the routers — don't build on them.
 - Every node wraps LLM calls with `classify_error()`:
   ```python
   except Exception as e:
@@ -36,7 +47,7 @@ Normative rules for working on the Python backend. Architecture and design ratio
       raise exc_class(message) from e
   ```
 - Strip extended-thinking output with `clean_thinking_content()` before using model responses.
-- Chat checkpoints (SqliteSaver) live at `./data/sqlite-db/checkpoints.sqlite` — `LANGGRAPH_CHECKPOINT_FILE` in `open_notebook/config.py` is a constant, not an env var.
+- Chat checkpoints live at `./data/sqlite-db/checkpoints.sqlite` — `LANGGRAPH_CHECKPOINT_FILE` in `open_notebook/config.py` is a constant, not an env var.
 
 ## Domain (`open_notebook/domain/`)
 
@@ -47,7 +58,7 @@ Normative rules for working on the Python backend. Architecture and design ratio
 
 ## Database (`open_notebook/database/`)
 
-- New migration = new file `open_notebook/database/migrations/N.surrealql` (+ `N_down.surrealql`) **and** an edit to `AsyncMigrationManager` — migrations are hard-coded, not auto-discovered. They run automatically on API startup.
+- New migration = new file `open_notebook/database/migrations/N.surrealql` (+ `N_down.surrealql`) **and** an edit to `AsyncMigrationManager` — migrations are hard-coded, not auto-discovered. They run automatically on API startup. The fork's are 26–29; a new source-scoped table also needs a line in the `source_delete` event.
 - No connection pooling — each `repo_*` call opens/closes a connection.
 - Transaction-conflict `RuntimeError`s are retriable and logged at DEBUG (don't "fix" the missing stack trace).
 - Bind values as `$params`, never f-string user input into SurrealQL ([security.md](../docs/7-DEVELOPMENT/security.md#database-queries-surrealql-injection)); see the [SurrealQL docs](https://surrealdb.com/docs/surrealql) for syntax.
@@ -75,6 +86,8 @@ Normative rules for working on the Python backend. Architecture and design ratio
 | `OPEN_NOTEBOOK_CHUNK_SIZE` / `_CHUNK_OVERLAP` | Token-based (default 400 / 15%); restart required |
 | `OPEN_NOTEBOOK_MAX_UPLOAD_SIZE_MB` | Upload cap (default 100) |
 | `CORS_ORIGINS` | Restrict before production |
+| `SEARXNG_URL` | SearXNG for `web_search` (default `http://127.0.0.1:8888`) |
+| `OPEN_NOTEBOOK_MCP_ALLOWED_HOSTS` | Extra `host:port` patterns allowed on `/mcp` |
 
 ## Deep dives
 

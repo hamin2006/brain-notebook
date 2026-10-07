@@ -1,5 +1,7 @@
 # Maintainer Guide
 
+> Upstream Open Notebook's maintainer process, kept for reference; Brain Notebook (a personal fork) doesn't use it.
+
 **📍 This file has moved!**
 
 All maintainer guidelines have been consolidated into the new development documentation structure.

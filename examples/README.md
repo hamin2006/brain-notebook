@@ -1,5 +1,11 @@
 # Docker Compose Examples
 
+> **From upstream Open Notebook.** These compose files reference upstream's `lfnovo/open_notebook` images, which
+> don't contain Brain Notebook's research agent. To use one, replace the app service's `image:` with `build: ..` (or
+> the path to your checkout) and `image: brain-notebook:local`, like the root `docker-compose.yml`. The tested setups
+> are in [docs/1-INSTALLATION](../docs/1-INSTALLATION/index.md).
+
+
 This folder contains different `docker-compose.yml` configurations for various use cases.
 
 It also includes an [`easypanel`](./easypanel/) template that can be copied into
