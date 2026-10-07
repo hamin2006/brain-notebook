@@ -98,9 +98,48 @@ Also shown on the search page as "Vector search requires an embedding model. Onl
 - After changing the embedding model, old and new vectors don't match. **Manage → Models** warns about this ("Important: Rebuild Required"); rebuild from the **Advanced** page.
 - Check that the sources are **Completed**, not Queued or Failed.
 
-### Ask fails with "The strategy model returned no search terms for this question."
+### The agent can't find something that's in a source
 
-The model chosen for the strategy step returned nothing usable, usually because a reasoning model spent its output budget on thinking. Pick a different strategy model in the Ask page's advanced model options, or rephrase the question. "The final answer model returned an empty response." has the same cause for the last step.
+Check that the source finished processing and is embedded (open it; **Embed Content** in its ⋮ menu if not), and
+that it's in the chat's scope. The agent's `grep` works without embeddings, so naming an exact term often finds it.
+
+---
+
+## PDF pages, outlines and visual search
+
+Watch the worker while a PDF processes: `docker compose logs -f open_notebook` (Docker) or
+`journalctl --user -u brain-worker -f` (systemd). A healthy run logs `Captioned N/M visual pages`,
+`Successfully embedded source …`, `Analyzed source:…: N sections, metadata {…}`,
+`Embedded N page images of source:…` and `Concept graph for source:…`.
+
+### Answers cite the whole source, never pages
+
+The source has no pages: it isn't a PDF, it's a scanned PDF without a text layer, or it was added before page-aware
+ingestion (or by upstream Open Notebook). Re-add the PDF. Export slides to PDF rather than adding PPTX.
+
+### Image-only slides are never found
+
+They're found through their captions, made by the **Transformation Model**, which must accept images. If the log
+shows `Caption failed for … p12` for many pages, pick a vision-capable Transformation Model and re-add the source. A
+few failed captions (provider hiccups) are logged and skipped.
+
+### "Outline parsing failed for source:…, using page windows"
+
+The analysis model didn't return a usable outline, so the document got fixed-size sections instead of topic
+sections. Usually a reasoning model that ran out of output budget, or a weak model. The source still works; re-add it
+after switching the Transformation Model if outlines matter to you.
+
+### Visual page search says it's off, or finds nothing
+
+`Visual page search is turned off` means **Settings → Research agent → Page image embedding model** is empty.
+"No page images are indexed" means pages haven't been embedded yet: they're embedded after analysis, a few minutes
+after the source shows Completed. For sources added before the feature was on, click **Embed pages of existing
+documents**. Errors mentioning OpenRouter mean no OpenRouter credential (or credit).
+
+### The concept graph is empty or misses a document
+
+Check **Settings → Research agent → Concept graph** is on, then click **Build concept graph for existing
+documents**. Sections the model couldn't parse are logged (`Concept extraction failed for section N`) and skipped.
 
 ---
 
@@ -118,7 +157,7 @@ Insights are created by a background job. If the source is Completed but its ins
 
 ## Podcast failures
 
-A failed episode shows **Failed** with the error message on the episode card in **Podcasts → Episodes**, and a **Retry** button. Podcast generation is attempted once; use Retry after fixing the cause. When Open Notebook recognizes the error, the message ends with a `NOTE:` that explains it.
+A failed episode shows **Failed** with the error message on the episode card in **Podcasts → Episodes**, and a **Retry** button. Podcast generation is attempted once; use Retry after fixing the cause. When Brain Notebook recognizes the error, the message ends with a `NOTE:` that explains it.
 
 ### Profile errors (generation stops before any model is called)
 
@@ -127,7 +166,7 @@ A failed episode shows **Failed** with the error message on the episode card in 
 | "Episode profile 'X' has no speaker profile configured. Please update the profile to select a speaker profile." | Edit the episode profile in **Podcasts → Profiles** and pick a speaker profile |
 | "Episode profile 'X' references a speaker profile that no longer exists. Please update the profile to select a speaker profile." | The speaker profile was deleted; pick another |
 | "Episode profile 'X' has no outline model configured. Please update the profile to select an outline model." (same for "transcript model") | Pick the models in the episode profile |
-| "Speaker profile 'X' has no voice model configured. Please update the profile to select a voice model." | Edit the speaker profile and choose a text-to-speech model. The speaker profiles that ship with Open Notebook have no voice model until you set one |
+| "Speaker profile 'X' has no voice model configured. Please update the profile to select a voice model." | Edit the speaker profile and choose a text-to-speech model. The speaker profiles that ship with Brain Notebook have no voice model until you set one |
 
 If no text-to-speech model is assigned, **Manage → Models** shows "Not set — audio generation unavailable until configured" next to the Text-to-Speech Model. Add a provider with TTS (OpenAI, Google, ElevenLabs, MiniMax, a local [Speaches](../5-CONFIGURATION/local-tts.md) server…).
 

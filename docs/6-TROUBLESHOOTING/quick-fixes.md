@@ -24,7 +24,7 @@ If the API answers locally but not from the browser: port 5055 must be reachable
 
 ## #2: Chat fails with "No model configured for default for type=chat"
 
-No models are assigned yet. Follow [Connect a provider](../4-AI-PROVIDERS/index.md#connect-a-provider) in **Manage → Models** through step 4 (**Auto-assign Defaults** under Default Model Assignments). → [AI & Chat Issues](ai-chat-issues.md#no-model-configured-for-default-for-typechat)
+No models are assigned yet. Run `python3 scripts/brain/provision_models.py` with your OpenRouter key, or set them by hand: [Models for the research agent](../4-AI-PROVIDERS/index.md#models-for-the-research-agent). → [AI & Chat Issues](ai-chat-issues.md#no-model-configured-for-default-for-typechat)
 
 ---
 
@@ -72,11 +72,18 @@ On v1.15.0 the same timeout shows as "Could not connect to the AI provider…" a
 
 ---
 
-## #8: "Podcast generation failed"
+## #8: Answers don't cite pages
+
+The source has no pages (not a PDF, scanned, or added before page-aware ingestion). Re-add the PDF.
+→ [Processing Issues → PDF pages](processing-issues.md#pdf-pages-outlines-and-visual-search)
+
+---
+
+## #8b: "Podcast generation failed"
 
 Open **Podcasts → Episodes**; the failed episode shows the error and a **Retry** button.
 
-- "Speaker profile 'X' has no voice model configured": the speaker profiles that ship with Open Notebook have no text-to-speech model. Edit them in **Podcasts → Profiles** and pick one.
+- "Speaker profile 'X' has no voice model configured": the speaker profiles that ship with Brain Notebook have no text-to-speech model. Edit them in **Podcasts → Profiles** and pick one.
 - `Voice name ... not supported` or `Requested entity was not found`: the profile's Voice ID isn't valid for its TTS model (the seeded profiles use OpenAI voice names).
 - Messages with a `NOTE:` explain the cause.
 
@@ -118,4 +125,3 @@ The published image has its Python dependencies installed. Downloads at startup 
 ## Still stuck?
 
 - Look up your exact message in the [Troubleshooting index](index.md).
-- Ask in [Discord](https://discord.gg/37XJPXfz2w) or [GitHub Discussions](https://github.com/lfnovo/open-notebook/discussions/categories/q-a).

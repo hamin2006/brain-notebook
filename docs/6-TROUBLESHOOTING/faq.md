@@ -6,9 +6,9 @@ Questions that aren't about an error message. For errors, see the [Troubleshooti
 
 ## General
 
-### What is Open Notebook?
+### What is Brain Notebook?
 
-An open-source, self-hosted research assistant in the spirit of Google's NotebookLM: you collect sources into notebooks, chat with them, search them, run transformations that extract insights, and generate podcasts. You choose the AI providers, including fully local ones.
+A self-hosted research notebook in the spirit of Google's NotebookLM, forked from Open Notebook: you collect sources into notebooks and ask questions, and a research agent searches, reads and looks at your documents and answers with page citations. You can also search, take notes, run transformations and generate podcasts. You choose the AI providers.
 
 ### How is it different from Google NotebookLM?
 
@@ -28,7 +28,7 @@ Files (PDF, Word, PowerPoint, Excel, EPUB, OpenDocument, HTML, plain text and Ma
 
 ### How much does it cost?
 
-The software is free. AI usage is billed by your providers per token, character or minute, at their prices; local models cost nothing beyond your hardware. The biggest cost drivers are the size of the context you send (how many sources are included in chat, and as "Full content" or "Insights only"), embedding large libraries, and podcast audio.
+The software is free. AI usage is billed by your providers per token, character or minute, at their prices; local models cost nothing beyond your hardware. With the recommended OpenRouter models a question costs about $0.003 and ingesting a 100-page deck a few cents. The biggest cost drivers are Deep-effort questions across many documents, ingesting large libraries, and podcast audio.
 
 ---
 
@@ -48,7 +48,7 @@ Yes. Every model role is assigned separately under **Manage → Models → Defau
 
 ### What happens if I change the embedding model?
 
-Existing embeddings were made by the old model and won't match new searches. Open Notebook warns you and offers to go to the **Advanced** page to rebuild them. Rebuild before relying on search or Ask.
+Existing embeddings were made by the old model and won't match new searches. Brain Notebook warns you and offers to go to the **Advanced** page to rebuild them. Rebuild before relying on search or Ask.
 
 ---
 
@@ -95,17 +95,15 @@ Infrastructure settings are environment variables in the `open_notebook` service
 
 ### How do I update?
 
-Back up, then `docker compose pull && docker compose up -d`. Database migrations run automatically when the API starts.
+Back up, then `git pull && docker compose up -d --build` (Docker) or `bash scripts/brain/deploy_pc.sh` (systemd install). Database migrations run automatically when the API starts.
 
 ---
 
 ## Getting help
 
-- **Discord:** https://discord.gg/37XJPXfz2w
-- **GitHub Discussions:** questions and ideas, https://github.com/lfnovo/open-notebook/discussions
-- **GitHub Issues:** reproducible bugs, https://github.com/lfnovo/open-notebook/issues
-
-When reporting a bug, include the exact error message, steps to reproduce, relevant logs (without keys or passwords), your version and how you run Open Notebook.
+Open an issue at https://github.com/hamin2006/brain-notebook/issues with the exact error message, steps to
+reproduce, relevant logs (without keys or passwords), the version (Settings → Advanced) and how you run it.
+Brain Notebook is a fork; Open Notebook's community channels are for upstream.
 
 ---
 

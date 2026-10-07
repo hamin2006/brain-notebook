@@ -81,12 +81,12 @@ The provider returned HTTP 429: too many requests, or the account is out of quot
 
 Full message: `Content too large for the selected model. Try using a smaller selection or a model with a larger context window.`
 
-**Cause:** the prompt (sources in context plus chat history) exceeds the model's context window.
+**Cause:** the prompt exceeds the model's context window. With the research agent that means a very long research transcript (many large reads) or a model with a small window.
 
 **Fix:**
 
-- In notebook chat, include fewer sources, or switch them from "Full content" to "Insights only".
-- Use a model with a larger window. Open Notebook switches to the **Large Context Model** automatically when the content exceeds about 105,000 tokens, so assign a model with a large window to that role under Default Model Assignments.
+- Use **Quick** or **Standard** effort, or ask a narrower question.
+- Use a model with a larger window. Brain Notebook switches to the **Large Context Model** automatically when the content exceeds about 105,000 tokens, so assign a model with a large window to that role under Default Model Assignments.
 - Start a new chat session to drop a long history.
 
 **Ollama doesn't report this error.** When a prompt exceeds the credential's **Context Window (num_ctx)** (8192 tokens by default), Ollama silently drops the start of the prompt. Answers then ignore your sources or earlier messages. Raise **Context Window (num_ctx)** on the Ollama configuration in Manage → Models if your hardware allows; see [Ollama → Context window](../5-CONFIGURATION/ollama.md#context-window-num_ctx).
@@ -101,11 +101,11 @@ The provider returned a server error (500, 502, 503 or "overloaded"). Wait and r
 
 ### "AI service error: …"
 
-An error Open Notebook doesn't recognize; the rest of the message is the provider's own text (shortened). It usually names the problem (unsupported parameter, content policy, model access). The full error is in the log: `docker compose logs open_notebook | grep -i "Unclassified LLM error"`.
+An error Brain Notebook doesn't recognize; the rest of the message is the provider's own text (shortened). It usually names the problem (unsupported parameter, content policy, model access). The full error is in the log: `docker compose logs open_notebook | grep -i "Unclassified LLM error"`.
 
 ### "The model returned an empty response. Try again, or pick a different model if this keeps happening."
 
-The model answered with no text. Common with reasoning models that use their whole output budget on thinking, or models with a small output limit. Retry, or choose a non-reasoning model for that role. In Ask, the same problem appears as "The strategy model returned no search terms for this question" or "The final answer model returned an empty response"; pick other models in the Ask page's advanced model options.
+The model answered with no text. Common with reasoning models that use their whole output budget on thinking. Brain Notebook already caps their thinking per call and retries an empty answer once with less thinking; if you still see this ("The model returned an empty answer…"), retry, or pick a different answer model (the chat's **Model** button, or the Chat Model default).
 
 ---
 
@@ -157,16 +157,44 @@ Discover Models returned an empty list. Local servers: load or pull a model firs
 
 ---
 
-## Answer quality
+## The research agent
 
-These aren't errors, but they are the most common complaints.
+### The answer says the notebook doesn't cover something that it does
 
-- **Answers ignore my sources.** In notebook chat, each source card has a context setting that cycles between "Not included in chat", "Insights only" and "Full content". Check that the sources you care about are included. With Ollama, also check [the context window](../5-CONFIGURATION/ollama.md#context-window-num_ctx).
-- **"Insights only" gives shallow answers.** It sends the source's insights, not its text. Use "Full content" for the sources the question is about.
-- **Generic or wrong answers.** Ask specific questions that name the source or section, and use a stronger model for the Chat Model role. Check the citations: they show which sources the answer used.
-- **Ask can't find something that is there.** Ask searches the embeddings; sources without embeddings aren't found. See [Processing Issues → Search](processing-issues.md#search-and-ask).
+- The source may be out of scope (its card set to *Not included in chat*) or still processing.
+- Try **Deep** effort, or name the document ("in lecture 4…").
+- Check the **N research steps** under the answer: they show what the agent searched. If searches found nothing,
+  the source may not be embedded.
 
-More: [Chat Effectively](../3-USER-GUIDE/chat-effectively.md).
+### Citations point to the wrong page
+
+Click through and read the page: the agent cites what it read, but can pick a neighboring page in a build sequence.
+Ask a follow-up ("quote the passage that says this"). If citations never include pages, the source has no pages: see
+[Processing Issues → PDF pages](processing-issues.md#pdf-pages-outlines-and-visual-search).
+
+### Answers are slow
+
+Standard effort usually takes 15–40 s; Deep and cross-document questions up to 2–3 minutes (several sub-agents,
+reviews). Use **Quick** for lookups. If every step is slow, check the **Tools Model**: it should be a fast, cheap
+model, not the same large model as the Chat Model.
+
+### The research steps show "Error: …"
+
+A tool call failed (bad arguments, a provider hiccup). The agent sees the error and usually recovers on the next
+step; it's only a problem if the answer suffers. Repeated errors from one tool are in the API log
+(`Agent tool … raised`).
+
+### Web search doesn't happen
+
+It's used only when **Settings → Research agent → Web search** is on **and** the notebook is set to
+*Notebook + general knowledge*. "Error: web search failed: the search service is unreachable" means SearXNG isn't
+running or `SEARXNG_URL` is wrong: see [Web search](../5-CONFIGURATION/research-agent.md#running-searxng).
+
+### The agent doesn't remember something
+
+It remembers only what you ask it to ("remember that…"), and only when **Memory** is on. Check the **Remembered**
+list in **Settings → Research agent**. Memory carries across conversations; within one conversation the history
+does.
 
 ---
 

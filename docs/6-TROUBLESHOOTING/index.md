@@ -25,7 +25,7 @@ Find your problem by the message you see, then follow the link. If you don't hav
 | "Rate limit exceeded…" | [AI & Chat Issues](ai-chat-issues.md#rate-limit-exceeded-please-wait-a-moment-and-try-again) |
 | "Content too large for the selected model…" | [AI & Chat Issues](ai-chat-issues.md#content-too-large-for-the-selected-model) |
 | "The AI provider is temporarily unavailable…" | [AI & Chat Issues](ai-chat-issues.md#the-ai-provider-is-temporarily-unavailable-please-try-again-in-a-few-minutes) |
-| "The model returned an empty response…" | [AI & Chat Issues](ai-chat-issues.md#the-model-returned-an-empty-response-try-again-or-pick-a-different-model-if-this-keeps-happening) |
+| "The model returned an empty response…" / "…empty answer…" | [AI & Chat Issues](ai-chat-issues.md#the-model-returned-an-empty-response-try-again-or-pick-a-different-model-if-this-keeps-happening) |
 | "AI service error: …" | [AI & Chat Issues](ai-chat-issues.md#ai-service-error-) |
 | "timeout of 600000ms exceeded" | [AI & Chat Issues](ai-chat-issues.md#timeout-of-600000ms-exceeded) |
 | "Cannot connect to server. Check the URL is correct." (Test button) | [AI & Chat Issues → Test fails](ai-chat-issues.md#test-fails) |
@@ -36,7 +36,11 @@ Find your problem by the message you see, then follow the link. If you don't hav
 | "Request body exceeds the maximum allowed upload size" | [Processing Issues → Uploads](processing-issues.md#uploads-rejected) |
 | "… (detected type: …)" on upload | [Processing Issues → Uploads](processing-issues.md#uploads-rejected) |
 | "This feature requires an embedding model…" / "Vector search requires an embedding model…" | [Processing Issues → Search](processing-issues.md#search-and-ask) |
-| "The strategy model returned no search terms…" (Ask) | [Processing Issues → Search](processing-issues.md#ask-fails-with-the-strategy-model-returned-no-search-terms-for-this-question) |
+| Answer cites no pages | [Processing Issues → PDF pages](processing-issues.md#answers-cite-the-whole-source-never-pages) |
+| "The notebook doesn't cover…" but it does | [AI & Chat Issues → Research agent](ai-chat-issues.md#the-answer-says-the-notebook-doesnt-cover-something-that-it-does) |
+| "Visual page search is turned off" / "No page images are indexed" | [Processing Issues](processing-issues.md#visual-page-search-says-its-off-or-finds-nothing) |
+| "web search failed: the search service is unreachable" | [AI & Chat Issues](ai-chat-issues.md#web-search-doesnt-happen) |
+| "No concept graph for these documents yet" | [Processing Issues](processing-issues.md#the-concept-graph-is-empty-or-misses-a-document) |
 | "This source has no text content to transform" | [Processing Issues](processing-issues.md#this-source-has-no-text-content-to-transform) |
 | Podcast episode "Failed" | [Processing Issues → Podcast failures](processing-issues.md#podcast-failures) |
 | CORS error in the browser console | [Connection Issues](connection-issues.md#cors-errors-in-the-browser-console) |
@@ -90,8 +94,7 @@ Settings belong under the `open_notebook` service's `environment:` block and tak
 
 ## Getting help
 
-1. Search [GitHub Issues](https://github.com/lfnovo/open-notebook/issues) for your exact message.
-2. Ask in [Discord](https://discord.gg/37XJPXfz2w) or [GitHub Discussions](https://github.com/lfnovo/open-notebook/discussions/categories/q-a).
-3. For a reproducible bug, open an issue with: the exact message, steps to reproduce, the relevant part of `docker compose logs open_notebook` (remove keys and passwords), your Open Notebook version, how you run it (Docker, single container, from source) and the provider you use.
+1. Search [GitHub Issues](https://github.com/hamin2006/brain-notebook/issues) for your exact message.
+3. For a reproducible bug, open an issue with: the exact message, steps to reproduce, the relevant part of `docker compose logs open_notebook` (remove keys and passwords), your Brain Notebook version, how you run it (Docker, single container, from source) and the provider you use.
 
 Security problems: don't open a public issue, see [SECURITY.md](../../SECURITY.md).
