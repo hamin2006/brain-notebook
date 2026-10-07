@@ -221,3 +221,113 @@ async def test_note_saves_into_the_notebook(corpus):
         "SELECT note_type, title FROM $n", {"n": ensure_record_id(note_id)}
     )
     assert rows[0]["note_type"] == "ai" and rows[0]["title"] == "Dropout summary"
+
+
+@pytest.mark.asyncio
+async def test_visual_page_search_merges_builds(corpus):
+    from open_notebook.agent import retrieval
+    from open_notebook.database.repository import ensure_record_id, repo_query
+
+    l4, l6 = corpus["l4"], corpus["l6"]
+    for source, first, last, vector in (
+        (l4, 1, 2, VEC_MIX),  # one animation build: shared vector
+        (l4, 3, 3, VEC_OPT),
+        (l6, 1, 1, VEC_CNN),
+    ):
+        await repo_query(
+            "UPDATE source_page SET image_embedding = $v WHERE source = $s AND page >= $a AND page <= $b",
+            {"v": vector, "s": ensure_record_id(source), "a": first, "b": last},
+        )
+    with (
+        patch.object(
+            retrieval, "page_embedding_model", new=AsyncMock(return_value="g")
+        ),
+        patch(
+            "open_notebook.ai.openrouter.embed_multimodal",
+            new=AsyncMock(return_value=[VEC_OPT]),
+        ),
+    ):
+        out = await _tools(corpus["scope"])["search"].ainvoke(
+            {"query": "algorithm box", "level": "page"}
+        )
+        like = await _tools(corpus["scope"])["search"].ainvoke(
+            {"like": f"{l4}#p3", "level": "page"}
+        )
+    lines = out.splitlines()
+    assert lines[1].startswith(f"- {l4}#p3 ")
+    assert f"- {l4}#p1-2 " in out  # the build comes back once, as a range
+    assert f"- {l4}#p3 " not in like and f"- {l4}#p1-2 " in like
+
+
+@pytest.mark.asyncio
+async def test_concept_graph_extraction_and_tool(corpus):
+    import json
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    from langchain_core.messages import AIMessage
+
+    from commands import concept_commands as cmd
+    from open_notebook.database.repository import repo_query
+
+    replies = {
+        "Regularization": {"concepts": [{"name": "Dropout", "page": 2, "context": "Implicit regularization"}], "relations": []},
+        "Optimizers": {
+            "concepts": [{"name": "Adam", "page": 3, "context": "Combines momentum and RMSProp"},
+                         {"name": "RMSProp", "page": 3, "context": ""}],
+            "relations": [{"source": "Adam", "relation": "builds on", "target": "RMSProp", "page": 3}],
+        },
+        "Residual networks": {"concepts": [{"name": "dropout", "page": 2, "context": "0.5 in AlexNet"}], "relations": []},
+    }  # fmt: skip
+    model = MagicMock()
+
+    async def answer(prompt):
+        section = next(title for title in replies if f'section "{title}"' in prompt)
+        return AIMessage(content=json.dumps(replies[section]))
+
+    model.ainvoke = answer
+    with (
+        patch.object(cmd.AgentSettings, "load", new=AsyncMock(return_value=SimpleNamespace(knowledge_graph=True))),
+        patch.object(cmd, "provision_langchain_model", new=AsyncMock(return_value=model)),
+        patch.object(cmd, "limit_reasoning", side_effect=lambda m: m),
+        patch.object(cmd, "generate_embeddings", side_effect=lambda texts: [[0.1, 0.2, 0.3]] * len(texts)),
+    ):  # fmt: skip
+        for source in (
+            corpus["l4"],
+            corpus["l6"],
+            corpus["l4"],
+        ):  # l4 twice: re-run replaces
+            await cmd.extract_concepts_command(
+                cmd.ExtractConceptsInput(source_id=source)
+            )
+
+    assert len(await repo_query("SELECT * FROM concept")) == 3  # dropout is shared
+    assert len(await repo_query("SELECT * FROM concept_mention")) == 4
+
+    tools = _tools(corpus["scope"])
+    overview = await tools["graph"].ainvoke({})
+    assert overview.splitlines()[1] == "- Dropout: 2 document(s), 2 section(s)"
+    with patch(
+        "open_notebook.utils.embedding.generate_embedding",
+        new=AsyncMock(return_value=[0.1, 0.2, 0.3]),
+    ):
+        adam = await tools["graph"].ainvoke({"concept": "adam"})
+    assert f"- {corpus['l4']}#p3 " in adam
+    assert f"- Adam --builds on--> RMSProp [{corpus['l4']}#p3]" in adam
+
+    # Deleting a source removes its part of the graph.
+    await repo_query(f"DELETE {corpus['l6']}")
+    assert len(await repo_query("SELECT * FROM concept_mention")) == 3
+
+
+@pytest.mark.asyncio
+async def test_notebook_grounding_is_read_by_the_agent(corpus):
+    from open_notebook.agent.graph import _notebook_info
+    from open_notebook.database.repository import ensure_record_id, repo_query
+
+    assert (await _notebook_info(corpus["notebook"])).get("grounding") is None
+    await repo_query(
+        "UPDATE $nb SET grounding = 'general'",
+        {"nb": ensure_record_id(corpus["notebook"])},
+    )
+    assert (await _notebook_info(corpus["notebook"]))["grounding"] == "general"

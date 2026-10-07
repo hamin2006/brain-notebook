@@ -4,6 +4,7 @@
     grep     exhaustive exact/regex matches with pages        ~ grep
     search   meaning-based search at passage, section or document level, or visual
              search over rendered pages (level=page); like=<address>
+    graph    the concept graph: where a concept appears and how it relates to others
     outline  a document's sections with page ranges
     read     read an address (pages, section, chunk, summary, note), capped
     view     look at a page or image as a picture
@@ -412,6 +413,82 @@ async def tool_outline(scope: AgentScope, source: str) -> str:
     return await _outline_text(scope, parse_address(source).record_id)
 
 
+# ---------------------------------------------------------------- graph
+GRAPH_MENTIONS = 12
+GRAPH_RELATIONS = 15
+
+
+async def tool_graph(
+    scope: AgentScope, concept: Optional[str] = None, limit: int = 15
+) -> str:
+    concepts = await retrieval.scoped_concepts(scope)
+    if not concepts:
+        return (
+            "No concept graph for these documents yet (it is built after analysis, "
+            "or turned off). Use search or grep."
+        )
+    limit = max(1, min(limit, 40))
+    if not concept or not concept.strip():
+        ranked = sorted(
+            concepts.values(),
+            key=lambda c: (-len(c["documents"]), -c["mentions"], c["name"]),
+        )[:limit]
+        lines = ["Concepts across the most documents:"]
+        lines += [
+            f"- {c['name']}: {len(c['documents'])} document(s), {c['mentions']} section(s)"
+            for c in ranked
+        ]
+        lines.append("Call graph(concept=...) for where one appears and its relations.")
+        return "\n".join(lines)
+
+    embed: Optional[List[float]] = None
+    try:
+        from open_notebook.utils.embedding import generate_embedding
+
+        embed = await generate_embedding(concept)
+    except Exception as e:
+        logger.warning(f"Concept lookup without vectors: {e}")
+    matches = retrieval.match_concepts(concepts, concept, embed, 4)
+    if not matches:
+        return f"No concept like {concept!r} in the graph. Try search or grep."
+    best = matches[0]
+    lines = [f'Concept "{concepts[best]["name"]}"']
+    if len(matches) > 1:
+        lines[0] += (
+            " (close matches: "
+            + ", ".join(concepts[m]["name"] for m in matches[1:])
+            + ")"
+        )
+
+    mentions = await retrieval.concept_mentions(best, scope)
+    docs = {str(m["source"]) for m in mentions}
+    lines.append(f"Appears in {len(docs)} document(s):")
+    for m in mentions[:GRAPH_MENTIONS]:
+        sid = str(m["source"])
+        label = scope.sources[sid].label if sid in scope.sources else sid
+        context = f": {_snippet(m['context'], 160)}" if m.get("context") else ""
+        lines.append(
+            f'- {pages(sid, m["page_start"], m["page_end"])} "{label}" (section {sid}#s{m["section"]}){context}'
+        )
+    if len(mentions) > GRAPH_MENTIONS:
+        lines.append(f"(+{len(mentions) - GRAPH_MENTIONS} more mentions)")
+
+    relations = await retrieval.concept_relations(best, scope)
+    if relations:
+        lines.append("Relations:")
+        for r in relations[:GRAPH_RELATIONS]:
+            where = pages(str(r["source"]), r["page_start"], r["page_end"])
+            lines.append(
+                f"- {r['from_name']} --{r['relation']}--> {r['to_name']} [{where}]"
+            )
+        if len(relations) > GRAPH_RELATIONS:
+            lines.append(f"(+{len(relations) - GRAPH_RELATIONS} more relations)")
+    lines.append(
+        "Graph entries are extracted automatically; read the pages before relying on them."
+    )
+    return "\n".join(lines)
+
+
 # ---------------------------------------------------------------- read
 async def tool_read(scope: AgentScope, address: str, limit: int = READ_LIMIT) -> str:
     addr = parse_address(address)
@@ -700,6 +777,14 @@ class SearchArgs(BaseModel):
     )
 
 
+class GraphArgs(BaseModel):
+    concept: Optional[str] = Field(
+        None,
+        description="A concept name, e.g. 'batch normalization'. Omit for the concepts shared by most documents",
+    )
+    limit: int = Field(15, description="Concepts to list when no concept is given")
+
+
 class OutlineArgs(BaseModel):
     source: str = Field(description="Document address, e.g. source:abc")
 
@@ -749,6 +834,14 @@ TOOL_SPECS = [
         "level=page searches page images by appearance (diagrams, charts, figures, slide layouts: describe what "
         "it looks like). like=<address> finds material similar to a page, section or document "
         "(with level=page: pages that look like that page).",
+    ),
+    (
+        "graph",
+        tool_graph,
+        GraphArgs,
+        "The concept graph built from the documents: for a concept, every document and page range where it appears "
+        "and its stated relations to other concepts (is a, part of, motivates, variant of...). Without a concept, the "
+        "concepts shared by the most documents. Use it to trace an idea across documents or find related topics.",
     ),
     (
         "outline",

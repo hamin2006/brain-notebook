@@ -254,6 +254,10 @@ async def analyze_source_command(input_data: AnalyzeSourceInput) -> AnalyzeSourc
     )
     # Visual search over rendered pages (skipped when the setting is off).
     submit_command("open_notebook", "embed_pages", {"source_id": input_data.source_id})
+    # Concept graph from the new sections (skipped when the setting is off).
+    submit_command(
+        "open_notebook", "extract_concepts", {"source_id": input_data.source_id}
+    )
     return AnalyzeSourceOutput(
         success=True,
         source_id=input_data.source_id,

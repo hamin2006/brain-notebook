@@ -8,6 +8,7 @@
 - `like`: the stored embedding of an address, for "more like this"
 - rerank: optionally reorders fused candidates with a rerank model
 - pages: visual search over rendered-page embeddings (multimodal model)
+- concepts: the concept graph (concepts, their mentions and relations)
 
 Vector similarity is brute force over the scope, which is fine at notebook
 scale (thousands of chunks).
@@ -395,3 +396,86 @@ async def document_summary(source_id: str) -> Optional[str]:
     )
     value: Any = rows[0] if rows else None
     return value
+
+
+# ---------------------------------------------------------------- concept graph
+async def scoped_concepts(scope: AgentScope) -> Dict[str, Dict[str, Any]]:
+    """Concepts mentioned by the scoped sources: id -> {name, key, embedding,
+    documents (set of source ids), mentions (count)}."""
+    sources, _ = _ids(scope)
+    if not sources:
+        return {}
+    rows = await per_source(
+        "SELECT concept, source FROM concept_mention WHERE source = $s", sources
+    )
+    if not rows:
+        return {}
+    stats: Dict[str, Dict[str, Any]] = {}
+    for row in rows:
+        entry = stats.setdefault(
+            str(row["concept"]), {"documents": set(), "mentions": 0}
+        )
+        entry["documents"].add(str(row["source"]))
+        entry["mentions"] += 1
+    concepts = await repo_query(
+        "SELECT id, name, key, embedding FROM $records",
+        {"records": [ensure_record_id(c) for c in stats]},
+    )
+    for c in concepts:
+        stats[str(c["id"])].update(
+            name=c["name"], key=c["key"], embedding=c.get("embedding")
+        )
+    return {cid: entry for cid, entry in stats.items() if "name" in entry}
+
+
+def match_concepts(
+    concepts: Dict[str, Dict[str, Any]],
+    name: str,
+    embed: Optional[List[float]],
+    k: int,
+) -> List[str]:
+    """Concept ids best matching a name: exact (normalized) name, then names
+    containing it or contained in it, then embedding similarity."""
+    from open_notebook.utils.concepts import concept_key
+
+    key = concept_key(name)
+    exact = [cid for cid, c in concepts.items() if c["key"] == key]
+    partial = [
+        cid
+        for cid, c in concepts.items()
+        if cid not in exact and key and (key in c["key"] or c["key"] in key)
+    ]
+    partial.sort(key=lambda cid: -len(concepts[cid]["documents"]))
+    similar: List[str] = []
+    if embed is not None:
+        scored = [
+            (_cosine(c["embedding"], embed), cid)
+            for cid, c in concepts.items()
+            if c.get("embedding") and cid not in exact and cid not in partial
+        ]
+        similar = [cid for score, cid in sorted(scored, reverse=True) if score > 0.5]
+    return (exact + partial + similar)[:k]
+
+
+async def concept_mentions(concept_id: str, scope: AgentScope) -> List[Dict[str, Any]]:
+    rows = await repo_query(
+        """
+        SELECT source, section, page_start, page_end, context FROM concept_mention
+        WHERE concept = $c ORDER BY source, page_start
+        """,
+        {"c": ensure_record_id(concept_id)},
+    )
+    return [r for r in rows if str(r["source"]) in scope.sources]
+
+
+async def concept_relations(concept_id: str, scope: AgentScope) -> List[Dict[str, Any]]:
+    record = ensure_record_id(concept_id)
+    rows = await repo_query(
+        """
+        SELECT from_concept, to_concept, from_concept.name AS from_name,
+            to_concept.name AS to_name, relation, source, page_start, page_end
+        FROM concept_relation WHERE from_concept = $c OR to_concept = $c
+        """,
+        {"c": record},
+    )
+    return [r for r in rows if str(r["source"]) in scope.sources]

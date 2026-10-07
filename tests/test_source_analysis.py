@@ -122,9 +122,10 @@ async def test_analyze_writes_sections_metadata_and_summary(submitted):
         result = await analyze_source_command(AnalyzeSourceInput(source_id="source:l4"))
 
     assert result.sections == 2
-    submitted.assert_called_once_with(
-        "open_notebook", "embed_pages", {"source_id": "source:l4"}
-    )
+    assert [c.args for c in submitted.call_args_list] == [
+        ("open_notebook", "embed_pages", {"source_id": "source:l4"}),
+        ("open_notebook", "extract_concepts", {"source_id": "source:l4"}),
+    ]
     assert [
         (r["title"], r["page_start"], r["page_end"], r["summary"]) for r in inserted
     ] == [

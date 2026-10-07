@@ -9,6 +9,7 @@ from open_notebook.utils.proxy import ensure_internal_no_proxy
 ensure_internal_no_proxy()
 
 from .analyze_commands import analyze_source_command
+from .concept_commands import extract_concepts_command
 from .embedding_commands import (
     embed_insight_command,
     embed_note_command,
@@ -25,6 +26,7 @@ __all__ = [
     "caption_pages_command",
     "analyze_source_command",
     "embed_pages_command",
+    "extract_concepts_command",
     # Embedding commands
     "embed_note_command",
     "embed_insight_command",
