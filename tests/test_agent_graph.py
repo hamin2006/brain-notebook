@@ -1,15 +1,21 @@
-"""The agent loop: tool calls, streaming events, dedupe, budget, images, errors."""
+"""The agent loop: tool calls, streaming events, dedupe, budget, images, errors,
+and the research model / answer writer split."""
 
 import json
 from typing import Any, List, Optional
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from langchain_core.messages import AIMessageChunk, HumanMessage
+from langchain_core.messages import (
+    AIMessageChunk,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
+)
 from langchain_core.tools import StructuredTool
 from langgraph.checkpoint.memory import InMemorySaver
 
-from open_notebook.agent.graph import build_graph
+from open_notebook.agent.graph import build_graph, run_loop
 from open_notebook.agent.scope import AgentScope, ScopedSource
 from open_notebook.exceptions import IncompleteGenerationError
 
@@ -59,16 +65,27 @@ def _tool(name, fn):
     return StructuredTool.from_function(coroutine=fn, name=name, description=name)
 
 
-async def _run(model, tools, scope=None, effort="standard"):
+def _writer(text="The answer [source:l4#p94]."):
+    return ScriptedModel([{"text": text}])
+
+
+async def _run(model, tools, scope=None, effort="standard", writer=None):
+    """Run the graph with `model` as the research ("tools") model and `writer`
+    as the answer ("chat") model."""
     scope = scope or AgentScope(
         sources={"source:l4": ScopedSource("source:l4", "Lecture 4")}, notes={}
     )
+    writer = writer or _writer()
     graph = build_graph().compile(checkpointer=InMemorySaver())
     events, final = [], None
+
+    async def provision(content, model_id, default_type, **kwargs):
+        return model if default_type == "tools" else writer
+
     with (
         patch(
             "open_notebook.agent.graph.provision_langchain_model",
-            new=AsyncMock(return_value=model),
+            new=AsyncMock(side_effect=provision),
         ),
         patch(
             "open_notebook.agent.graph.load_scope", new=AsyncMock(return_value=scope)
@@ -103,10 +120,11 @@ async def test_searches_then_answers_with_trace_and_events():
     model = ScriptedModel(
         [
             {"tools": [("search", {"query": "Adam"})]},
-            {"text": "Adam combines momentum and RMSProp [source:l4#p94]."},
+            {"text": "- momentum + RMSProp [source:l4#p94]"},  # research findings
         ]
     )
-    events, final = await _run(model, [_tool("search", search)])
+    writer = _writer("Adam combines momentum and RMSProp [source:l4#p94].")
+    events, final = await _run(model, [_tool("search", search)], writer=writer)
 
     answer = final["messages"][-1]
     assert answer.content == "Adam combines momentum and RMSProp [source:l4#p94]."
@@ -114,11 +132,10 @@ async def test_searches_then_answers_with_trace_and_events():
     assert search_calls == ["Adam"]
     kinds = [e["type"] for e in events]
     assert kinds[:2] == ["step", "step_result"] and "text_delta" in kinds
-    assert (
-        "".join(
-            e["text"] for e in events if e["type"] == "text_delta" and e["step"] == 2
-        )
-        == answer.content
+    assert {"type": "step", "step": 3, "tool": "answer", "args": {}} in events
+    # Only the writer's text is streamed, never the research findings.
+    assert "".join(e["text"] for e in events if e["type"] == "text_delta") == (
+        answer.content
     )
     # Tool traffic is not checkpointed: only the question and the answer.
     assert [m.type for m in final["messages"]] == ["human", "ai"]
@@ -146,7 +163,55 @@ async def test_repeated_identical_calls_are_not_rerun():
 
 
 @pytest.mark.asyncio
-async def test_budget_exhaustion_forces_an_answer_without_tools():
+async def test_budget_exhaustion_hands_the_evidence_to_the_writer():
+    async def search(query: str = ""):
+        return f"result for {query}"
+
+    model = ScriptedModel(
+        [{"tools": [("search", {"query": f"q{i}"})]} for i in range(4)]
+    )
+    writer = _writer("Best answer so far.")
+    _, final = await _run(
+        model, [_tool("search", search)], effort="quick", writer=writer
+    )
+    assert final["messages"][-1].content == "Best answer so far."
+    assert len(model.calls) == 4  # no extra research call after the budget
+    written = writer.calls[0]
+    assert any("budget is used up" in str(m.content) for m in written)
+    assert any("result for q3" in str(m.content) for m in written)
+
+
+@pytest.mark.asyncio
+async def test_writer_gets_a_flat_transcript_with_the_answer_rules():
+    async def search(query: str = ""):
+        return "Passages: source:l4#p94 Adam"
+
+    model = ScriptedModel(
+        [
+            {"tools": [("search", {"query": "Adam"})]},
+            {"text": "- found [source:l4#p94]"},
+        ]
+    )
+    writer = _writer()
+    await _run(model, [_tool("search", search)], writer=writer)
+
+    research_system = model.calls[0][0]
+    assert "Another writer composes the final answer" in research_system.content
+    written = writer.calls[0]
+    assert isinstance(written[0], SystemMessage)
+    assert "# The answer" in written[0].content
+    assert "Another writer" not in written[0].content
+    assert sum(isinstance(m, SystemMessage) for m in written) == 1
+    assert not any(
+        isinstance(m, ToolMessage) or getattr(m, "tool_calls", None) for m in written
+    )
+    assert any("[Result of search]" in str(m.content) for m in written)
+    assert "- found [source:l4#p94]" in str(written[-2].content)
+    assert "Write the final answer" in written[-1].content
+
+
+@pytest.mark.asyncio
+async def test_budget_exhaustion_without_a_writer_answers_without_tools():
     async def search(query: str = ""):
         return f"result for {query}"
 
@@ -154,8 +219,16 @@ async def test_budget_exhaustion_forces_an_answer_without_tools():
         [{"tools": [("search", {"query": f"q{i}"})]} for i in range(4)]
         + [{"text": "Best answer so far."}]
     )
-    events, final = await _run(model, [_tool("search", search)], effort="quick")
-    assert final["messages"][-1].content == "Best answer so far."
+    scope = AgentScope(sources={}, notes={})
+    answer, _ = await run_loop(
+        model,
+        [_tool("search", search)],
+        scope,
+        [HumanMessage(content="q")],
+        4,
+        lambda e: None,
+    )
+    assert answer == "Best answer so far."
     assert model.last_tool_choice == "none"
     assert "used your research budget" in model.calls[-1][-1].content
 
@@ -178,18 +251,21 @@ async def test_viewed_images_reach_the_next_model_call():
             {"text": "The 1x1 convolution feeds it [source:l6#p48]."},
         ]
     )
-    await _run(model, [_tool("view", view)], scope=scope)
+    writer = _writer()
+    await _run(model, [_tool("view", view)], scope=scope, writer=writer)
     image_message = model.calls[1][-1]
     assert isinstance(image_message, HumanMessage)
     image_block: Any = image_message.content[1]
     assert image_block["image_url"]["url"].startswith("data:image/png")
     assert scope.pending_images == []
+    # The writer sees the viewed page too.
+    assert image_message in writer.calls[0]
 
 
 @pytest.mark.asyncio
 async def test_empty_answer_raises():
     with pytest.raises(IncompleteGenerationError):
-        await _run(ScriptedModel([{"text": ""}]), [])
+        await _run(ScriptedModel([{"text": "findings"}]), [], writer=_writer(""))
 
 
 @pytest.mark.asyncio
@@ -203,8 +279,7 @@ async def test_a_failing_tool_becomes_an_error_message():
             {"text": "Could not read it."},
         ]
     )
-    _, final = await _run(model, [_tool("read", read)])
-    assert final["messages"][-1].content == "Could not read it."
+    await _run(model, [_tool("read", read)])
     assert (
         "Error: read failed (RuntimeError: database hiccup)"
         in model.calls[1][-1].content
@@ -233,7 +308,7 @@ async def test_deep_mode_review_sends_the_agent_back_for_gaps():
         ],
     )
     events, final = await _run(model, [_tool("read", read)], effort="deep")
-    assert final["messages"][-1].content.endswith("[source:l4#p94].")
+    assert final["messages"][-1].content == "The answer [source:l4#p94]."
     assert reads == ["source:l4#p94"]
     gap_prompt = model.calls[1][-1]
     assert "the default hyperparameters" in gap_prompt.content
@@ -251,7 +326,8 @@ async def test_deep_mode_review_sends_the_agent_back_for_gaps():
 async def test_unreadable_review_does_not_force_another_round():
     model = ScriptedModel([{"text": "Answer [source:l4#p1]."}], reviews=["not json"])
     _, final = await _run(model, [], effort="deep")
-    assert final["messages"][-1].content == "Answer [source:l4#p1]."
+    assert final["messages"][-1].content == "The answer [source:l4#p94]."
+    assert len(model.calls) == 1
 
 
 @pytest.mark.asyncio
@@ -305,8 +381,16 @@ async def test_final_answer_falls_back_when_tool_choice_none_is_rejected():
         [{"tools": [("search", {"query": f"q{i}"})]} for i in range(4)]
         + [{"text": "Answer from evidence."}]
     )
-    _, final = await _run(model, [_tool("search", search)], effort="quick")
-    assert final["messages"][-1].content == "Answer from evidence."
+    scope = AgentScope(sources={}, notes={})
+    answer, _ = await run_loop(
+        model,
+        [_tool("search", search)],
+        scope,
+        [HumanMessage(content="q")],
+        4,
+        lambda e: None,
+    )
+    assert answer == "Answer from evidence."
     flattened = model.calls[-1]
     assert not any(getattr(m, "tool_calls", None) for m in flattened)
     assert any("[Result of search]" in str(m.content) for m in flattened)

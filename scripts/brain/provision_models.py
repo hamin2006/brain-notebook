@@ -1,7 +1,7 @@
 """Configure the Brain deployment's models through the Open Notebook API.
 
 Creates (or reuses) an OpenRouter credential for chat and embeddings,
-registers both models, and sets them as defaults. Safe to re-run. The OpenRouter key is read from a dotenv file on this machine and only
+registers the models, and sets them as defaults. Safe to re-run. The OpenRouter key is read from a dotenv file on this machine and only
 ever sent to the local API.
 
 Usage (on the PC, next to the running API):
@@ -16,6 +16,10 @@ from pathlib import Path
 
 API = "http://127.0.0.1:5055/api"
 CHAT_MODEL = "z-ai/glm-5.3-flash"
+# The agent's research loop makes many calls over a growing transcript, so it runs
+# on a model 5x cheaper than the chat model, which only writes the final answer.
+# Qwen3.7 Flash: tool calling and vision (the agent's view tool) at $0.03/$0.13 per M.
+RESEARCH_MODEL = "qwen/qwen3.7-flash"
 # Qwen3-Embedding-8B on OpenRouter: the strongest model of the family for ~$0.01/M
 # tokens. Chat already sends notebook text to OpenRouter, so embedding locally
 # bought no privacy, and the GTX 1660 could only run the 0.6B model at a usable speed.
@@ -88,19 +92,24 @@ def main():
     )
 
     chat = ensure_model(CHAT_MODEL, "openrouter", "language", openrouter)
+    research = ensure_model(RESEARCH_MODEL, "openrouter", "language", openrouter)
     embedding = ensure_model(EMBEDDING_MODEL, "openrouter", "embedding", openrouter)
 
     defaults = call("GET", "/models/defaults") or {}
     defaults.update(
         default_chat_model=chat,
         default_transformation_model=chat,
-        default_tools_model=chat,
+        default_tools_model=research,
         large_context_model=chat,
         default_embedding_model=embedding,
     )
     call("PUT", "/models/defaults", defaults)
 
-    for model_id, label in ((chat, CHAT_MODEL), (embedding, EMBEDDING_MODEL)):
+    for model_id, label in (
+        (chat, CHAT_MODEL),
+        (research, RESEARCH_MODEL),
+        (embedding, EMBEDDING_MODEL),
+    ):
         result = call("POST", f"/models/{model_id}/test")
         print(
             f"{label}: {'ok' if result.get('success') else 'FAILED'} - {str(result.get('message', ''))[:120]}"

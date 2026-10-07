@@ -1,8 +1,9 @@
 """Agentic notebook chat: a tool-calling research loop over the notebook.
 
-One graph node runs the loop: the model calls tools (list, grep, search, outline,
-read, view) until it can answer or the effort budget runs out, then answers with
-citations. Only the user's question and the final answer are checkpointed (plus a
+One graph node runs the loop: a cheap research model (the default "tools" model)
+calls tools (list, grep, search, outline, read, view) until it has enough or the
+effort budget runs out, then the writer (the chat model) composes the cited answer
+from the gathered evidence in a single call. Only the user's question and the final answer are checkpointed (plus a
 compact trace of the steps): tool traffic and viewed images live only inside the
 turn, so history stays small.
 
@@ -98,14 +99,14 @@ def _first_line(text: str, n: int = 160) -> str:
 
 
 async def _stream_step(
-    llm, messages: List[BaseMessage], writer, step: int
+    llm, messages: List[BaseMessage], writer, step: int, stream_text: bool = True
 ) -> AIMessage:
     """One model call, streaming its text as it is generated."""
     full = None
     async for chunk in llm.astream(messages):
         full = chunk if full is None else full + chunk
         delta = extract_text_content(chunk.content)
-        if delta:
+        if delta and stream_text:
             writer({"type": "text_delta", "step": step, "text": delta})
     if full is None:
         return AIMessage(content="")
@@ -179,11 +180,16 @@ async def run_loop(
     writer,
     reviewer: Optional[Callable[[str], Awaitable[List[str]]]] = None,
     review_rounds: int = 0,
+    answer_writer: Optional[Callable[[List[BaseMessage], int], Awaitable[str]]] = None,
 ) -> Tuple[str, List[Dict[str, Any]]]:
     """Call tools until the model answers or the budget runs out. Returns (answer, trace).
 
     With a reviewer, a finished draft is checked; listed gaps send the model back
     to research (at most `review_rounds` times, budget permitting).
+
+    With an answer_writer, the loop model only researches: its closing reply is
+    a findings draft, and answer_writer(messages, step) writes the answer from
+    the whole transcript. The research model's text is then not streamed.
     """
     tools = {t.name: t for t in tool_list}
     llm = model.bind_tools(tool_list)
@@ -191,7 +197,9 @@ async def run_loop(
     trace: List[Dict[str, Any]] = []
     reviews = 0
     for step in range(1, max_steps + 1):
-        message = await _stream_step(llm, working, writer, step)
+        message = await _stream_step(
+            llm, working, writer, step, stream_text=answer_writer is None
+        )
         working.append(message)
         if not message.tool_calls:
             answer = extract_text_content(message.content)
@@ -219,6 +227,8 @@ async def run_loop(
                         )
                     )
                     continue
+            if answer_writer is not None:
+                return await answer_writer(working, step + 1), trace
             return answer, trace
         results = await _run_tools(message.tool_calls, tools, seen, writer, step)
         working.extend(results)
@@ -235,6 +245,13 @@ async def run_loop(
             working.append(image)
 
     # Out of budget: answer from what was gathered, without more tools.
+    if answer_writer is not None:
+        working.append(
+            HumanMessage(
+                content="The research budget is used up; say briefly what could not be verified."
+            )
+        )
+        return await answer_writer(working, max_steps + 1), trace
     writer({"type": "step", "step": max_steps + 1, "tool": "answer", "args": {}})
     working.append(
         HumanMessage(
@@ -284,6 +301,39 @@ def _flatten_tool_messages(messages: List[BaseMessage]) -> List[BaseMessage]:
         else:
             flat.append(message)
     return flat
+
+
+WRITE_INSTRUCTION = (
+    "Write the final answer to my last question now, using only the evidence gathered above "
+    "(tool results and viewed pages). The research notes are a guide; check them against the "
+    "evidence. Cite with the addresses exactly as the tools printed them."
+)
+
+
+def make_answer_writer(
+    model, system: str, writer
+) -> Callable[[List[BaseMessage], int], Awaitable[str]]:
+    """The writer step: one streamed call that turns the research transcript into
+    the answer, with the answer rules in place of the researcher's instructions."""
+
+    async def write(messages: List[BaseMessage], step: int) -> str:
+        writer({"type": "step", "step": step, "tool": "answer", "args": {}})
+        transcript = [
+            m
+            for m in _flatten_tool_messages(messages)
+            if not isinstance(m, SystemMessage)
+        ]
+        final = await _stream_step(
+            model,
+            [SystemMessage(content=system)]
+            + transcript
+            + [HumanMessage(content=WRITE_INSTRUCTION)],
+            writer,
+            step,
+        )
+        return extract_text_content(final.content)
+
+    return write
 
 
 async def review_answer(model, question: str, draft: str) -> List[str]:
@@ -373,22 +423,28 @@ async def agent_node(state: AgentState, config: RunnableConfig) -> dict:
         effort = state.get("effort") or DEFAULT_EFFORT
         max_steps = EFFORT_STEPS.get(effort, EFFORT_STEPS[DEFAULT_EFFORT])
         info = await _notebook_info(notebook_id)
-        system = Prompter(prompt_template="agent/system").render(
-            data={
-                "notebook_name": info.get("name"),
-                "notebook_description": info.get("description"),
-                "document_count": len(scope.sources),
-                "note_count": len(scope.notes),
-                "today": date.today().isoformat(),
-                "max_steps": max_steps,
-                "strict": True,
-            }
-        )
+        prompt_data = {
+            "notebook_name": info.get("name"),
+            "notebook_description": info.get("description"),
+            "document_count": len(scope.sources),
+            "note_count": len(scope.notes),
+            "today": date.today().isoformat(),
+            "max_steps": max_steps,
+            "strict": True,
+        }
+        prompter = Prompter(prompt_template="agent/system")
+        system = prompter.render(data={**prompt_data, "researcher": True})
+        answer_system = prompter.render(data=prompt_data)
+        # The model the user picked writes the answer; the research loop, which
+        # makes many calls over a growing transcript, runs on the "tools" model.
         model_id = config.get("configurable", {}).get("model_id") or state.get(
             "model_override"
         )
+        answer_model = await provision_langchain_model(
+            answer_system, model_id, "chat", max_tokens=MAX_ANSWER_TOKENS
+        )
         model = await provision_langchain_model(
-            system, model_id, "chat", max_tokens=MAX_ANSWER_TOKENS
+            system, None, "tools", max_tokens=MAX_ANSWER_TOKENS
         )
 
         tool_list = tool_list + [make_delegate_tool(model, scope, writer)]
@@ -410,6 +466,7 @@ async def agent_node(state: AgentState, config: RunnableConfig) -> dict:
             writer,
             reviewer=reviewer,
             review_rounds=REVIEW_ROUNDS.get(effort, 0),
+            answer_writer=make_answer_writer(answer_model, answer_system, writer),
         )
 
         answer = clean_thinking_content(answer).strip()
