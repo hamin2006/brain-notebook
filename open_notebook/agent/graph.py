@@ -38,8 +38,8 @@ from typing_extensions import TypedDict
 
 from open_notebook.agent.addresses import AddressError, parse_address
 from open_notebook.agent.scope import AgentScope, ToolError, load_scope
-from open_notebook.agent.tools import build_tools
-from open_notebook.ai.provision import provision_langchain_model
+from open_notebook.agent.tools import AddressList, build_tools
+from open_notebook.ai.provision import limit_reasoning, provision_langchain_model
 from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.exceptions import IncompleteGenerationError, OpenNotebookError
 from open_notebook.graphs.checkpoint import get_checkpointer
@@ -323,15 +323,24 @@ def make_answer_writer(
             for m in _flatten_tool_messages(messages)
             if not isinstance(m, SystemMessage)
         ]
-        final = await _stream_step(
-            model,
+        prompt = (
             [SystemMessage(content=system)]
             + transcript
-            + [HumanMessage(content=WRITE_INSTRUCTION)],
-            writer,
-            step,
+            + [HumanMessage(content=WRITE_INSTRUCTION)]
         )
-        return extract_text_content(final.content)
+        final = await _stream_step(model, prompt, writer, step)
+        answer = extract_text_content(final.content)
+        if not clean_thinking_content(answer).strip():
+            # A reasoning model can spend the whole output budget thinking over
+            # a long transcript; once more, thinking less.
+            logger.warning(
+                "Answer writer returned nothing; retrying with low reasoning"
+            )
+            final = await _stream_step(
+                limit_reasoning(model, "low"), prompt, writer, step
+            )
+            answer = extract_text_content(final.content)
+        return answer
 
     return write
 
@@ -359,7 +368,7 @@ async def review_answer(model, question: str, draft: str) -> List[str]:
 
 class DelegateArgs(BaseModel):
     task: str = Field(description="What to find out in each document")
-    addresses: List[str] = Field(
+    addresses: AddressList = Field(
         description="Document addresses, one sub-agent each (max 12)"
     )
 

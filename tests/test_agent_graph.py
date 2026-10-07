@@ -211,6 +211,19 @@ async def test_writer_gets_a_flat_transcript_with_the_answer_rules():
 
 
 @pytest.mark.asyncio
+async def test_empty_writer_reply_is_retried_once():
+    model = ScriptedModel([{"text": "- found [source:l4#p94]"}])
+    writer = ScriptedModel([{"text": "<think>long</think>"}, {"text": "Answer."}])
+    with patch(
+        "open_notebook.agent.graph.limit_reasoning", side_effect=lambda m, e: m
+    ) as limit:
+        _, final = await _run(model, [], writer=writer)
+    assert final["messages"][-1].content == "Answer."
+    limit.assert_called_once_with(writer, "low")
+    assert len(writer.calls) == 2
+
+
+@pytest.mark.asyncio
 async def test_budget_exhaustion_without_a_writer_answers_without_tools():
     async def search(query: str = ""):
         return f"result for {query}"
@@ -265,7 +278,11 @@ async def test_viewed_images_reach_the_next_model_call():
 @pytest.mark.asyncio
 async def test_empty_answer_raises():
     with pytest.raises(IncompleteGenerationError):
-        await _run(ScriptedModel([{"text": "findings"}]), [], writer=_writer(""))
+        await _run(
+            ScriptedModel([{"text": "findings"}]),
+            [],
+            writer=ScriptedModel([{"text": ""}, {"text": ""}]),  # retry is empty too
+        )
 
 
 @pytest.mark.asyncio

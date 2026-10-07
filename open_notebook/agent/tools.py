@@ -15,13 +15,14 @@ can act on; they never end the turn.
 import ast
 import asyncio
 import base64
+import json
 import math
 import re
-from typing import Any, Callable, Dict, List, Optional
+from typing import Annotated, Any, Callable, Dict, List, Optional
 
 from langchain_core.tools import StructuredTool
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, BeforeValidator, Field
 
 from open_notebook.agent import retrieval
 from open_notebook.agent.addresses import Address, AddressError, pages, parse_address
@@ -568,6 +569,24 @@ async def tool_calculate(scope: AgentScope, expression: str) -> str:
 
 
 # ---------------------------------------------------------------- bindings
+def _as_list(value: Any) -> Any:
+    """Some models send a list argument as a string: '["source:a", "source:b"]',
+    'source:a, source:b' or a single address. Accept those as the list they mean."""
+    if not isinstance(value, str):
+        return value
+    text = value.strip()
+    if text.startswith("["):
+        try:
+            return json.loads(text)
+        except ValueError:
+            text = text.strip("[]")
+    return [part.strip().strip("'\"") for part in text.split(",") if part.strip()]
+
+
+# A list of addresses that also accepts the string forms above.
+AddressList = Annotated[List[str], BeforeValidator(_as_list)]
+
+
 class ListArgs(BaseModel):
     doc_type: Optional[str] = Field(None, description="e.g. lecture, paper, notes")
     course: Optional[str] = Field(None, description="Course or series name (substring)")
@@ -582,13 +601,17 @@ class GrepArgs(BaseModel):
     pattern: str = Field(
         description="Case-insensitive regex, e.g. 'adam|rmsprop' or 'dropout'"
     )
-    addresses: Optional[List[str]] = Field(None, description="Limit to these documents")
+    addresses: Optional[AddressList] = Field(
+        None, description="Limit to these documents"
+    )
 
 
 class SearchArgs(BaseModel):
     query: str = Field("", description="What to look for, in words")
     level: str = Field("passage", description="passage, section or document")
-    addresses: Optional[List[str]] = Field(None, description="Limit to these documents")
+    addresses: Optional[AddressList] = Field(
+        None, description="Limit to these documents"
+    )
     like: Optional[str] = Field(
         None, description="Find material similar to this address instead of a query"
     )

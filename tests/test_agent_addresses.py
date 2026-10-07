@@ -50,3 +50,35 @@ def test_citations_found_in_answer_text():
 def test_pages_helper():
     assert str(pages("source:l4", 86, 94)) == "source:l4#p86-94"
     assert str(pages("source:l4", 7)) == "source:l4#p7"
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        ["source:a", "source:b"],
+        '["source:a", "source:b"]',
+        "source:a, source:b",
+        "['source:a', 'source:b']",
+    ],
+)
+def test_address_list_arguments_accept_string_forms(value):
+    # Some models send list arguments JSON-encoded or comma-separated.
+    from open_notebook.agent.graph import DelegateArgs
+    from open_notebook.agent.tools import GrepArgs, SearchArgs
+
+    assert GrepArgs(pattern="x", addresses=value).addresses == ["source:a", "source:b"]
+    assert SearchArgs(addresses=value).addresses == ["source:a", "source:b"]
+    assert DelegateArgs(task="t", addresses=value).addresses == [
+        "source:a",
+        "source:b",
+    ]
+
+
+def test_address_list_single_address_and_schema():
+    from open_notebook.agent.tools import GrepArgs
+
+    assert GrepArgs(pattern="x", addresses="source:a").addresses == ["source:a"]
+    assert GrepArgs(pattern="x").addresses is None
+    # The model is still told it is an array.
+    schema = GrepArgs.model_json_schema()["properties"]["addresses"]
+    assert {"type": "array", "items": {"type": "string"}} in schema["anyOf"]
