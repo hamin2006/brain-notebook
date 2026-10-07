@@ -69,7 +69,7 @@ def test_rebuild_submits_one_job_per_source_with_rows(client):
     async def fake_query(sql, params=None):
         if sql == "SELECT VALUE id FROM source":
             return ["source:a", "source:b"]
-        return ["page:1"] if params["s"] == "source:a" else []
+        return ["page:1"] if str(params["s"]) == "source:a" else []
 
     with (
         patch("api.routers.agent.repo_query", new=fake_query),
