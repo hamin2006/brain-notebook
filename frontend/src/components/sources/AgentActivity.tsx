@@ -19,6 +19,15 @@ const TOOL_KEYS: Record<string, string> = {
   read: 'chat.agentToolRead',
   view: 'chat.agentToolView',
   answer: 'chat.agentToolAnswer',
+  delegate: 'chat.agentToolDelegate',
+  note: 'chat.agentToolNote',
+  calculate: 'chat.agentToolCalculate',
+  review: 'chat.agentToolReview',
+  graph: 'chat.agentToolGraph',
+  remember: 'chat.agentToolRemember',
+  forget: 'chat.agentToolForget',
+  web_search: 'chat.agentToolWebSearch',
+  web_read: 'chat.agentToolWebRead',
 }
 
 /** "Searching for “adam optimizer”" from a tool name and its arguments. */
@@ -26,6 +35,7 @@ export function describeStep(tool: string, args: Record<string, unknown>, t: Tra
   const label = TOOL_KEYS[tool] ? t(TOOL_KEYS[tool]) : tool
   const subject =
     args.query || args.pattern || args.address || args.source || args.like || args.title_contains ||
+    args.concept || args.url || args.expression || args.task ||
     (args.sequence !== undefined && args.sequence !== null ? `#${args.sequence}` : '')
   return subject ? `${label} “${String(subject)}”` : label
 }

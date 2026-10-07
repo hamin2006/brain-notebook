@@ -297,6 +297,7 @@ export interface AgentSettings {
   page_embedding_model: string
   knowledge_graph: boolean
   memory: boolean
+  web_search: boolean
 }
 
 export interface AgentMemory {

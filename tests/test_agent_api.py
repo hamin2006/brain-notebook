@@ -36,6 +36,7 @@ def test_settings_defaults_and_partial_update(client, settings):
         "page_embedding_model": "google/gemini-embedding-2",
         "knowledge_graph": True,
         "memory": True,
+        "web_search": False,
     }
     out = client.put(
         "/api/agent/settings", json={"rerank_model": "  ", "memory": False}

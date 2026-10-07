@@ -231,6 +231,7 @@ Of the 6 misses, 2 were grader bugs (LaTeX `\times` / `10^{-8}` not matched; not
 | Image questions | Notebook chat accepts up to 4 pasted/attached images, passed in the run config (never checkpointed) | — |
 | Concept graph | `extract_concepts` after analysis: per-section concepts + stated relations (research model, reasoning capped); names merged through `concept_alias` ("Full name (ABBR)"); `graph` tool | On by default, ~$0.01/lecture |
 | Memory | `memory` table (notebook or global); recalled into the prompt each turn; `remember` / `forget` tools | On by default |
+| Web search | Self-hosted SearXNG (`scripts/brain/searxng`, localhost:8888, 512 MB cap) + `web_read` (readability/markdownify, PDFs via pdfium); public addresses only, every redirect re-checked, IP pinned; offered only with grounding = general | Off by default; free |
 | MCP | `/mcp` (FastMCP, streamable HTTP, JSON) on the API, proxied by the frontend: `ask` + the primitives + `view` returning page images | `OPEN_NOTEBOOK_MCP_ALLOWED_HOSTS` |
 
 Eval after Phase 5 (same 35 questions, clean run): **35/35**, right page cited 30/30, right document 34/34, image-only 6/6, median 37 s, $0.096 for the run (old chat: 27/35, 1/30, 32/34, 2/6, 30 s, $0.34). Two earlier misses were grader patterns, one a type-filter bug in `list`.

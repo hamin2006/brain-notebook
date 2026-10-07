@@ -28,6 +28,10 @@ class AgentSettingsModel(BaseModel):
     memory: Optional[bool] = Field(
         None, description="Let the agent remember things across conversations"
     )
+    web_search: Optional[bool] = Field(
+        None,
+        description="Let the agent search the web (self-hosted SearXNG) in notebooks set to general knowledge",
+    )
 
 
 class MemoryResponse(BaseModel):
@@ -60,6 +64,7 @@ def _settings_model(settings: AgentSettings) -> AgentSettingsModel:
         page_embedding_model=settings.page_embedding_model or "",
         knowledge_graph=bool(settings.knowledge_graph),
         memory=bool(settings.memory),
+        web_search=bool(settings.web_search),
     )
 
 

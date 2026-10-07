@@ -574,3 +574,32 @@ async def test_memory_off_hides_memories_and_tools():
         await _run(model, [], writer=writer)
     assert "remember about the user" not in writer.calls[0][0].content
     assert "remember" not in seen_tools
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "web_search, grounding, offered",
+    [(True, "general", True), (True, "strict", False), (False, "general", False)],
+)
+async def test_web_tools_need_the_setting_and_general_grounding(
+    web_search, grounding, offered
+):
+    model = ScriptedModel([{"text": "- findings"}])
+    writer = _writer()
+    seen_tools: List[str] = []
+    original = ScriptedModel.bind_tools
+
+    def capture(self, tools, tool_choice=None):
+        seen_tools.extend(t.name for t in tools)
+        return original(self, tools, tool_choice)
+
+    with patch.object(ScriptedModel, "bind_tools", capture):
+        await _run(
+            model,
+            [],
+            writer=writer,
+            settings=SimpleNamespace(memory=False, web_search=web_search),
+            notebook={"name": "AI 360", "grounding": grounding},
+        )
+    assert ("web_search" in seen_tools) is offered
+    assert ("# The web" in model.calls[0][0].content) is offered

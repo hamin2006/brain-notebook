@@ -26,6 +26,10 @@ class AgentSettings(RecordModel):
     memory: Optional[bool] = Field(
         True, description="Let the agent remember things across conversations"
     )
+    web_search: Optional[bool] = Field(
+        False,
+        description="Let the agent search the web (self-hosted SearXNG) in notebooks that allow general knowledge",
+    )
 
     @classmethod
     async def load(cls) -> "AgentSettings":

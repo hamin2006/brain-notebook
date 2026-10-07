@@ -127,6 +127,19 @@ export function AgentSettingsCard() {
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <Checkbox
+              id="web_search"
+              checked={settings.web_search}
+              onCheckedChange={checked => update.mutate({ web_search: checked === true })}
+              disabled={busy}
+            />
+            <Label htmlFor="web_search">{t('settings.webSearch')}</Label>
+          </div>
+          <p className="text-sm text-muted-foreground">{t('settings.webSearchHelp')}</p>
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Checkbox
               id="agent_memory"
               checked={settings.memory}
               onCheckedChange={checked => update.mutate({ memory: checked === true })}

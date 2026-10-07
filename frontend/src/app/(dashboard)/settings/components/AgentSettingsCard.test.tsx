@@ -13,6 +13,7 @@ vi.mock('@/lib/hooks/use-agent', () => ({
       page_embedding_model: '',
       knowledge_graph: true,
       memory: true,
+      web_search: false,
     },
     isLoading: false,
   }),
@@ -41,6 +42,8 @@ describe('AgentSettingsCard', () => {
     render(<AgentSettingsCard />)
     fireEvent.click(screen.getByLabelText('settings.agentMemory'))
     expect(update).toHaveBeenCalledWith({ memory: false })
+    fireEvent.click(screen.getByLabelText('settings.webSearch'))
+    expect(update).toHaveBeenCalledWith({ web_search: true })
     expect((screen.getByText('settings.rebuildPageEmbeddings') as HTMLButtonElement).disabled).toBe(true)
     fireEvent.click(screen.getByText('settings.rebuildConcepts'))
     expect(rebuild).toHaveBeenCalledWith('concepts')

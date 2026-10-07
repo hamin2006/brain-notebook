@@ -41,6 +41,7 @@ from open_notebook.agent import memory as agent_memory
 from open_notebook.agent.addresses import AddressError, parse_address
 from open_notebook.agent.scope import AgentScope, ToolError, load_scope
 from open_notebook.agent.tools import AddressList, build_tools
+from open_notebook.agent.web import web_tools
 from open_notebook.ai.provision import limit_reasoning, provision_langchain_model
 from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.exceptions import IncompleteGenerationError, OpenNotebookError
@@ -339,7 +340,8 @@ WRITE_INSTRUCTION = (
 WRITE_INSTRUCTION_GENERAL = (
     "Write the final answer to my last question now. Base it on the evidence gathered above "
     "(tool results and viewed pages), citing addresses exactly as the tools printed them; where "
-    "the notebook falls short you may add general knowledge, clearly marked as not from the notebook."
+    "the notebook falls short you may add general knowledge, clearly marked as not from the notebook, "
+    "and cite anything taken from a web page with a Markdown link to it."
 )
 
 
@@ -531,6 +533,8 @@ async def agent_node(state: AgentState, config: RunnableConfig) -> dict:
             await agent_memory.recall(notebook_id, question) if settings.memory else []
         )
         strict = info.get("grounding") != "general"
+        # The web only where general knowledge is allowed, and when turned on.
+        web_enabled = bool(getattr(settings, "web_search", False)) and not strict
         prompt_data: Dict[str, Any] = {
             "notebook_name": info.get("name"),
             "notebook_description": info.get("description"),
@@ -542,6 +546,7 @@ async def agent_node(state: AgentState, config: RunnableConfig) -> dict:
             "conversation_summary": summary,
             "memory_enabled": bool(settings.memory),
             "memories": agent_memory.format_memories(memories),
+            "web_enabled": web_enabled,
         }
         prompter = Prompter(prompt_template="agent/system")
         system = prompter.render(data={**prompt_data, "researcher": True})
@@ -561,6 +566,8 @@ async def agent_node(state: AgentState, config: RunnableConfig) -> dict:
         tool_list = tool_list + [make_delegate_tool(model, scope, writer)]
         if settings.memory:
             tool_list += agent_memory.memory_tools(scope)
+        if web_enabled:
+            tool_list += web_tools()
         working: List[BaseMessage] = [SystemMessage(content=system)] + list(
             state["messages"][-HISTORY_MESSAGES:]
         )

@@ -1,0 +1,20 @@
+# SearXNG settings for local, programmatic use by the agent.
+use_default_settings: true
+
+server:
+  # Overridden by SEARXNG_SECRET from the environment.
+  secret_key: "change-me"
+  # Only the API on this machine talks to it, so no bot limiter.
+  limiter: false
+  image_proxy: false
+  public_instance: false
+
+search:
+  safe_search: 0
+  # The agent reads JSON.
+  formats:
+    - html
+    - json
+
+ui:
+  static_use_hash: true
