@@ -61,7 +61,12 @@ class CaptionPagesOutput(CommandOutput):
 async def _caption_page(model, path: str, title: str, page: PdfPage) -> Optional[str]:
     png = await asyncio.to_thread(render_page_png, path, page.number)
     prompt = Prompter(prompt_template="sources/page_caption").render(
-        data={"title": title, "page": page.number, "text": page.text}
+        data={
+            "title": title,
+            "page": page.number,
+            "text": page.text,
+            "garbled": page.garbled,
+        }
     )
     message = HumanMessage(
         content=[

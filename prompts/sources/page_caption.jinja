@@ -7,6 +7,10 @@ Describe what the image adds, literally and factually:
 - Equations: in LaTeX.
 - Charts and tables: axes, series, rows and the key values.
 
+{% if garbled %}
+The extracted text's math is garbled (symbols, subscripts and fractions were lost), so the image adds the math:
+transcribe every equation on the page in LaTeX, exactly as shown.
+{% endif %}
 Do not add knowledge that is not on the page. Plain text, no preamble, under 250 words.
 If the image adds nothing beyond the extracted text, reply with exactly: NO_VISUAL_CONTENT
 
