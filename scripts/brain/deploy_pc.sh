@@ -43,7 +43,7 @@ fi
 # password check, and the API serves nothing until its migrations succeed.
 systemctl --user restart brain-api
 api_up=0
-for _ in $(seq 1 90); do
+for _ in $(seq 1 300); do  # up to 10 minutes: a migration may backfill big tables
   if curl -fs -o /dev/null http://127.0.0.1:5055/health; then
     api_up=1
     echo "api up"

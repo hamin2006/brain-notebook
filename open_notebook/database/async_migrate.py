@@ -3,11 +3,12 @@ Async migration system for SurrealDB using the official Python client.
 Based on patterns from sblpy migration system.
 """
 
+import asyncio
 from typing import List
 
 from loguru import logger
 
-from .repository import db_connection, repo_query
+from .repository import db_connection, ensure_record_id, repo_query
 
 
 class AsyncMigration:
@@ -44,6 +45,58 @@ class AsyncMigration:
             else:
                 await lower_version()
 
+        except Exception as e:
+            logger.error(f"Migration failed: {str(e)}")
+            raise
+
+
+class AsyncBatchedUpdate(AsyncMigration):
+    """A backfill over a table too large for one statement.
+
+    One UPDATE over every row of a big table (pages with image embeddings) can
+    run longer than the client's websocket keepalive, and the connection drops
+    or hangs mid-migration, so the API never starts. This selects the matching
+    ids once, then updates them in batches, each its own short transaction,
+    retried on a write conflict with a running worker. Re-running it is safe:
+    `where` matches only rows still to fill.
+    """
+
+    def __init__(
+        self, table: str, set_clause: str, where: str, batch_size: int = 100
+    ) -> None:
+        super().__init__(f"UPDATE {table} SET {set_clause} WHERE {where}")
+        self.table = table
+        self.set_clause = set_clause
+        self.where = where
+        self.batch_size = batch_size
+
+    async def run(self, bump: bool = True) -> None:
+        try:
+            ids = [
+                ensure_record_id(str(i))
+                for i in await repo_query(
+                    f"SELECT VALUE id FROM {self.table} WHERE {self.where}"
+                )
+            ]
+            for start in range(0, len(ids), self.batch_size):
+                batch = ids[start : start + self.batch_size]
+                for attempt in range(1, 6):
+                    try:
+                        await repo_query(
+                            f"UPDATE $ids SET {self.set_clause} RETURN NONE",
+                            {"ids": batch},
+                        )
+                        break
+                    except RuntimeError:  # transaction conflict: retriable
+                        if attempt == 5:
+                            raise
+                        await asyncio.sleep(attempt)
+            if ids:
+                logger.info(f"Backfilled {len(ids)} {self.table} rows")
+            if bump:
+                await bump_version()
+            else:
+                await lower_version()
         except Exception as e:
             logger.error(f"Migration failed: {str(e)}")
             raise
@@ -127,7 +180,17 @@ class AsyncMigrationManager:
             AsyncMigration.from_file("open_notebook/database/migrations/29.surrealql"),
             AsyncMigration.from_file("open_notebook/database/migrations/30.surrealql"),
             AsyncMigration.from_file("open_notebook/database/migrations/31.surrealql"),
-            AsyncMigration.from_file("open_notebook/database/migrations/32.surrealql"),
+            # 32: fill source_page fields added by 30 and 31 on older rows
+            # (DEFINE FIELD ... DEFAULT applies only to new records, and
+            # SCHEMAFULL validation rejects any later UPDATE of a row still
+            # missing one). All fields in one SET: validation checks the whole
+            # record. Batched: one UPDATE over every page outlasts the client.
+            AsyncBatchedUpdate(
+                "source_page",
+                "shapes = shapes ?? 0, garbled = garbled ?? false, "
+                "caption_version = caption_version ?? 0",
+                "shapes = NONE OR garbled = NONE OR caption_version = NONE",
+            ),
         ]
         self.down_migrations = [
             AsyncMigration.from_file(
