@@ -142,7 +142,7 @@ database: **Settings → Research agent**, see [Research Agent Settings](researc
 |----------|---------|---------|-------------|
 | `OPEN_NOTEBOOK_WORKER_MAX_TASKS` | `5` | Container / `make worker-start` | Jobs the worker runs at once. Set `1` for a local model on a single GPU. Passed to the worker as `--max-tasks` at launch |
 | `OPEN_NOTEBOOK_REQUEUE_INTERRUPTED` | `true` | Worker | On start, put jobs a stopped worker left *running* back in the queue. Set `false` when several workers share one database |
-| `OPEN_NOTEBOOK_AUTO_REPROCESS` | `true` | Worker | On start, re-run sources processed by an older version of an ingestion step, from that step ([How documents are ingested](../2-CORE-CONCEPTS/ingestion.md#re-processing)) |
+| `OPEN_NOTEBOOK_AUTO_REPROCESS` | `true` | Worker | On start, retry failed ingestion steps, resume stalled ones and re-run steps an upgrade improved, each from that step ([How documents are ingested](../2-CORE-CONCEPTS/ingestion.md#re-processing)) |
 | `OPEN_NOTEBOOK_OFFICE_TO_PDF` | `auto` | Worker | Convert PowerPoint/Word uploads to PDF with LibreOffice so they get pages: `auto` (when `soffice` is on PATH), `off`, or the path of the `soffice` binary |
 | `TTS_BATCH_SIZE` | `5` | Worker | Text-to-speech requests sent in parallel per podcast. Lower it (for example `1` or `2`) for rate-limited or single-threaded TTS servers |
 | `SURREAL_COMMANDS_RETRY_ENABLED` | `false` | Worker | Turns on the job queue's global retry policy. See the note below |

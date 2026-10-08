@@ -1,0 +1,12 @@
+-- Migration 32: fill in source_page fields added by migrations 30 and 31 on rows
+-- that existed before them. DEFINE FIELD ... DEFAULT applies only to records
+-- created afterwards, and SCHEMAFULL validation rejects any later UPDATE of an
+-- older row whose required field is still NONE. One statement sets all three:
+-- validation checks the whole record, so filling one field at a time fails on
+-- the others.
+
+UPDATE source_page SET
+    shapes = shapes ?? 0,
+    garbled = garbled ?? false,
+    caption_version = caption_version ?? 0
+WHERE shapes = NONE OR garbled = NONE OR caption_version = NONE;

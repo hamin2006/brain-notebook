@@ -22,7 +22,7 @@ re-run only when that stage's output changed (see caption_pages).
 
 import asyncio
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from typing import Any, AsyncIterator, Dict, List, Optional
 
@@ -75,8 +75,53 @@ def stage_record(source_id: str, stage: str) -> RecordID:
     return RecordID("source_stage", f"{_key(source_id)}_{stage}")
 
 
+async def _adopt_untracked(source_id: str, stage: str) -> None:
+    """Record the finished stages of a source ingested before tracking.
+
+    A source with no stage rows that already has output (pages or chunks) was
+    ingested before tracking existed; a new source has none yet when its first
+    row is written (the API queues its extract row before the job runs). The
+    adopted source's other stages are written as done at LEGACY_VERSION, so
+    they don't read as pending once rows exist, whichever stage writes first.
+    """
+    record = ensure_record_id(source_id)
+    if await repo_query(
+        "SELECT VALUE id FROM source_stage WHERE source = $s LIMIT 1", {"s": record}
+    ):
+        return
+    paged = bool(
+        await repo_query(
+            "SELECT VALUE id FROM source_page WHERE source = $s AND page = 1",
+            {"s": record},
+        )
+    )
+    if not paged and not await repo_query(
+        "SELECT VALUE id FROM source_embedding WHERE source = $s LIMIT 1",
+        {"s": record},
+    ):
+        return  # nothing built yet: a new source
+    for other in expected_stages(paged):
+        if other == stage:
+            continue
+        await repo_query(
+            "UPSERT $id MERGE $fields",
+            {
+                "id": stage_record(source_id, other),
+                "fields": {
+                    "source": record,
+                    "stage": other,
+                    "status": "done",
+                    "version": LEGACY_VERSION,
+                    "detail": {"before_tracking": True},
+                    "updated": _now(),
+                },
+            },
+        )
+
+
 async def _set(source_id: str, stage: str, fields: Dict[str, Any]) -> None:
     try:
+        await _adopt_untracked(source_id, stage)
         await repo_query(
             "UPSERT $id MERGE $fields",
             {
@@ -196,6 +241,7 @@ class StageState:
     finished_at: Optional[str] = None
     error: Optional[str] = None
     detail: Optional[Dict[str, Any]] = None
+    recorded: bool = True  # False: inferred for a source ingested before tracking
 
 
 def expected_stages(paged: bool) -> List[str]:
@@ -235,8 +281,10 @@ async def _paged_sources(source_ids: List[str]) -> set:
 async def ingestion_states(source_ids: List[str]) -> Dict[str, List[StageState]]:
     """Every expected stage of each source, in pipeline order.
 
-    Sources ingested before tracking have no rows: their stages read as done
-    (untracked) unless the source is still being processed.
+    A source with rows has every stage it went through recorded (a source
+    ingested before tracking is adopted by its first row, `_adopt_untracked`),
+    so its stages without a row are pending. A source without rows predates
+    tracking: its stages read as done at LEGACY_VERSION (`recorded=False`).
     """
     if not source_ids:
         return {}
@@ -248,14 +296,16 @@ async def ingestion_states(source_ids: List[str]) -> Dict[str, List[StageState]]
     states: Dict[str, List[StageState]] = {}
     for sid in source_ids:
         recorded = by_source.get(sid, {})
+        legacy = not recorded
         is_paged = sid in paged or any(s in PAGED_ONLY for s in recorded)
         result = []
         for stage in expected_stages(is_paged):
             entry = recorded.get(stage)
             if entry is None:
-                status = "done" if not recorded else "pending"
                 result.append(
-                    StageState(stage, status, LEGACY_VERSION if not recorded else None)
+                    StageState(stage, "done", LEGACY_VERSION, recorded=False)
+                    if legacy
+                    else StageState(stage, "pending")
                 )
                 continue
             result.append(
@@ -285,42 +335,102 @@ def has_failed(stages: List[StageState]) -> bool:
 # --- Reprocessing -----------------------------------------------------------
 
 
-def first_outdated(stages: List[StageState]) -> Optional[str]:
-    """The earliest stage whose output predates the current version.
+@dataclass
+class Restart:
+    stage: str
+    reason: str  # outdated | failed | stalled
+    # Continue past this stage only if its output changed (true when every later
+    # stage already finished, so their output is still valid).
+    only_if_changed: bool = False
 
-    None while any stage is unfinished (queued, running, pending or failed):
-    in-progress work is never restarted, and failures are retried explicitly.
+
+def _later_finished(stages: List[StageState], stage: str) -> bool:
+    # The caption job also redoes extraction, so restarting either covers both.
+    covered = {"extract", "caption"} if stage in ("extract", "caption") else {stage}
+    names = [s.stage for s in stages]
+    later = stages[names.index(stage) + 1 :]
+    return all(s.status in FINISHED for s in later if s.stage not in covered)
+
+
+def restart_point(stages: List[StageState]) -> Optional[Restart]:
+    """Where to restart a source, or None when it needs nothing (or a person).
+
+    Nothing while any stage is queued or running (callers first turn rows
+    without a live job into pending with `without_stale_claims`). Otherwise
+    the earliest stage, in pipeline order, that is:
+
+    - failed: retried there. A failed extraction is retried in place (refresh)
+      only for paged sources; others need their content re-read
+      (POST /sources/{id}/retry);
+    - pending: the chain stopped (a job lost before it queued the next one);
+    - finished but behind its stage version: outdated.
     """
-    if not is_complete(stages):
+    if any(s.status in ("queued", "running") for s in stages):
         return None
+    paged = any(s.stage == "caption" for s in stages)
     for state in stages:
-        if (state.version or 0) < STAGE_VERSIONS[state.stage]:
-            return state.stage
+        if state.status == "failed":
+            reason = "failed"
+        elif state.status == "pending":
+            reason = "stalled"
+        elif (state.version or 0) < STAGE_VERSIONS[state.stage]:
+            reason = "outdated"
+        else:
+            continue
+        if state.stage == "extract" and reason == "failed" and not paged:
+            return None
+        return Restart(state.stage, reason, _later_finished(stages, state.stage))
     return None
 
 
-async def plan_reprocessing() -> Dict[str, str]:
-    """Source id → the stage to restart it from, for every outdated source."""
+async def sources_with_live_jobs() -> set:
+    """Sources that have a job waiting or running in the queue."""
+    rows = await repo_query(
+        "SELECT VALUE args.source_id FROM command WHERE status IN ['new', 'running']"
+    )
+    return {str(r) for r in rows if r}
+
+
+def without_stale_claims(stages: List[StageState], live: bool) -> List[StageState]:
+    """Stages marked queued/running with no live job for the source are pending:
+    the job died (or failed before reaching the stage) and will not update them."""
+    if live:
+        return stages
+    return [
+        replace(s, status="pending") if s.status in ("queued", "running") else s
+        for s in stages
+    ]
+
+
+async def plan_reprocessing() -> Dict[str, Restart]:
+    """Source id → where to restart it, for every failed, stalled or outdated source."""
     source_ids = [str(s) for s in await repo_query("SELECT VALUE id FROM source")]
     states = await ingestion_states(source_ids)
+    live = await sources_with_live_jobs()
     plan = {}
     for sid, stages in states.items():
-        stage = first_outdated(stages)
-        if stage:
-            plan[sid] = stage
+        restart = restart_point(without_stale_claims(stages, sid in live))
+        if restart:
+            plan[sid] = restart
     return plan
 
 
-async def reprocess(source_id: str, stage: str) -> None:
-    """Restart a source from `stage` without re-running upstream work.
+async def reprocess(source_id: str, restart: Restart) -> None:
+    """Restart a source from a stage without re-running upstream work.
 
     Extraction is redone in place by the caption job (`refresh`), which keeps
     the source's text, insights and captions; re-running process_source would
-    duplicate insights and repeat content-core extraction.
+    duplicate insights and repeat content-core extraction. When the later
+    stages already finished (`only_if_changed`), the pipeline continues past
+    the restarted stage only if its output changed.
     """
+    stage = restart.stage
     if stage in ("extract", "caption"):
         await submit_stage(
-            "caption", source_id, refresh=stage == "extract", reprocess=True
+            "caption",
+            source_id,
+            refresh=stage == "extract",
+            reprocess=restart.only_if_changed,
         )
     else:
         await submit_stage(stage, source_id)

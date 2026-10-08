@@ -1,0 +1,2 @@
+-- Down migration 32: nothing to undo (the backfilled values are the defaults).
+RETURN NONE;

@@ -122,7 +122,7 @@ Transformations you select when adding a source still run and produce insights, 
   worker starts, sources processed by an older version of a step are re-run from that step (only what changed is
   redone; captions, insights and page images are kept). Set `OPEN_NOTEBOOK_AUTO_REPROCESS=false` to turn this off.
 - **A restart during ingestion** (a deploy, a crash) loses nothing: the worker re-queues the interrupted jobs when it
-  starts.
+  starts, retries steps that failed (an update often fixes the cause) and resumes processing that stopped half way.
 - **A source added before Brain Notebook** (or by upstream Open Notebook) has no pages. Delete it and add the file
   again to get the full pipeline.
 - **After turning on visual page search or the concept graph**, or changing the page-embedding model: **Settings →

@@ -75,6 +75,38 @@ async def test_stage_rows_track_a_source_through_the_pipeline(db):
 
 
 @pytest.mark.asyncio
+async def test_rows_from_before_the_new_page_fields_can_still_be_updated(db):
+    """Migration 32: DEFINE FIELD ... DEFAULT doesn't fill existing records."""
+    from open_notebook.database.async_migrate import AsyncMigrationManager
+    from open_notebook.domain import ingestion
+
+    repo_query, make_source = db
+    deck = ingestion.ensure_record_id(await make_source("old.pdf"))
+    # An old row: written before shapes / garbled / caption_version existed.
+    await repo_query("REMOVE FIELD shapes ON source_page")
+    await repo_query("REMOVE FIELD garbled ON source_page")
+    await repo_query("REMOVE FIELD caption_version ON source_page")
+    await repo_query(
+        "CREATE source_page CONTENT {source: $s, page: 1, text: 'x'}", {"s": deck}
+    )
+    await repo_query("DELETE _sbl_migrations WHERE version >= 30")
+    await AsyncMigrationManager().run_migration_up()
+
+    await repo_query(
+        "UPDATE source_page SET text = 'y' WHERE source = $s AND page = 1", {"s": deck}
+    )
+    row = (
+        await repo_query("SELECT * FROM source_page WHERE source = $s", {"s": deck})
+    )[0]
+    assert (row["text"], row["shapes"], row["garbled"], row["caption_version"]) == (
+        "y",
+        0,
+        False,
+        0,
+    )
+
+
+@pytest.mark.asyncio
 async def test_deleting_a_source_removes_its_stage_rows(db):
     from open_notebook.domain import ingestion
 
@@ -113,6 +145,54 @@ async def test_worker_startup_requeues_running_jobs_and_drops_orphan_rows(db):
 
 
 @pytest.mark.asyncio
+async def test_sources_with_live_jobs_reads_the_queue(db):
+    from open_notebook.domain import ingestion
+
+    repo_query, _ = db
+    for sid, status in (
+        ("source:a", "new"),
+        ("source:b", "running"),
+        ("source:c", "failed"),
+    ):
+        await repo_query(
+            "CREATE command CONTENT {app: 'open_notebook', name: 'caption_pages', "
+            "args: {source_id: $sid}, status: $status}",
+            {"sid": sid, "status": status},
+        )
+    await repo_query(
+        "CREATE command CONTENT {app: 'open_notebook', name: 'generate_podcast', "
+        "args: {}, status: 'new'}"
+    )
+    assert await ingestion.sources_with_live_jobs() == {"source:a", "source:b"}
+
+
+@pytest.mark.asyncio
+async def test_reprocessing_a_source_from_before_tracking_keeps_it_complete(db):
+    from open_notebook.domain import ingestion
+
+    repo_query, make_source = db
+    old = await make_source("old.pdf")
+    await repo_query(
+        "CREATE source_page CONTENT {source: $s, page: 1, text: 'x'}",
+        {"s": ingestion.ensure_record_id(old)},
+    )
+    # A reprocess queues the caption job, which refreshes extraction and
+    # captions without changes, so the chain stops there.
+    await ingestion.stage_queued(old, "caption")
+    async with ingestion.tracked(old, "extract"):
+        pass
+    async with ingestion.tracked(old, "caption"):
+        pass
+
+    stages = (await ingestion.ingestion_states([old]))[old]
+    assert ingestion.is_complete(stages)
+    versions = {s.stage: s.version for s in stages}
+    assert versions["extract"] == ingestion.STAGE_VERSIONS["extract"]
+    assert versions["embed"] == ingestion.LEGACY_VERSION
+    assert await ingestion.plan_reprocessing() == {}
+
+
+@pytest.mark.asyncio
 async def test_plan_reprocessing_finds_legacy_and_outdated_sources(db):
     from open_notebook.domain import ingestion
 
@@ -127,4 +207,5 @@ async def test_plan_reprocessing_finds_legacy_and_outdated_sources(db):
         await ingestion.stage_done(current, stage)
 
     plan = await ingestion.plan_reprocessing()
-    assert plan == {legacy: "extract"}  # extract is at version 2, legacy at 1
+    # extract is at version 2, legacy sources at 1
+    assert plan == {legacy: ingestion.Restart("extract", "outdated", True)}

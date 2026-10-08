@@ -29,9 +29,10 @@ pipeline is [How Documents Are Ingested](../2-CORE-CONCEPTS/ingestion.md).
   each command runs inside `tracked(source_id, stage)` (running → done / skipped / failed, with a `detail` dict) and
   queues the next stage with `stage_queued()` beside its `submit_command()`. `STAGE_VERSIONS` holds each stage's
   version; bump it (with a reason in the comment) when existing sources should get a change. The worker entrypoint
-  then restarts outdated sources: `reprocess()` maps extract/caption to `caption_pages(refresh=…, reprocess=True)`,
-  which updates pages in place and continues the chain only if captions or text changed; other stages re-submit
-  their own command. `caption_pages` skips pages already checked at the current caption version
+  then restarts sources per `restart_point()` (failed, stalled, then outdated; never while work is queued or
+  running): `reprocess()` maps extract/caption to `caption_pages(refresh=…, reprocess=…)`, which updates pages in
+  place; after an outdated stage it continues the chain only if captions or text changed, after a failure or stall
+  always. Other stages re-submit their own command. `caption_pages` skips pages already checked at the current caption version
   (`source_page.caption_version`).
 - Ingestion re-runs replace a transformation's insight (`add_insight(replace=True)`) instead of duplicating it.
 - **Office documents** (`utils/office_convert.py`): `content_process` converts PPTX/PPT/PPSX/ODP/DOCX/DOC/ODT/RTF to

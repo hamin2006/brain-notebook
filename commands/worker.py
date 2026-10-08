@@ -10,9 +10,11 @@ Before handing over to the surreal-commands worker it:
    This assumes a single worker process, which is how this project runs; set
    OPEN_NOTEBOOK_REQUEUE_INTERRUPTED=false when several workers share a DB.
 2. Removes stage rows of deleted sources.
-3. Queues outdated sources for reprocessing from their earliest outdated stage
-   (see open_notebook/domain/ingestion.py). OPEN_NOTEBOOK_AUTO_REPROCESS=false
-   turns this off.
+3. Restarts sources that need it (see `restart_point` in
+   open_notebook/domain/ingestion.py): a failed stage (a deploy often fixes
+   what broke it; retried once per start, so permanent failures don't loop),
+   a stalled chain, or a stage behind its version.
+   OPEN_NOTEBOOK_AUTO_REPROCESS=false turns this off.
 
 A failure in these steps is logged and never keeps the worker from starting.
 """
@@ -48,9 +50,11 @@ async def reprocess_outdated() -> int:
     from open_notebook.domain.ingestion import plan_reprocessing, reprocess
 
     plan = await plan_reprocessing()
-    for source_id, stage in plan.items():
-        logger.info(f"Reprocessing {source_id} from its {stage} stage (outdated)")
-        await reprocess(source_id, stage)
+    for source_id, restart in plan.items():
+        logger.info(
+            f"Restarting {source_id} from its {restart.stage} stage ({restart.reason})"
+        )
+        await reprocess(source_id, restart)
     return len(plan)
 
 
@@ -60,7 +64,9 @@ async def prepare() -> None:
         steps.append(("re-queue interrupted jobs", requeue_interrupted))
     steps.append(("remove stage rows of deleted sources", remove_orphan_stages))
     if _enabled("OPEN_NOTEBOOK_AUTO_REPROCESS"):
-        steps.append(("reprocess outdated sources", reprocess_outdated))
+        steps.append(
+            ("restart failed, stalled or outdated sources", reprocess_outdated)
+        )
     for label, step in steps:
         try:
             count = await step()

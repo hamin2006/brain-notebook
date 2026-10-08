@@ -26,7 +26,9 @@ starts.**
 - **`source_stage`** (one row per source and stage, migration 31): `queued` → `running` → `done` / `skipped` /
   `failed`, timestamps, the stage version that produced the current output, an error and a small detail object.
   Jobs write it through `open_notebook/domain/ingestion.py` (`tracked()`, `stage_queued()`); a failing write is
-  logged and never fails the job. Sources ingested before tracking read as done at version 1.
+  logged and never fails the job. A source without rows predates tracking: its stages read as done at version 1.
+  When the first row is written for a source that already has output (pages or chunks), its other stages are
+  recorded as done at version 1 first, so they stay done once rows exist; a new source has no output yet.
 - **Stage versions** (`STAGE_VERSIONS`): a change that should reach ingested sources bumps its stage's version. On
   start the worker finds sources whose recorded version is older and restarts each from its earliest outdated stage.
   Extraction is redone in place by the caption job (`refresh`: page text and signals updated, captions and page
@@ -36,7 +38,14 @@ starts.**
   re-sent to the model only after the caption version changes.
 - **Worker entrypoint** `python -m commands.worker`: before handing over to surreal-commands it re-queues jobs left
   `running` (single-worker assumption; `OPEN_NOTEBOOK_REQUEUE_INTERRUPTED=false` for shared databases), deletes
-  stage rows of deleted sources and queues the reprocessing (`OPEN_NOTEBOOK_AUTO_REPROCESS=false` to turn it off).
+  stage rows of deleted sources and restarts the sources that need it (`restart_point`;
+  `OPEN_NOTEBOOK_AUTO_REPROCESS=false` turns it off): a **failed** stage is retried (a deploy usually fixes what broke
+  it; once per start, so a permanent failure doesn't loop), a **stalled** chain (a stage pending with nothing queued or
+  running) is resumed, and an **outdated** stage is re-run. Sources with a live job in the queue are left alone; a
+  stage marked queued or running with no live job for its source (its job died, or failed before reaching it) counts
+  as pending. When the stages after the restart point already finished, the pipeline continues past it only if its
+  output changed. A
+  failed extraction of a source without pages needs its content re-read and is left to the user.
 - **Visible progress**: `GET /api/sources/{id}/ingestion`, `GET /api/notebooks/{id}/ingestion` and
   `POST /api/sources/{id}/ingestion/retry`; the library shows an indexing strip and per-source stage, the Structure
   tab a stage timeline; `scripts/brain/ingest_folder.py --wait` prints per-stage timing.

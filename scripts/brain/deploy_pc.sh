@@ -37,15 +37,24 @@ if [ -f "$unit" ] && grep -q "surreal-commands-worker" "$unit"; then
   echo "brain-worker.service now runs python -m commands.worker"
 fi
 
-# Jobs interrupted by this restart are re-queued when the worker starts.
-systemctl --user restart brain-api brain-worker brain-frontend
-for _ in $(seq 1 60); do
+# The API applies migrations on start: restart it first and wait, so the worker
+# never runs jobs against the old schema. Jobs interrupted by the worker's
+# restart are re-queued when it starts.
+systemctl --user restart brain-api
+api_up=0
+for _ in $(seq 1 90); do
   if curl -fs -o /dev/null http://127.0.0.1:5055/api/models; then
+    api_up=1
     echo "api up"
     break
   fi
   sleep 2
 done
+if [ "$api_up" != 1 ]; then
+  echo "api did not come up; worker not restarted (journalctl --user -u brain-api)" >&2
+  exit 1
+fi
+systemctl --user restart brain-worker brain-frontend
 for unit in brain-api brain-worker brain-frontend; do
   echo "$unit: $(systemctl --user is-active "$unit")"
 done

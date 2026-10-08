@@ -13,11 +13,13 @@ from open_notebook.domain.ingestion import (
     FINISHED,
     STAGE_VERSIONS,
     StageState,
-    first_outdated,
     has_failed,
     ingestion_states,
     is_complete,
     reprocess,
+    restart_point,
+    sources_with_live_jobs,
+    without_stale_claims,
 )
 from open_notebook.exceptions import InvalidInputError, NotFoundError
 
@@ -148,24 +150,24 @@ async def notebook_ingestion(notebook_id: str) -> NotebookIngestion:
 
 @router.post("/sources/{source_id}/ingestion/retry", response_model=SourceIngestion)
 async def retry_ingestion(source_id: str) -> SourceIngestion:
-    """Re-run a source from its first failed stage (or first outdated one).
+    """Re-run a source from its first failed stage (or a stalled or outdated one).
 
-    A failed extraction is retried with `POST /sources/{id}/retry`, which
-    re-reads the original content.
+    A failed extraction of a source without pages is retried with
+    `POST /sources/{id}/retry`, which re-reads the original content.
     """
     source_id = _source_record(source_id)
     titles = await _titles([source_id])
     if source_id not in titles:
         raise NotFoundError("Source not found")
     stages = (await ingestion_states([source_id]))[source_id]
-    failed = next((s.stage for s in stages if s.status == "failed"), None)
-    stage = failed or first_outdated(stages)
-    if stage is None:
+    live = source_id in await sources_with_live_jobs()
+    restart = restart_point(without_stale_claims(stages, live))
+    if restart is None:
+        if any(s.status == "failed" for s in stages):
+            raise InvalidInputError(
+                "Extraction failed; retry the source itself (POST /sources/{id}/retry)"
+            )
         raise InvalidInputError("Nothing to retry: every stage is done or in progress")
-    if stage == "extract" and failed:
-        raise InvalidInputError(
-            "Extraction failed; retry the source itself (POST /sources/{id}/retry)"
-        )
-    await reprocess(source_id, stage)
+    await reprocess(source_id, restart)
     states = await ingestion_states([source_id])
     return _source_ingestion(source_id, titles[source_id], states[source_id])

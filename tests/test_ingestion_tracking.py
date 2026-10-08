@@ -12,12 +12,14 @@ from commands.page_commands import CaptionPagesInput, caption_pages_command
 from open_notebook.domain import ingestion
 from open_notebook.domain.ingestion import (
     STAGE_VERSIONS,
+    Restart,
     StageState,
-    first_outdated,
     ingestion_states,
     is_complete,
+    restart_point,
     stage_record,
     tracked,
+    without_stale_claims,
 )
 from open_notebook.graphs.source import SourceState, save_source
 from open_notebook.utils.pdf_pages import PdfPage
@@ -57,7 +59,7 @@ async def test_tracked_records_skips_and_failures(stage_writes):
 @pytest.mark.real_stage_writes
 @pytest.mark.asyncio
 async def test_stage_writes_upsert_one_row_per_source_and_stage():
-    query = AsyncMock(return_value=[])
+    query = AsyncMock(return_value=["source_stage:x"])  # already tracked
     with patch("open_notebook.domain.ingestion.repo_query", new=query):
         await ingestion.stage_queued(SOURCE_ID, "caption")
     assert query.await_args is not None
@@ -76,6 +78,71 @@ async def test_a_failing_stage_write_never_fails_the_work():
     ):
         async with tracked(SOURCE_ID, "analyze"):
             pass  # no exception escapes
+
+
+@pytest.mark.real_stage_writes
+@pytest.mark.asyncio
+async def test_the_first_row_of_an_untracked_source_records_its_other_stages():
+    writes = []
+
+    async def fake_query(sql, params=None):
+        if sql.startswith("SELECT VALUE id FROM source_stage"):
+            return []  # no rows yet: the source predates tracking
+        if sql.startswith("SELECT VALUE id FROM source_page"):
+            return ["source_page:1"]
+        writes.append(params["fields"])
+        return []
+
+    with patch("open_notebook.domain.ingestion.repo_query", new=fake_query):
+        await ingestion.stage_queued(SOURCE_ID, "caption")
+    adopted = {w["stage"]: w for w in writes[:-1]}
+    assert set(adopted) == {"extract", "embed", "analyze", "page_images", "concepts"}
+    assert {w["status"] for w in adopted.values()} == {"done"}
+    assert {w["version"] for w in adopted.values()} == {ingestion.LEGACY_VERSION}
+    assert writes[-1]["stage"] == "caption" and writes[-1]["status"] == "queued"
+
+
+@pytest.mark.real_stage_writes
+@pytest.mark.asyncio
+async def test_new_sources_adopt_nothing():
+    writes = []
+
+    async def fake_query(sql, params=None):
+        if sql.startswith("SELECT"):
+            return []  # no rows, no pages, no chunks: a new source
+        writes.append(params["fields"]["stage"])
+        return []
+
+    with patch("open_notebook.domain.ingestion.repo_query", new=fake_query):
+        await ingestion.stage_queued(SOURCE_ID, "extract")
+    assert writes == ["extract"]
+
+
+@pytest.mark.real_stage_writes
+@pytest.mark.asyncio
+async def test_an_old_source_refreshed_first_is_adopted_too():
+    writes = []
+
+    async def fake_query(sql, params=None):
+        if sql.startswith("SELECT VALUE id FROM source_stage"):
+            return []
+        if sql.startswith("SELECT VALUE id FROM source_page"):
+            return ["source_page:1"]
+        if sql.startswith("SELECT"):
+            return []
+        writes.append(params["fields"]["stage"])
+        return []
+
+    with patch("open_notebook.domain.ingestion.repo_query", new=fake_query):
+        await ingestion.stage_running(SOURCE_ID, "extract")
+    assert writes[-1] == "extract"
+    assert set(writes[:-1]) == {
+        "caption",
+        "embed",
+        "analyze",
+        "page_images",
+        "concepts",
+    }
 
 
 # --- states and versions ----------------------------------------------------
@@ -126,26 +193,63 @@ def _states(**versions):
     ]
 
 
-def test_first_outdated_is_the_earliest_stage_behind_its_version():
-    assert first_outdated(_states()) is None
-    assert first_outdated(_states(caption=1, concepts=0)) == "caption"
-    assert first_outdated(_states(extract=1)) == "extract"
-    in_progress = _states(caption=1)
-    in_progress[3] = StageState("analyze", "running")
-    assert first_outdated(in_progress) is None  # never interrupt running work
+@pytest.mark.asyncio
+def _with(**statuses):
+    return [
+        StageState(stage, statuses.get(stage, "done"), STAGE_VERSIONS[stage])
+        for stage in ingestion.STAGES
+    ]
+
+
+def test_restart_point_retries_failures_resumes_stalls_and_upgrades():
+    assert restart_point(_with()) is None
+    # The earliest problem wins: an outdated extraction before a pending caption.
+    legacy = _with(caption="pending")
+    legacy[0] = StageState("extract", "done", 1)
+    assert restart_point(legacy) == Restart("extract", "outdated", True)
+    # Later stages already done: go past the restart only if its output changed.
+    assert restart_point(_with(concepts="failed")) == Restart(
+        "concepts", "failed", True
+    )
+    assert restart_point(_with(extract="failed")) == Restart("extract", "failed", True)
+    # Later stages never ran: the chain must continue.
+    assert restart_point(
+        _with(extract="failed", caption="pending", embed="pending")
+    ) == Restart("extract", "failed", False)
+    assert restart_point(_with(analyze="pending", page_images="pending")) == Restart(
+        "analyze", "stalled", False
+    )
+    # In progress anywhere: leave it alone, even with a failure elsewhere.
+    assert restart_point(_with(embed="failed", analyze="running")) is None
+    assert restart_point(_states(caption=1)) == Restart("caption", "outdated", True)
+    # An unpaged source whose extraction failed needs its content re-read.
+    web = [StageState("extract", "failed"), StageState("embed", "pending")]
+    assert restart_point(web) is None
+
+
+def test_queued_stages_without_a_live_job_count_as_stalled():
+    # The caption job died in its refresh step before reaching the caption stage.
+    stages = _with(extract="failed", caption="queued")
+    assert restart_point(without_stale_claims(stages, live=True)) is None
+    assert restart_point(without_stale_claims(stages, live=False)) == Restart(
+        "extract", "failed", True
+    )
 
 
 @pytest.mark.asyncio
-async def test_reprocess_restarts_from_the_outdated_stage():
+async def test_reprocess_continues_the_chain_unless_later_stages_are_done():
     with patch("open_notebook.domain.ingestion.submit_command") as submit:
-        await ingestion.reprocess(SOURCE_ID, "extract")
-        await ingestion.reprocess(SOURCE_ID, "concepts")
-    assert submit.call_args_list[0].args == (
+        await ingestion.reprocess(SOURCE_ID, Restart("extract", "outdated", True))
+        await ingestion.reprocess(SOURCE_ID, Restart("caption", "failed", False))
+        await ingestion.reprocess(SOURCE_ID, Restart("concepts", "failed", True))
+    calls = [c.args for c in submit.call_args_list]
+    assert calls[0] == (
         "open_notebook",
         "caption_pages",
         {"source_id": SOURCE_ID, "refresh": True, "reprocess": True},
     )
-    assert submit.call_args_list[1].args[1] == "extract_concepts"
+    assert calls[1][2] == {"source_id": SOURCE_ID, "refresh": False, "reprocess": False}
+    assert calls[2][1] == "extract_concepts"
 
 
 # --- caption job reprocessing -------------------------------------------------
@@ -299,15 +403,16 @@ async def test_worker_startup_requeues_and_reprocesses(monkeypatch):
     query = AsyncMock(return_value=[{"id": "command:1"}, {"id": "command:2"}])
     monkeypatch.setattr("open_notebook.database.repository.repo_query", query)
     reprocess = AsyncMock()
+    restart = Restart("caption", "outdated", True)
     monkeypatch.setattr(
         "open_notebook.domain.ingestion.plan_reprocessing",
-        AsyncMock(return_value={SOURCE_ID: "caption"}),
+        AsyncMock(return_value={SOURCE_ID: restart}),
     )
     monkeypatch.setattr("open_notebook.domain.ingestion.reprocess", reprocess)
     await worker.prepare()
     sqls = [c.args[0] for c in query.await_args_list]
     assert any("SET status = 'new' WHERE status = 'running'" in s for s in sqls)
-    reprocess.assert_awaited_once_with(SOURCE_ID, "caption")
+    reprocess.assert_awaited_once_with(SOURCE_ID, restart)
 
 
 @pytest.mark.asyncio
@@ -377,6 +482,10 @@ def test_retry_refuses_when_nothing_failed_or_outdated(client):
         patch(
             "api.routers.ingestion.ingestion_states",
             new=AsyncMock(return_value={"source:a": _states()}),
+        ),
+        patch(
+            "api.routers.ingestion.sources_with_live_jobs",
+            new=AsyncMock(return_value=set()),
         ),
     ):
         response = client.post("/api/sources/source:a/ingestion/retry")
