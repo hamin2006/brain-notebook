@@ -29,13 +29,20 @@ starts.**
   logged and never fails the job. A source without rows predates tracking: its stages read as done at version 1.
   When the first row is written for a source that already has output (pages or chunks), its other stages are
   recorded as done at version 1 first, so they stay done once rows exist; a new source has no output yet.
+- **Partial failures are failures.** A stage that works per item (pages to caption, sections to outline, summarize or
+  extract concepts from) keeps going when one item's model call fails and falls back (page windows for an unreadable
+  outline, a plain extract for an empty summary) or leaves the item out. It reports that with `run.partly_failed()`:
+  the job succeeds and the pipeline continues with what it has, but the stage is recorded as `failed` with the reason
+  and the failed items in `detail`, so the restart rules below retry it. Recording it as done would keep the gap until
+  someone bumped the version (captions did this until caption 3).
 - **Stage versions** (`STAGE_VERSIONS`): a change that should reach ingested sources bumps its stage's version. On
   start the worker finds sources whose recorded version is older and restarts each from its earliest outdated stage.
   Extraction is redone in place by the caption job (`refresh`: page text and signals updated, captions and page
   embeddings kept), never by re-running `process_source`. A reprocessed stage continues the pipeline only when its
   output changed (new captions or changed text), so a version bump costs model calls only where it matters. Captions
-  record the version a page was checked with (`source_page.caption_version`), so pages without visual content are
-  re-sent to the model only after the caption version changes.
+  record the version a page was checked with (`source_page.caption_version`); a page checked at
+  `CAPTION_CHECKS_VALID_FROM` or later is not asked again, so a bump that only re-runs the stage costs nothing on
+  pages already checked, and one that changes the prompt or page selection raises it too.
 - **Worker entrypoint** `python -m commands.worker`: before handing over to surreal-commands it re-queues jobs left
   `running` (single-worker assumption; `OPEN_NOTEBOOK_REQUEUE_INTERRUPTED=false` for shared databases), deletes
   stage rows of deleted sources and restarts the sources that need it (`restart_point`;

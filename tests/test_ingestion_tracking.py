@@ -56,6 +56,18 @@ async def test_tracked_records_skips_and_failures(stage_writes):
     assert "rate limited" in stage_writes[-1][2]["error"]
 
 
+@pytest.mark.asyncio
+async def test_partly_failed_work_is_recorded_as_failed_without_raising(stage_writes):
+    async with tracked(SOURCE_ID, "caption") as run:
+        run.detail = {"captioned": 3, "failed_pages": [7]}
+        run.partly_failed("1 of 4 pages could not be captioned (pages 7)")
+    assert _status_writes(stage_writes, "caption") == ["running", "failed"]
+    failed = stage_writes[-1][2]
+    assert failed["error"].startswith("1 of 4 pages")
+    assert failed["detail"] == {"captioned": 3, "failed_pages": [7]}
+    assert "version" not in failed  # stays behind, as for any failure
+
+
 @pytest.mark.real_stage_writes
 @pytest.mark.asyncio
 async def test_stage_writes_upsert_one_row_per_source_and_stage():

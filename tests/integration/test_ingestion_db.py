@@ -211,3 +211,30 @@ async def test_plan_reprocessing_finds_legacy_and_outdated_sources(db):
     plan = await ingestion.plan_reprocessing()
     # extract is at version 2, legacy sources at 1
     assert plan == {legacy: ingestion.Restart("extract", "outdated", True)}
+
+
+@pytest.mark.asyncio
+async def test_a_partly_failed_stage_is_stored_and_planned_for_a_retry(db):
+    from open_notebook.domain import ingestion
+
+    repo_query, make_source = db
+    deck = await make_source("deck.pdf")
+    await ingestion.stage_queued(deck, "extract")
+    await repo_query(
+        "CREATE source_page CONTENT {source: $s, page: 1, text: 'x'}",
+        {"s": ingestion.ensure_record_id(deck)},
+    )
+    await ingestion.stage_done(deck, "extract")
+    async with ingestion.tracked(deck, "caption") as run:
+        run.detail = {"captioned": 2, "failed_pages": [1]}
+        run.partly_failed("1 of 3 pages could not be captioned (pages 1)")
+    for stage in ("embed", "analyze", "page_images", "concepts"):
+        await ingestion.stage_done(deck, stage)
+
+    stages = {s.stage: s for s in (await ingestion.ingestion_states([deck]))[deck]}
+    assert stages["caption"].status == "failed"
+    assert (stages["caption"].error or "").startswith("1 of 3 pages")
+    assert stages["caption"].detail == {"captioned": 2, "failed_pages": [1]}
+    plan = await ingestion.plan_reprocessing()
+    # Later stages finished: continue past the retry only if a caption is added.
+    assert plan == {deck: ingestion.Restart("caption", "failed", True)}

@@ -93,7 +93,9 @@ def _pdf_title(path: Optional[str]) -> Optional[str]:
 
 async def plan_outline(
     source: Source, pages: List[PdfPage]
-) -> tuple[DocumentMetadata, List[Section]]:
+) -> tuple[DocumentMetadata, List[Section], bool]:
+    """Metadata and sections, and whether the model's outline was used (False:
+    fixed-size page windows stood in for it)."""
     groups = group_builds(pages)
     page_count = max(p.number for p in pages)
     path = source.asset.file_path if source.asset else None
@@ -115,7 +117,11 @@ async def plan_outline(
     )
     try:
         plan = parser.parse(await _complete(prompt, max_tokens=4096, json_mode=True))
-        return plan.metadata, normalize_sections(plan.sections, groups, page_count)
+        return (
+            plan.metadata,
+            normalize_sections(plan.sections, groups, page_count),
+            True,
+        )
     except ConfigurationError:
         raise
     except Exception as e:
@@ -124,14 +130,21 @@ async def plan_outline(
             f"Outline parsing failed for {source.id}, using page windows: {e}"
         )
         title = os.path.splitext(file_name)[0] or "Untitled"
-        return DocumentMetadata(doc_type="other", title=title), normalize_sections(
-            [], groups, page_count
+        return (
+            DocumentMetadata(doc_type="other", title=title),
+            normalize_sections([], groups, page_count),
+            False,
         )
 
 
 async def summarize_sections(
-    source_title: str, pages: List[PdfPage], sections: List[Section]
+    source_title: str,
+    pages: List[PdfPage],
+    sections: List[Section],
+    fallbacks: Optional[List[int]] = None,
 ) -> List[str]:
+    """One summary per section; the indexes of sections whose summary fell back
+    to a plain extract (the model returned nothing) are added to `fallbacks`."""
     groups = group_builds(pages)
     semaphore = asyncio.Semaphore(MAX_CONCURRENT_SECTIONS)
 
@@ -154,7 +167,11 @@ async def summarize_sections(
                 # Reasoning models can spend the whole budget thinking and
                 # return nothing; give it room once before falling back.
                 summary = await _complete(prompt, max_tokens=4000)
-        return summary or _extract_fallback(section, text)
+        if summary:
+            return summary
+        if fallbacks is not None:
+            fallbacks.append(section.index)
+        return _extract_fallback(section, text)
 
     return list(await asyncio.gather(*(one(s) for s in sections)))
 
@@ -204,9 +221,10 @@ async def _analyze_source(
             processing_time=time.time() - start,
         )
 
-    metadata, sections = await plan_outline(source, pages)
+    metadata, sections, outlined = await plan_outline(source, pages)
     title = metadata.title or source.title or "Untitled"
-    summaries = await summarize_sections(title, pages, sections)
+    fallbacks: List[int] = []
+    summaries = await summarize_sections(title, pages, sections, fallbacks)
     overview = await _complete(
         Prompter(prompt_template="sources/document_summary").render(
             data={
@@ -219,10 +237,13 @@ async def _analyze_source(
             }
         ),
         max_tokens=2500,
-    ) or "\n\n".join(
-        f"{s.title} (pp. {s.page_start}-{s.page_end}): {summary}"
-        for s, summary in zip(sections, summaries)
     )
+    overview_ok = bool(overview)
+    if not overview:
+        overview = "\n\n".join(
+            f"{s.title} (pp. {s.page_start}-{s.page_end}): {summary}"
+            for s, summary in zip(sections, summaries)
+        )
     embeddings = await generate_embeddings(
         [f"{s.title}\n{summary}" for s, summary in zip(sections, summaries)]
     )
@@ -262,6 +283,20 @@ async def _analyze_source(
         f"Analyzed {input_data.source_id}: {len(sections)} sections, metadata {metadata.model_dump()}"
     )
     run.detail = {"sections": len(sections)}
+    # Fallbacks keep the source usable; recording them as a failure gets the
+    # stage retried (worker start, Retry) instead of keeping them for good.
+    problems = []
+    if not outlined:
+        problems.append("the outline could not be read (page windows used)")
+    if fallbacks:
+        run.detail["extract_sections"] = sorted(fallbacks)
+        problems.append(
+            f"{len(fallbacks)} of {len(sections)} section summaries are plain extracts"
+        )
+    if not overview_ok:
+        problems.append("the document summary joins the section summaries")
+    if problems:
+        run.partly_failed("Model output missing: " + "; ".join(problems))
     # Visual search over rendered pages (skipped when the setting is off).
     await stage_queued(input_data.source_id, "page_images")
     submit_command("open_notebook", "embed_pages", {"source_id": input_data.source_id})

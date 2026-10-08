@@ -167,6 +167,54 @@ async def test_extract_concepts_writes_mentions_and_relations():
 
 
 @pytest.mark.asyncio
+async def test_a_section_whose_extraction_fails_is_reported(stage_writes):
+    from commands import concept_commands as cmd
+
+    good = json.dumps({"concepts": [{"name": "Dropout", "page": 2}], "relations": []})
+
+    async def reply(prompt):
+        if "Broken section" in prompt:
+            raise RuntimeError("bad JSON")
+        return AIMessage(content=good)
+
+    model = MagicMock(ainvoke=AsyncMock(side_effect=reply))
+    sections = [
+        {"index": 0, "title": "Dropout", "page_start": 1, "page_end": 2},
+        {"index": 1, "title": "Broken section", "page_start": 3, "page_end": 4},
+    ]
+
+    async def fake_query(sql, params=None):
+        if "FROM source_section" in sql:
+            return sections
+        if "FROM source_page" in sql:
+            return [
+                {"page": p, "text": f"page {p}", "caption": None} for p in range(1, 5)
+            ]
+        return []
+
+    inserted: dict = {}
+    with (
+        patch.object(cmd.AgentSettings, "load", new=AsyncMock(return_value=SimpleNamespace(knowledge_graph=True))),
+        patch.object(cmd, "repo_query", new=fake_query),
+        patch.object(cmd, "repo_insert", new=AsyncMock(side_effect=lambda t, rows: inserted.setdefault(t, rows))),
+        patch.object(cmd.Source, "get", new=AsyncMock(return_value=MagicMock(metadata={}, title="L5"))),
+        patch.object(cmd, "provision_langchain_model", new=AsyncMock(return_value=model)),
+        patch.object(cmd, "limit_reasoning", side_effect=lambda m: m),
+        patch.object(cmd, "generate_embeddings", new=AsyncMock(return_value=[[0.1]])),
+    ):  # fmt: skip
+        out = await cmd.extract_concepts_command(
+            cmd.ExtractConceptsInput(source_id="source:l5")
+        )
+
+    assert out.success and out.concepts == 1  # the good section still counts
+    assert len(inserted["concept_mention"]) == 1
+    failed = stage_writes[-1][2]
+    assert failed["status"] == "failed"
+    assert failed["error"] == "Concept extraction failed for 1 of 2 sections"
+    assert failed["detail"]["failed_sections"] == [1]
+
+
+@pytest.mark.asyncio
 async def test_extract_concepts_off():
     from commands import concept_commands as cmd
 

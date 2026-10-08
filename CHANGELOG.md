@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Jobs running when the worker stopped (a deploy, a crash) stayed "running" forever and their sources never finished; the worker now re-queues them when it starts (`OPEN_NOTEBOOK_REQUEUE_INTERRUPTED=false` for several workers on one database)
 - Re-running a source's processing (retry, or a job resumed after a restart) duplicated its default-transformation insights; they are replaced now
 - Pages whose math extracts as garbled glyphs were sent to the caption model but often came back empty; the prompt now asks for the equations in LaTeX
+- A page whose caption request failed (a rate limit, a timeout, a refused image), a section whose concepts couldn't be extracted and an outline or summary the model didn't return were silently kept as gaps with the step shown as done. The step now shows as failed with what's missing, keeps what worked, and is retried when the worker starts or with **Retry**; existing notebooks retry their failed captions on the next start (no model calls for pages already checked)
 - `scripts/brain/ingest_folder.py` uploaded macOS `._name.pdf` metadata files as sources
 - Notebook chat failed with HTTP 422 on every message: the API required a legacy `context` field the UI no longer sends
 - Opening a link to a notebook or source in a fresh browser (no saved session) bounced through the login page to the notebook list

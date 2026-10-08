@@ -39,9 +39,12 @@ PAGED_ONLY = {"caption", "analyze", "page_images", "concepts"}
 #   extract 2: page shape counts and garbled-text flags; (cid:N) removed from text
 #   caption 2: drawn diagrams and garbled math are captioned; garbled pages get
 #              a transcribe-the-math prompt
+#   caption 3: pages whose caption call failed are retried (they were left
+#              uncaptioned with the stage done); pages already checked aren't
+#              asked again (CAPTION_CHECKS_VALID_FROM in commands/page_commands.py)
 STAGE_VERSIONS: Dict[str, int] = {
     "extract": 2,
-    "caption": 2,
+    "caption": 3,
     "embed": 1,
     "analyze": 1,
     "page_images": 1,
@@ -179,29 +182,46 @@ async def stage_done(
     )
 
 
-async def stage_failed(source_id: str, stage: str, error: str) -> None:
-    await _set(
-        source_id,
-        stage,
-        {"status": "failed", "finished_at": _now(), "error": error[:500]},
-    )
+async def stage_failed(
+    source_id: str, stage: str, error: str, detail: Optional[Dict[str, Any]] = None
+) -> None:
+    fields: Dict[str, Any] = {
+        "status": "failed",
+        "finished_at": _now(),
+        "error": error[:500],
+    }
+    if detail is not None:
+        fields["detail"] = detail
+    await _set(source_id, stage, fields)
 
 
 class StageRun:
-    """What a tracked stage reports: details for the UI, or that it was skipped."""
+    """What a tracked stage reports: details for the UI, that it was skipped, or
+    that part of its work failed."""
 
     def __init__(self) -> None:
         self.detail: Dict[str, Any] = {}
         self.skipped = False
+        self.incomplete: Optional[str] = None
 
     def skip(self, reason: str) -> None:
         self.skipped = True
         self.detail["reason"] = reason
 
+    def partly_failed(self, reason: str) -> None:
+        """Part of the work failed (a page, a section) and fell back or was left out.
+
+        The stage is recorded as failed with this reason, so `restart_point`
+        retries it (on worker start or with Retry); the job itself succeeds and
+        the pipeline continues with what it has.
+        """
+        self.incomplete = reason
+
 
 @asynccontextmanager
 async def tracked(source_id: str, stage: str) -> AsyncIterator[StageRun]:
-    """Record a stage as running, then done/skipped, or failed on an exception.
+    """Record a stage as running, then done/skipped, or failed on an exception
+    or when the stage reports that part of its work failed (`partly_failed`).
 
     A retried job passes through here again, so a transient failure is
     overwritten by the next attempt's state.
@@ -213,7 +233,10 @@ async def tracked(source_id: str, stage: str) -> AsyncIterator[StageRun]:
     except BaseException as e:
         await stage_failed(source_id, stage, f"{type(e).__name__}: {e}")
         raise
-    await stage_done(source_id, stage, run.detail, skipped=run.skipped)
+    if run.incomplete:
+        await stage_failed(source_id, stage, run.incomplete, run.detail)
+    else:
+        await stage_done(source_id, stage, run.detail, skipped=run.skipped)
 
 
 async def submit_stage(stage: str, source_id: str, **args: Any) -> str:

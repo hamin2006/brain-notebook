@@ -45,6 +45,11 @@ CAPTION_RETRY_CONFIG = {
     "retry_log_level": "warning",
 }
 MAX_CONCURRENT_PAGES = 4
+# A page checked at this caption version or later is not asked again. Raise it
+# to the new STAGE_VERSIONS["caption"] when a bump changes which pages get
+# captioned or what the model is asked; leave it when a bump only re-runs the
+# stage (caption 3 retries pages whose model call failed under version 2).
+CAPTION_CHECKS_VALID_FROM = 2
 NO_VISUAL_CONTENT = "NO_VISUAL_CONTENT"
 
 
@@ -126,9 +131,10 @@ async def _refresh_pages(source_id: str, path: str) -> bool:
 async def caption_pages_command(input_data: CaptionPagesInput) -> CaptionPagesOutput:
     """Caption the visual pages of a PDF source, then embed and analyze it.
 
-    A page is checked once per caption version: pages the model found nothing
-    visual on are retried only after the caption stage's version is bumped,
-    and existing captions are kept.
+    A page is checked once: pages the model found nothing visual on are asked
+    again only when CAPTION_CHECKS_VALID_FROM is raised,
+    and existing captions are kept. Pages whose model call failed leave the
+    stage failed, so the next restart (worker start, Retry) captions them.
     """
     start = time.time()
     source_id = input_data.source_id
@@ -166,12 +172,14 @@ async def caption_pages_command(input_data: CaptionPagesInput) -> CaptionPagesOu
         checked = {
             r["page"]
             for r in rows
-            if r.get("caption") or (r.get("caption_version") or 0) >= version
+            if r.get("caption")
+            or (r.get("caption_version") or 0) >= CAPTION_CHECKS_VALID_FROM
         }
         visual = pages_needing_captions(pages)
         targets = [n for n in visual if n not in checked] if has_file else []
 
         captioned = 0
+        failed: list[int] = []
         if targets:
             model = limit_reasoning(
                 await provision_langchain_model(
@@ -182,7 +190,8 @@ async def caption_pages_command(input_data: CaptionPagesInput) -> CaptionPagesOu
             semaphore = asyncio.Semaphore(MAX_CONCURRENT_PAGES)
             title = (source.title if source else None) or "Untitled"
 
-            async def caption_one(number: int) -> bool:
+            async def caption_one(number: int) -> Optional[bool]:
+                """True: captioned, False: nothing visual to add, None: failed."""
                 async with semaphore:
                     try:
                         caption = await _caption_page(
@@ -190,9 +199,10 @@ async def caption_pages_command(input_data: CaptionPagesInput) -> CaptionPagesOu
                         )
                     except Exception as e:
                         # One unreadable page or refused image shouldn't lose
-                        # the others; it stays unchecked and is retried later.
+                        # the others; it stays unchecked, and the stage is
+                        # recorded as failed so it is retried.
                         logger.warning(f"Caption failed for {source_id} p{number}: {e}")
-                        return False
+                        return None
                 await repo_query(
                     "UPDATE source_page SET caption = $caption, caption_version = $version "
                     "WHERE source = $source AND page = $page",
@@ -205,7 +215,9 @@ async def caption_pages_command(input_data: CaptionPagesInput) -> CaptionPagesOu
                 )
                 return bool(caption)
 
-            captioned = sum(await asyncio.gather(*(caption_one(n) for n in targets)))
+            outcomes = await asyncio.gather(*(caption_one(n) for n in targets))
+            captioned = sum(1 for o in outcomes if o)
+            failed = [n for n, o in zip(targets, outcomes) if o is None]
             logger.info(
                 f"Captioned {captioned}/{len(targets)} visual pages of {source_id}"
             )
@@ -214,6 +226,13 @@ async def caption_pages_command(input_data: CaptionPagesInput) -> CaptionPagesOu
             "checked": len(targets),
             "captioned": captioned,
         }
+        if failed:
+            run.detail["failed_pages"] = failed
+            run.partly_failed(
+                f"{len(failed)} of {len(targets)} pages could not be captioned "
+                f"(pages {', '.join(map(str, failed[:10]))}"
+                f"{', …' if len(failed) > 10 else ''})"
+            )
         if not has_file:
             run.skip("original file missing")
 

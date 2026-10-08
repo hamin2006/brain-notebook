@@ -62,7 +62,10 @@ class ExtractConceptsOutput(CommandOutput):
     error_message: Optional[str] = None
 
 
-async def _extract(model, title: str, section: Section, text: str) -> ConceptExtraction:
+async def _extract(
+    model, title: str, section: Section, text: str
+) -> Optional[ConceptExtraction]:
+    """The section's concepts, or None when the model's reply could not be read."""
     parser: PydanticOutputParser[ConceptExtraction] = PydanticOutputParser(
         pydantic_object=ConceptExtraction
     )
@@ -85,9 +88,10 @@ async def _extract(model, title: str, section: Section, text: str) -> ConceptExt
             return parse_extraction(raw)
         except Exception as e:
             error = e
-    # One unreadable section must not lose the others.
+    # One unreadable section must not lose the others (the stage is recorded
+    # as failed, so it is retried).
     logger.warning(f"Concept extraction failed for section {section.index}: {error}")
-    return ConceptExtraction()
+    return None
 
 
 def _page_range(section: Section, page: Optional[int]) -> tuple[int, int]:
@@ -226,14 +230,16 @@ async def _extract_concepts(
     )
     semaphore = asyncio.Semaphore(MAX_CONCURRENT_SECTIONS)
 
-    async def one(section: Section) -> ConceptExtraction:
+    async def one(section: Section) -> Optional[ConceptExtraction]:
         text = section_text(groups, section)
         if not text.strip():
             return ConceptExtraction()
         async with semaphore:
             return await _extract(model, title, section, text)
 
-    extractions = await asyncio.gather(*(one(s) for s in sections))
+    results = await asyncio.gather(*(one(s) for s in sections))
+    failed = [s.index for s, r in zip(sections, results) if r is None]
+    extractions = [r or ConceptExtraction() for r in results]
 
     resolved = await _resolve_concepts(
         [
@@ -291,6 +297,11 @@ async def _extract_concepts(
         await repo_insert("concept_relation", relations)
     concepts = len({str(m["concept"]) for m in mentions})
     run.detail = {"concepts": concepts, "relations": len(relations)}
+    if failed:
+        run.detail["failed_sections"] = failed
+        run.partly_failed(
+            f"Concept extraction failed for {len(failed)} of {len(sections)} sections"
+        )
     logger.info(
         f"Concept graph for {input_data.source_id}: {len(mentions)} mentions of "
         f"{concepts} concepts, {len(relations)} relations"

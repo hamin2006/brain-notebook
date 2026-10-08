@@ -71,10 +71,16 @@ PAGE_ROWS = [
     {"page": 2, "text": "Regularization", "caption": None},
     {"page": 3, "text": "", "caption": "Adam update rule with defaults alpha=0.001"},
 ]
+OUTLINE_JSON = json.dumps(
+    {
+        "metadata": {"doc_type": "lecture", "title": "Losses"},
+        "sections": [{"title": "Losses", "start_page": 1, "end_page": 3}],
+    }
+)
 
 
 @pytest.mark.asyncio
-async def test_analyze_writes_sections_metadata_and_summary(submitted):
+async def test_analyze_writes_sections_metadata_and_summary(submitted, stage_writes):
     outline = {
         "metadata": {
             "doc_type": "lecture",
@@ -122,6 +128,7 @@ async def test_analyze_writes_sections_metadata_and_summary(submitted):
         result = await analyze_source_command(AnalyzeSourceInput(source_id="source:l4"))
 
     assert result.sections == 2
+    assert [w[2]["status"] for w in stage_writes if w[1] == "analyze"][-1] == "done"
     assert [c.args for c in submitted.call_args_list] == [
         ("open_notebook", "embed_pages", {"source_id": "source:l4"}),
         ("open_notebook", "extract_concepts", {"source_id": "source:l4"}),
@@ -142,7 +149,7 @@ async def test_analyze_writes_sections_metadata_and_summary(submitted):
 
 
 @pytest.mark.asyncio
-async def test_analyze_survives_unparseable_outline():
+async def test_analyze_survives_unparseable_outline(stage_writes):
     replies = iter(["not json at all", "summary"])
     inserted: list = []
     with (
@@ -174,6 +181,45 @@ async def test_analyze_survives_unparseable_outline():
         result = await analyze_source_command(AnalyzeSourceInput(source_id="source:l4"))
     assert result.success and result.sections == 1
     assert inserted[0]["page_start"] == 1 and inserted[0]["page_end"] == 3
+    # Usable, but recorded as failed so the stage is retried.
+    failed = stage_writes[-1][2]
+    assert failed["status"] == "failed"
+    assert "outline could not be read" in failed["error"]
+
+
+@pytest.mark.asyncio
+async def test_analyze_records_fallback_summaries_as_failed(stage_writes):
+    replies = iter([OUTLINE_JSON, "", ""])  # outline, then two empty summaries
+    with (
+        patch(
+            "commands.analyze_commands.Source.get",
+            new=AsyncMock(return_value=_source()),
+        ),
+        patch(
+            "commands.analyze_commands.repo_query",
+            new=AsyncMock(
+                side_effect=lambda q, p=None: PAGE_ROWS
+                if q.startswith("SELECT")
+                else []
+            ),
+        ),
+        patch("commands.analyze_commands.repo_insert", new=AsyncMock()),
+        patch(
+            "commands.analyze_commands._complete",
+            new=AsyncMock(side_effect=lambda *a, **k: next(replies, "")),
+        ),
+        patch(
+            "commands.analyze_commands.generate_embeddings",
+            new=AsyncMock(return_value=[[0.1]]),
+        ),
+    ):
+        result = await analyze_source_command(AnalyzeSourceInput(source_id="source:l4"))
+    assert result.success
+    failed = stage_writes[-1][2]
+    assert failed["status"] == "failed"
+    assert "1 of 1 section summaries are plain extracts" in failed["error"]
+    assert "document summary" in failed["error"]
+    assert failed["detail"]["extract_sections"] == [0]
 
 
 @pytest.mark.asyncio
