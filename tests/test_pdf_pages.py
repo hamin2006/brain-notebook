@@ -15,8 +15,36 @@ from open_notebook.utils.pdf_pages import (
     has_page_text,
     latexit_source,
     page_chunks,
+    pages_needing_captions,
     pages_to_full_text,
 )
+
+
+def _write_pdf(path, contents):
+    """Write a minimal PDF, one page per content stream (Helvetica as /F1)."""
+    objects = [
+        "<< /Type /Catalog /Pages 2 0 R >>",
+        "",  # page tree, filled in below
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+    kids = []
+    for stream in contents:
+        objects.append(f"<< /Length {len(stream)} >>\nstream\n{stream}\nendstream")
+        objects.append(
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 400 300] "
+            f"/Contents {len(objects)} 0 R /Resources << /Font << /F1 3 0 R >> >> >>"
+        )
+        kids.append(f"{len(objects)} 0 R")
+    objects[1] = f"<< /Type /Pages /Kids [{' '.join(kids)}] /Count {len(kids)} >>"
+    out, offsets = "%PDF-1.4\n", []
+    for number, body in enumerate(objects, 1):
+        offsets.append(len(out))
+        out += f"{number} 0 obj\n{body}\nendobj\n"
+    xref = len(out)
+    out += f"xref\n0 {len(objects) + 1}\n0000000000 65535 f \n"
+    out += "".join(f"{offset:010d} 00000 n \n" for offset in offsets)
+    out += f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n"
+    path.write_bytes(out.encode("latin-1"))
 
 
 def _latexit_block(source: str) -> str:
@@ -73,6 +101,14 @@ def test_clean_page_text_drops_residual_junk_and_nul_glyphs():
     assert equations == []
     assert "bbbm" not in text and "====" not in text
     assert "\x00" not in text and "Slide title" in text and "body text" in text
+
+
+def test_clean_page_text_drops_unmapped_glyph_placeholders():
+    text, _ = clean_page_text(
+        "T +(N/4-1)T\n(cid:124)(cid:123)(cid:122)(cid:125)\nTAs judge"
+    )
+    assert "cid" not in text
+    assert "T +(N/4-1)T" in text and "TAs judge" in text
 
 
 def test_clean_page_text_keeps_normal_text():
@@ -163,3 +199,30 @@ def test_concurrent_renders_do_not_crash(tmp_path):
             )
         )
     assert len(images) == 32 and all(i.startswith(b"\x89PNG") for i in images)
+
+
+def test_extract_pdf_pages_counts_shapes_and_flags_garbled_text(tmp_path):
+    path = tmp_path / "deck.pdf"
+    text = "BT /F1 18 Tf 40 250 Td (Reduce tree) Tj ET"
+    tree = " ".join(f"{20 * i} 20 m {20 * i + 10} 120 l S" for i in range(15))
+    junk = "BT /F1 12 Tf 40 200 Td ((cid:124)(cid:123)(cid:122) total time) Tj ET"
+    _write_pdf(path, [text, f"{text}\n{tree}", f"{text}\n{junk}"])
+
+    plain, drawing, math = extract_pdf_pages(str(path))
+
+    assert plain.shapes == 0 and not plain.garbled
+    assert drawing.shapes == 15 and "Reduce tree" in drawing.text
+    assert math.garbled and "cid" not in math.text
+
+
+def test_pages_needing_captions_finds_drawn_diagrams_and_garbled_math():
+    # Every page draws the template's 34 shapes (Beamer navigation symbols).
+    pages = [
+        PdfPage(1, "Reduce: the algorithm", shapes=34),
+        PdfPage(2, "Parallel poetry\n- each TA ranks N/P poems", shapes=36),
+        PdfPage(3, "Up a tree\nrank rank rank", shapes=150),  # TikZ diagram
+        PdfPage(4, "Total time", shapes=34, garbled=True),  # math as glyph junk
+        PdfPage(5, "Summary", shapes=35),
+    ]
+    assert pages_needing_captions(pages) == [3, 4]
+    assert pages_needing_captions([]) == []

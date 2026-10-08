@@ -129,7 +129,7 @@ From the migrations (read them for exact fields). Upstream tables plus Brain Not
 |---|---|
 | `notebook` | Name, description, `archived`, `grounding` |
 | `source` | `title`, `full_text`, `asset` (file path or URL), `metadata` (doc type, course, sequence, topics, page count…), `command` |
-| `source_page` | Per page: `text`, `equations`, `image_ratio`, `caption`, `image_embedding`; unique `(source, page)` |
+| `source_page` | Per page: `text`, `equations`, `image_ratio`, `shapes`, `garbled`, `caption`, `image_embedding`; unique `(source, page)` |
 | `source_embedding` | Chunks: `order`, `content`, `embedding`, `page_start`, `page_end` |
 | `source_section` | Outline sections: `index`, `title`, `page_start`, `page_end`, `summary`, `embedding`; unique `(source, index)` |
 | `source_insight` | Transformation output, incl. the "Document Summary" from analysis |

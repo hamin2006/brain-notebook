@@ -5,13 +5,15 @@ pipeline is [How Documents Are Ingested](../2-CORE-CONCEPTS/ingestion.md).
 
 ## Page-aware PDF ingestion (`utils/pdf_pages.py`, `graphs/source.py`, `commands/`)
 
-- `extract_pdf_pages(path)` reads each page with pdfplumber into `PdfPage(number, text, equations, image_ratio)`.
-  `clean_page_text` removes residual junk; `latexit_source()` decodes LaTeXiT payloads (base64 → 4-byte qCompress
+- `extract_pdf_pages(path)` reads each page with pdfplumber into `PdfPage(number, text, equations, image_ratio,
+  shapes, garbled)` (`shapes` = vector lines + curves + rects; `garbled` = 3+ `(cid:N)` placeholders).
+  `clean_page_text` removes residual junk and `(cid:N)`; `latexit_source()` decodes LaTeXiT payloads (base64 → 4-byte qCompress
   length + zlib → binary plist, `source` key) so the 4×-repeated invisible text becomes `$…$`.
 - `group_builds(pages)` merges animation builds: a page is a build step of the previous one when it covers ≥ 90% of
   its text (`SequenceMatcher`) and isn't shorter. The last page carries the text; page numbers are kept as ranges.
 - `graphs/source.py` uses page extraction for PDFs with a text layer (others go through content-core), stores
-  `source_page` rows, and chains the jobs: `caption_pages` (pages with `image_ratio ≥ 0.25`, Transformation Model,
+  `source_page` rows, and chains the jobs: `caption_pages` (`pages_needing_captions`: `image_ratio ≥ 0.25`, or ≥ 12 shapes over the
+  document's median, or garbled; Transformation Model,
   4 concurrent, `NO_VISUAL_CONTENT` sentinel) → `embed_source` → `analyze_source` → `embed_pages` +
   `extract_concepts`.
 - `embed_source` builds **page-ranged chunks** (`_paged_chunks`: page text + caption, header `Title — pp. N–M`,

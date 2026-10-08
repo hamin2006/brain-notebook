@@ -13,7 +13,7 @@ upload
 1. pages          text per page (pdfplumber), equations recovered, junk removed      → source_page
   │
   ▼
-2. captions       pages that are mostly image → described by a vision model          → source_page.caption
+2. captions       visual pages (images, drawn diagrams, math) → vision model       → source_page.caption
   │
   ▼
 3. chunks         page-ranged chunks, embedded                                       → source_embedding
@@ -46,8 +46,16 @@ Scanned PDFs (no text layer) fall back to Open Notebook's regular extraction: on
 
 ### 2. Captions for visual pages
 
-Pages whose area is at least a quarter images (diagrams, plots, slides exported as pictures) are rendered and
-described by the **Transformation Model**, which must accept images. The caption adds what the text layer misses:
+Visual pages are rendered and described by the **Transformation Model**, which must accept images. A page is
+visual when:
+
+- at least a quarter of its area is images (plots, screenshots, slides exported as pictures);
+- it draws a diagram as vector shapes (PowerPoint, Keynote and TikZ diagrams): at least 12 more lines, curves and
+  rectangles than the document's typical page, so what a template draws on every slide doesn't count;
+- or its text came out as unmapped glyphs (`(cid:…)`), which is how LaTeX math often extracts. The junk is removed
+  from the text and the caption transcribes the math.
+
+Animation builds are captioned once, on their most complete page. The caption adds what the text layer misses:
 text inside the image, equations in LaTeX, and for diagrams the structure (what feeds into what). Pages with nothing
 visual to add are skipped. Captions are stored with the page and searched like text, so "where are RMSProp's update
 equations?" can find a slide that is only a picture.

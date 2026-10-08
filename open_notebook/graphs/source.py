@@ -335,6 +335,8 @@ async def _store_pages(source_id: str, pages: List[PdfPage]) -> None:
                 "text": page.text,
                 "equations": page.equations,
                 "image_ratio": page.image_ratio,
+                "shapes": page.shapes,
+                "garbled": page.garbled,
             }
             for page in pages
         ],

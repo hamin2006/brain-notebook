@@ -12,6 +12,13 @@ put in the text layer:
   extracted text; decoded, it becomes `$...$` LaTeX.
 - Residual runs of repeated characters (corrupted copies of the above) and NUL
   glyph placeholders.
+- `(cid:N)` placeholders for glyphs without a Unicode mapping (LaTeX math
+  delimiters and braces in Beamer slides). The page is flagged as garbled so
+  it gets a vision caption, which transcribes the math.
+
+It also records how many vector shapes each page draws: diagrams drawn in
+PowerPoint, Keynote or TikZ are shapes, not images, and their text layer is
+only scattered labels.
 
 It also groups animation builds (consecutive slides where each adds a little to
 the previous one) so a chunker can embed the build once with its page range.
@@ -20,6 +27,7 @@ the previous one) so a chunker can embed the build once with its page range.
 import base64
 import plistlib
 import re
+import statistics
 import threading
 import zlib
 from dataclasses import dataclass, field
@@ -35,6 +43,8 @@ _QUAD_CHAR = re.compile(r"(\S)\1{3}")
 _LONG_TOKEN = re.compile(r"\S{30,}")
 _REPEAT = re.compile(r"(\S)\1{2,}")
 _LATEXIT_BLOCK = re.compile(r'<latexit sha1_base64="[^"]*">(.*?)</latexit>', re.S)
+_CID = re.compile(r"\(cid:\d+\)")
+GARBLED_MIN_CIDS = 3  # a stray unmapped bullet glyph doesn't make a page garbled
 
 BUILD_COVERAGE = 0.9  # share of the previous page a build step must contain
 
@@ -50,6 +60,8 @@ class PdfPage:
     text: str
     equations: List[str] = field(default_factory=list)
     image_ratio: float = 0.0  # share of the page area covered by images
+    shapes: int = 0  # vector lines, curves and rectangles drawn on the page
+    garbled: bool = False  # text layer had unmapped glyphs (usually math)
 
 
 @dataclass
@@ -100,7 +112,7 @@ def clean_page_text(text: str) -> Tuple[str, List[str]]:
     text = _LONG_TOKEN.sub(
         lambda m: " " if _is_residual_junk(m.group(0)) else m.group(0), text
     )
-    text = text.replace("\x00", "")
+    text = _CID.sub("", text.replace("\x00", ""))
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\n\s*\n+", "\n\n", text)
     return text.strip(), equations
@@ -127,11 +139,13 @@ def extract_pdf_pages(path: str) -> List[PdfPage]:
             try:
                 raw = page.extract_text() or ""
                 ratio = _image_ratio(page)
+                shapes = len(page.lines) + len(page.curves) + len(page.rects)
             except Exception as e:  # one malformed page shouldn't lose the document
                 logger.warning(f"Page {number} of {path} could not be read: {e}")
-                raw, ratio = "", 0.0
+                raw, ratio, shapes = "", 0.0, 0
+            garbled = len(_CID.findall(raw)) >= GARBLED_MIN_CIDS
             text, equations = clean_page_text(raw)
-            pages.append(PdfPage(number, text, equations, ratio))
+            pages.append(PdfPage(number, text, equations, ratio, shapes, garbled))
             page.flush_cache()  # pdfplumber keeps parsed layout objects per page
     return pages
 
@@ -218,19 +232,36 @@ def page_chunks(
 
 
 VISUAL_IMAGE_RATIO = 0.25  # pages with at least this much image area get a caption
+# Pages drawing at least this many more shapes than the document's typical page
+# hold a diagram. Comparing with the typical page ignores what a template draws
+# on every slide (Beamer's navigation symbols, rules, logos).
+DRAWING_EXTRA_SHAPES = 12
+
+
+def _is_visual(page: PdfPage, typical_shapes: float) -> bool:
+    return (
+        page.image_ratio >= VISUAL_IMAGE_RATIO
+        or page.shapes - typical_shapes >= DRAWING_EXTRA_SHAPES
+        or page.garbled
+    )
 
 
 def pages_needing_captions(pages: List[PdfPage]) -> List[int]:
     """Page numbers to caption: the last (most complete) page of each visual group.
 
-    A group counts as visual when any of its pages is at least
-    VISUAL_IMAGE_RATIO image; animation builds are captioned once.
+    A group counts as visual when any of its pages is mostly image, draws a
+    diagram (well above the document's typical shape count) or has garbled
+    text; animation builds are captioned once. The caption model answers
+    NO_VISUAL_CONTENT when a page turns out to add nothing.
     """
+    if not pages:
+        return []
+    typical = statistics.median(page.shapes for page in pages)
     by_number = {page.number: page for page in pages}
     targets = []
     for group in group_builds(pages):
         members = [by_number[n] for n in range(group.start, group.end + 1)]
-        if max(p.image_ratio for p in members) >= VISUAL_IMAGE_RATIO:
+        if any(_is_visual(p, typical) for p in members):
             targets.append(group.end)
     return targets
 

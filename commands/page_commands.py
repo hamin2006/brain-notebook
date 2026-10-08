@@ -88,11 +88,17 @@ async def caption_pages_command(input_data: CaptionPagesInput) -> CaptionPagesOu
     record = ensure_record_id(input_data.source_id)
 
     rows = await repo_query(
-        "SELECT page, text, image_ratio, caption FROM source_page WHERE source = $source ORDER BY page",
+        "SELECT page, text, image_ratio, shapes, garbled, caption FROM source_page WHERE source = $source ORDER BY page",
         {"source": record},
     )
     pages = [
-        PdfPage(r["page"], r.get("text") or "", image_ratio=r.get("image_ratio") or 0.0)
+        PdfPage(
+            r["page"],
+            r.get("text") or "",
+            image_ratio=r.get("image_ratio") or 0.0,
+            shapes=r.get("shapes") or 0,
+            garbled=bool(r.get("garbled")),
+        )
         for r in rows
     ]
     already = {r["page"] for r in rows if r.get("caption")}

@@ -34,7 +34,7 @@ Click **Done**. You can click **Done** on any step to submit with the current ch
 ## PDFs: what the research agent gets
 
 PDFs with a text layer go through Brain Notebook's page-aware pipeline: text per page (with LaTeXiT equations
-recovered and animation builds merged), vision captions for pages that are mostly pictures, page-ranged chunks, then
+recovered and animation builds merged), vision captions for visual pages (pictures, drawn diagrams, math), page-ranged chunks, then
 document analysis (metadata such as course and lecture number, a topic outline with page ranges, summaries), page-image
 embeddings and the concept graph. That's what makes page citations, "the 4th lecture", diagram questions and visual
 search work. Details: [How Documents Are Ingested](../2-CORE-CONCEPTS/ingestion.md).

@@ -1,0 +1,4 @@
+-- Down migration 30: drop the page caption signals.
+
+REMOVE FIELD IF EXISTS shapes ON TABLE source_page;
+REMOVE FIELD IF EXISTS garbled ON TABLE source_page;

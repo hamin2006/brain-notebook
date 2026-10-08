@@ -1,0 +1,6 @@
+-- Migration 30: page signals for vision captions. Diagrams drawn as vector
+-- shapes and pages whose text came out as unmapped glyphs (math) get captioned
+-- too, not only pages that are mostly image.
+
+DEFINE FIELD IF NOT EXISTS shapes ON TABLE source_page TYPE int DEFAULT 0;
+DEFINE FIELD IF NOT EXISTS garbled ON TABLE source_page TYPE bool DEFAULT false;
