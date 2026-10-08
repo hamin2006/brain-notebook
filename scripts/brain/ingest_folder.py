@@ -97,6 +97,12 @@ def main():
     ap.add_argument("--timeout", type=float, default=180, help="minutes to wait")
     args = ap.parse_args()
     started = time.time()
+    folder = Path(args.folder).expanduser()
+    pdfs = sorted(p for p in folder.glob("*.pdf") if not p.name.startswith("."))
+    if not pdfs:  # before touching the notebook: a typo shouldn't create one
+        raise SystemExit(
+            f"no PDFs in {folder}" + ("" if folder.is_dir() else " (no such folder)")
+        )
 
     client = httpx.Client(base_url=API, timeout=300)
     notebooks = client.get("/notebooks").raise_for_status().json()
@@ -125,9 +131,7 @@ def main():
         .json()
     }
 
-    for pdf in sorted(Path(args.folder).expanduser().glob("*.pdf")):
-        if pdf.name.startswith("."):  # macOS metadata files (._name.pdf), not PDFs
-            continue
+    for pdf in pdfs:  # ._name.pdf (macOS metadata files) were left out above
         if pdf.name in existing or pdf.stem in existing:
             print(f"skip  {pdf.name}")
             continue
