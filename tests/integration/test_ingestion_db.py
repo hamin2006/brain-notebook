@@ -47,12 +47,14 @@ async def test_stage_rows_track_a_source_through_the_pipeline(db):
     repo_query, make_source = db
     deck = await make_source("deck.pdf")
     web = await make_source("article")
+
+    # The API queues a new source's extract row before extraction writes pages
+    # (a source with pages but no rows would be adopted as pre-tracking).
+    await ingestion.stage_queued(deck, "extract")
     await repo_query(
         "CREATE source_page CONTENT {source: $s, page: 1, text: 'Adam'}",
         {"s": ingestion.ensure_record_id(deck)},
     )
-
-    await ingestion.stage_queued(deck, "extract")
     async with ingestion.tracked(deck, "extract") as run:
         run.detail = {"pages": 1}
     await ingestion.stage_queued(deck, "caption")  # same row updated, not a new one
