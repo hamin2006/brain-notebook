@@ -52,6 +52,8 @@ def main():
     }
 
     for pdf in sorted(Path(args.folder).expanduser().glob("*.pdf")):
+        if pdf.name.startswith("."):  # macOS metadata files (._name.pdf), not PDFs
+            continue
         if pdf.name in existing or pdf.stem in existing:
             print(f"skip  {pdf.name}")
             continue
