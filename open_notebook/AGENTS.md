@@ -39,6 +39,7 @@ Normative rules for working on the Python backend. Architecture and design ratio
 - `repo_query` returns record ids as strings: wrap with `ensure_record_id()` before comparing against record fields.
 - Web fetching must go through `agent/web.py` (public IPs only, per-hop checks, IP pinning), never `validate_url()` (which allows private hosts).
 - PDFium (pypdfium2) is not thread-safe: hold `PDFIUM_LOCK` around every call.
+- Page extraction (pdfplumber) is pure Python, so threads don't parallelize it (the GIL): `extract_pdf_pages` splits large PDFs into page ranges for a shared spawn-process pool (`OPEN_NOTEBOOK_PDF_PROCESSES`). Keep the per-page work in `_read_page`, picklable and free of module state.
 
 ## Graphs (`open_notebook/graphs/`)
 

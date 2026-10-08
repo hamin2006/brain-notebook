@@ -226,3 +226,27 @@ def test_pages_needing_captions_finds_drawn_diagrams_and_garbled_math():
     ]
     assert pages_needing_captions(pages) == [3, 4]
     assert pages_needing_captions([]) == []
+
+
+def test_large_pdfs_are_parsed_in_processes_with_the_same_result(tmp_path, monkeypatch):
+    from PIL import Image, ImageDraw
+
+    from open_notebook.utils import pdf_pages
+
+    frames = []
+    for n in range(1, 61):
+        img = Image.new("RGB", (400, 300), "white")
+        ImageDraw.Draw(img).rectangle([10, 10, 50 + n, 60], outline="black")
+        frames.append(img)
+    path = tmp_path / "deck.pdf"
+    frames[0].save(path, "PDF", save_all=True, append_images=frames[1:])
+
+    monkeypatch.setattr(pdf_pages, "PDF_PROCESSES", 1)
+    in_place = pdf_pages.extract_pdf_pages(str(path))
+    monkeypatch.setattr(pdf_pages, "PDF_PROCESSES", 2)
+    monkeypatch.setattr(pdf_pages, "PAGES_PER_TASK", 25)  # 3 ranges
+    pooled = pdf_pages.extract_pdf_pages(str(path))
+
+    assert len(pooled) == 60 and [p.number for p in pooled] == list(range(1, 61))
+    assert pooled == in_place
+    assert pdf_pages._pool is None  # shut down once nothing is extracting

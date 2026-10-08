@@ -25,14 +25,19 @@ the previous one) so a chunker can embed the build once with its page range.
 """
 
 import base64
+import multiprocessing
+import os
 import plistlib
 import re
 import statistics
 import threading
 import zlib
+from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, Iterator, List, Optional, Tuple
 
 from loguru import logger
 
@@ -129,25 +134,91 @@ def _image_ratio(page) -> float:
     return min(covered / area, 1.0)
 
 
+def _read_page(page, number: int, path: str) -> PdfPage:
+    try:
+        raw = page.extract_text() or ""
+        ratio = _image_ratio(page)
+        shapes = len(page.lines) + len(page.curves) + len(page.rects)
+    except Exception as e:  # one malformed page shouldn't lose the document
+        logger.warning(f"Page {number} of {path} could not be read: {e}")
+        raw, ratio, shapes = "", 0.0, 0
+    garbled = len(_CID.findall(raw)) >= GARBLED_MIN_CIDS
+    text, equations = clean_page_text(raw)
+    page.flush_cache()  # pdfplumber keeps parsed layout objects per page
+    return PdfPage(number, text, equations, ratio, shapes, garbled)
+
+
+def _extract_range(path: str, first: int, last: int) -> List[PdfPage]:
+    """Pages first..last (1-based, inclusive); runs in a pool process or in place."""
+    import pdfplumber
+
+    with pdfplumber.open(path) as pdf:
+        return [
+            _read_page(pdf.pages[number - 1], number, path)
+            for number in range(first, last + 1)
+        ]
+
+
+# pdfplumber is pure Python, so threads parse one page at a time under the GIL
+# (seven decks "in parallel" took longer than one after another). Large PDFs are
+# split into page ranges and parsed in a few processes instead. Default: half
+# the CPU threads (physical cores), at most 4, leaving cores for the database,
+# the API and the worker's model calls. 1 parses in the calling thread.
+PDF_PROCESSES = int(
+    os.environ.get("OPEN_NOTEBOOK_PDF_PROCESSES")
+    or max(1, min(4, (os.cpu_count() or 2) // 2))
+)
+PAGES_PER_TASK = 25
+
+_pool: Optional[ProcessPoolExecutor] = None
+_pool_users = 0
+_pool_lock = threading.Lock()
+
+
+@contextmanager
+def _shared_pool() -> Iterator[ProcessPoolExecutor]:
+    """One pool for all concurrent extractions (bounded processes and memory),
+    shut down when the last one finishes so an idle worker holds no parsers."""
+    global _pool, _pool_users
+    with _pool_lock:
+        if _pool is None:
+            # spawn: forking a process that runs threads can deadlock the child
+            _pool = ProcessPoolExecutor(
+                PDF_PROCESSES, mp_context=multiprocessing.get_context("spawn")
+            )
+        _pool_users += 1
+        pool = _pool
+    try:
+        yield pool
+    finally:
+        with _pool_lock:
+            _pool_users -= 1
+            if _pool_users == 0 and _pool is pool:
+                pool.shutdown(wait=False)
+                _pool = None
+
+
 def extract_pdf_pages(path: str) -> List[PdfPage]:
     """Extract cleaned text for every page of a PDF (synchronous; run in a thread)."""
     import pdfplumber
 
-    pages: List[PdfPage] = []
     with pdfplumber.open(path) as pdf:
-        for number, page in enumerate(pdf.pages, 1):
-            try:
-                raw = page.extract_text() or ""
-                ratio = _image_ratio(page)
-                shapes = len(page.lines) + len(page.curves) + len(page.rects)
-            except Exception as e:  # one malformed page shouldn't lose the document
-                logger.warning(f"Page {number} of {path} could not be read: {e}")
-                raw, ratio, shapes = "", 0.0, 0
-            garbled = len(_CID.findall(raw)) >= GARBLED_MIN_CIDS
-            text, equations = clean_page_text(raw)
-            pages.append(PdfPage(number, text, equations, ratio, shapes, garbled))
-            page.flush_cache()  # pdfplumber keeps parsed layout objects per page
-    return pages
+        count = len(pdf.pages)
+    if PDF_PROCESSES <= 1 or count <= PAGES_PER_TASK:
+        return _extract_range(path, 1, count)
+    ranges = [
+        (first, min(first + PAGES_PER_TASK - 1, count))
+        for first in range(1, count + 1, PAGES_PER_TASK)
+    ]
+    try:
+        with _shared_pool() as pool:
+            futures = [pool.submit(_extract_range, path, a, b) for a, b in ranges]
+            return [page for future in futures for page in future.result()]
+    except BrokenProcessPool as e:  # a parser process died (memory cap, crash)
+        logger.warning(
+            f"Parallel page extraction failed for {path}, retrying in place: {e}"
+        )
+        return _extract_range(path, 1, count)
 
 
 def _is_build_step(previous: str, current: str) -> bool:

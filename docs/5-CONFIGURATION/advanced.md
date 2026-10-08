@@ -22,6 +22,8 @@ Higher values process bulk uploads faster but send more parallel requests to you
 
 The value is read when the worker starts. In Docker, recreate the container (`docker compose up -d`). From source, `export` it in your shell before `make worker-start`. The systemd install (`scripts/brain/install_services.sh`) runs 8: jobs are async tasks in one process, mostly waiting on model calls, so more slots cost little memory.
 
+PDF pages are parsed in a small pool of processes (`OPEN_NOTEBOOK_PDF_PROCESSES`, default half the CPU threads, at most 4; about 75 MB each, shut down when idle). The parser is pure Python, so the worker's threads could only parse one page at a time: on a 738-page course that took 10 of a 10.4-minute ingestion.
+
 Inside an ingestion job, model calls also run in parallel: `OPEN_NOTEBOOK_SECTION_CONCURRENCY` (default `10`) sections are summarized or mined for concepts at once, and `OPEN_NOTEBOOK_CAPTION_CONCURRENCY` (default `8`) pages are captioned at once. Lower both on rate-limited providers.
 
 ### Memory
