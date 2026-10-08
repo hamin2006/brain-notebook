@@ -15,7 +15,12 @@ from surreal_commands import CommandInput, CommandOutput, command, submit_comman
 
 from open_notebook.ai.models import model_manager
 from open_notebook.database.repository import ensure_record_id, repo_insert, repo_query
-from open_notebook.domain.ingestion import stage_done, stage_failed, stage_running
+from open_notebook.domain.ingestion import (
+    release_memory,
+    stage_done,
+    stage_failed,
+    stage_running,
+)
 from open_notebook.domain.notebook import Note, Source, SourceInsight
 from open_notebook.exceptions import (
     ConfigurationError,
@@ -469,6 +474,8 @@ async def embed_source_command(input_data: EmbedSourceInput) -> EmbedSourceOutpu
     except BaseException as e:  # transient: the retry layer runs it again
         await stage_failed(input_data.source_id, "embed", f"{type(e).__name__}: {e}")
         raise
+    finally:
+        release_memory()
     if error_message is None:
         await stage_done(input_data.source_id, "embed", extra_fields)
     else:

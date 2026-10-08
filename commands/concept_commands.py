@@ -8,8 +8,9 @@ part of the graph. The agent reads the graph with the `graph` tool.
 """
 
 import asyncio
+import os
 import time
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from ai_prompter import Prompter
 from langchain_core.output_parsers.pydantic import PydanticOutputParser
@@ -17,7 +18,7 @@ from loguru import logger
 from surreal_commands import CommandInput, CommandOutput, command
 
 from open_notebook.ai.provision import limit_reasoning, provision_langchain_model
-from open_notebook.database.repository import ensure_record_id, repo_insert, repo_query
+from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.domain.agent_settings import AgentSettings
 from open_notebook.domain.ingestion import StageRun, tracked
 from open_notebook.domain.notebook import Source
@@ -46,7 +47,7 @@ CONCEPT_RETRY_CONFIG = {
     "stop_on": [ValueError, ConfigurationError, NotFoundError],
     "retry_log_level": "warning",
 }
-MAX_CONCURRENT_SECTIONS = 4
+MAX_CONCURRENT_SECTIONS = int(os.environ.get("OPEN_NOTEBOOK_SECTION_CONCURRENCY", "10"))
 
 
 class ExtractConceptsInput(CommandInput):
@@ -172,6 +173,26 @@ async def _resolve_concepts(raw_names: List[str]) -> Dict[str, str]:
     return resolved
 
 
+async def replace_concept_graph(
+    record: Any, mentions: List[dict], relations: List[dict]
+) -> None:
+    """Replace a source's concept mentions and relations in one transaction.
+
+    Two runs for the same source (analyze queues this job before it finishes,
+    and a retried analyze queues it again) must not interleave their deletes
+    and inserts into duplicate mentions.
+    """
+    await repo_query(
+        "BEGIN TRANSACTION; "
+        "DELETE concept_mention WHERE source = $s; "
+        "DELETE concept_relation WHERE source = $s; "
+        "INSERT INTO concept_mention $mentions RETURN NONE; "
+        "INSERT INTO concept_relation $relations RETURN NONE; "
+        "COMMIT TRANSACTION;",
+        {"s": record, "mentions": mentions, "relations": relations},
+    )
+
+
 @command("extract_concepts", app="open_notebook", retry=CONCEPT_RETRY_CONFIG)
 async def extract_concepts_command(
     input_data: ExtractConceptsInput,
@@ -289,12 +310,7 @@ async def _extract_concepts(
                 }
             )
 
-    await repo_query("DELETE concept_mention WHERE source = $s", {"s": record})
-    await repo_query("DELETE concept_relation WHERE source = $s", {"s": record})
-    if mentions:
-        await repo_insert("concept_mention", mentions)
-    if relations:
-        await repo_insert("concept_relation", relations)
+    await replace_concept_graph(record, mentions, relations)
     concepts = len({str(m["concept"]) for m in mentions})
     run.detail = {"concepts": concepts, "relations": len(relations)}
     if failed:

@@ -14,6 +14,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import threading
 from pathlib import Path
 from typing import Optional
 
@@ -31,6 +32,9 @@ OFFICE_SUFFIXES = {
     ".rtf",
 }
 CONVERT_TIMEOUT_SECONDS = 300
+# One conversion at a time: each soffice process takes a few hundred MB, and
+# the worker runs several jobs at once.
+_CONVERT_LOCK = threading.Lock()
 
 
 def office_converter() -> Optional[str]:
@@ -65,7 +69,7 @@ def convert_to_pdf(path: str) -> Optional[str]:
     if not soffice:
         return None
     source = Path(path)
-    with tempfile.TemporaryDirectory(prefix="brain-office-") as tmp:
+    with _CONVERT_LOCK, tempfile.TemporaryDirectory(prefix="brain-office-") as tmp:
         # A private profile per conversion: concurrent soffice processes
         # sharing the default profile block on its lock.
         profile = Path(tmp, "profile").as_uri()

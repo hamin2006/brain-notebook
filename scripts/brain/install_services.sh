@@ -36,7 +36,7 @@ Environment=API_RELOAD=false
 ExecStart=$UV run --env-file .env run_api.py
 Restart=on-failure
 RestartSec=5
-MemoryMax=2G
+MemoryMax=1G
 
 [Install]
 WantedBy=default.target
@@ -49,10 +49,15 @@ After=brain-api.service
 
 [Service]
 WorkingDirectory=$REPO
-ExecStart=$UV run --env-file .env python -m commands.worker --max-tasks 2
+# Two malloc arenas instead of one per thread: PDF parsing and rendering run in
+# threads, and per-thread arenas kept the worker at its peak after ingestion.
+Environment=MALLOC_ARENA_MAX=2
+# Jobs are async tasks in one process, mostly waiting on model calls, so
+# several at once cost little memory (a few hundred MB at 8).
+ExecStart=$UV run --env-file .env python -m commands.worker --max-tasks 8
 Restart=on-failure
 RestartSec=5
-MemoryMax=3G
+MemoryMax=2560M
 
 [Install]
 WantedBy=default.target
@@ -72,7 +77,7 @@ Environment=API_URL=relative
 ExecStart=$NODE server.js
 Restart=on-failure
 RestartSec=5
-MemoryMax=1G
+MemoryMax=512M
 
 [Install]
 WantedBy=default.target

@@ -37,6 +37,30 @@ if [ -f "$unit" ] && grep -q "surreal-commands-worker" "$unit"; then
   echo "brain-worker.service now runs python -m commands.worker"
 fi
 
+# Units from before 2026-10-08: 2 worker slots, per-thread malloc arenas and
+# memory caps summing to 6 GB without SurrealDB. Only the old defaults are
+# replaced, so values changed by hand are kept.
+units="$HOME/.config/systemd/user"
+changed=0
+if [ -f "$units/brain-worker.service" ] && grep -q -- "--max-tasks 2$" "$units/brain-worker.service"; then
+  sed -i -e 's/--max-tasks 2$/--max-tasks 8/' -e 's/^MemoryMax=3G$/MemoryMax=2560M/' \
+    -e 's/^\(ExecStart=.*commands.worker.*\)$/Environment=MALLOC_ARENA_MAX=2\n\1/' \
+    "$units/brain-worker.service"
+  changed=1
+fi
+if [ -f "$units/brain-api.service" ] && grep -q "^MemoryMax=2G$" "$units/brain-api.service"; then
+  sed -i 's/^MemoryMax=2G$/MemoryMax=1G/' "$units/brain-api.service"
+  changed=1
+fi
+if [ -f "$units/brain-frontend.service" ] && grep -q "^MemoryMax=1G$" "$units/brain-frontend.service"; then
+  sed -i 's/^MemoryMax=1G$/MemoryMax=512M/' "$units/brain-frontend.service"
+  changed=1
+fi
+if [ "$changed" = 1 ]; then
+  systemctl --user daemon-reload
+  echo "services updated: 8 worker slots, MALLOC_ARENA_MAX=2, caps api 1G / worker 2.5G / frontend 512M"
+fi
+
 # The API applies migrations on start: restart it first and wait, so the worker
 # never runs jobs against the old schema. Jobs interrupted by the worker's
 # restart are re-queued when it starts. /health is the one route outside the

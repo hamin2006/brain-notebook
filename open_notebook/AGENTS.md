@@ -42,7 +42,7 @@ Normative rules for working on the Python backend. Architecture and design ratio
 
 ## Graphs (`open_notebook/graphs/`)
 
-- Nodes are `async def`. `source.py` is the ingestion graph (page extraction for PDFs, then the job chain caption → embed → analyze → page images + concepts). Upstream's `chat.py`, `source_chat.py` and `ask.py` (sync, SqliteSaver) are no longer used by the routers — don't build on them.
+- Nodes are `async def`. `source.py` is the ingestion graph (page extraction for PDFs, then the job chain caption → embed → analyze → page images + concepts; analyze queues the last two once the outline is written, so they run beside its summaries). Upstream's `chat.py`, `source_chat.py` and `ask.py` (sync, SqliteSaver) are no longer used by the routers — don't build on them.
 - Every node wraps LLM calls with `classify_error()`:
   ```python
   except Exception as e:

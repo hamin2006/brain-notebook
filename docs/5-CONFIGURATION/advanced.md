@@ -20,7 +20,15 @@ With Docker Compose, variables go under the `open_notebook` service's `environme
 
 Higher values process bulk uploads faster but send more parallel requests to your models and cause more SurrealDB transaction conflicts. Conflicts are retried automatically (source processing up to 15 times).
 
-The value is read when the worker starts. In Docker, recreate the container (`docker compose up -d`). From source, `export` it in your shell before `make worker-start`.
+The value is read when the worker starts. In Docker, recreate the container (`docker compose up -d`). From source, `export` it in your shell before `make worker-start`. The systemd install (`scripts/brain/install_services.sh`) runs 8: jobs are async tasks in one process, mostly waiting on model calls, so more slots cost little memory.
+
+Inside an ingestion job, model calls also run in parallel: `OPEN_NOTEBOOK_SECTION_CONCURRENCY` (default `10`) sections are summarized or mined for concepts at once, and `OPEN_NOTEBOOK_CAPTION_CONCURRENCY` (default `8`) pages are captioned at once. Lower both on rate-limited providers.
+
+### Memory
+
+The worker parses and renders PDFs in threads. On Linux, set `MALLOC_ARENA_MAX=2` for it (the systemd units do): with one allocator arena per thread it kept its peak memory after ingestion, 2.3 GB idle after a 29-deck run. Each ingestion step also hands freed memory back when it finishes.
+
+SurrealDB's RocksDB engine sizes its block cache from the host's RAM unless `SURREAL_ROCKSDB_BLOCK_CACHE_SIZE` (bytes) is set. `docker-compose.yml` sets 512 MB and a 1.5 GB container limit (`SURREAL_MEM_LIMIT`); a library of several courses is a few hundred MB.
 
 ### Model call timeout
 

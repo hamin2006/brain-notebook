@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `API_URL=relative` makes the UI call the API through its own origin; `scripts/brain/install_services.sh` sets it, so a systemd install whose API listens on 127.0.0.1 works from other machines. Existing installs: add `Environment=API_URL=relative` to `brain-frontend.service`
 
 ### Changed
+- **Faster ingestion.** The systemd worker runs 8 jobs at once instead of 2; sections and pages are processed 10 and 8 at a time within a document (`OPEN_NOTEBOOK_SECTION_CONCURRENCY`, `OPEN_NOTEBOOK_CAPTION_CONCURRENCY`); concept extraction and page images start as soon as the outline exists instead of after the summaries; embedding batches go out 3 at a time. `scripts/brain/deploy_pc.sh` updates existing units
+- Memory caps: the systemd units cap the API at 1 GB, the worker at 2.5 GB and the UI at 512 MB, and `docker-compose.yml` limits SurrealDB to 1.5 GB with a 512 MB RocksDB block cache (it sized the cache from host RAM, about 2 GB idle)
 - The worker starts with `python -m commands.worker` (Makefile, `dev-init.sh`, systemd units, supervisord). Systemd installs from `scripts/brain/install_services.sh`: re-run it or change `ExecStart` in `brain-worker.service` to `... python -m commands.worker --max-tasks 2`
 - Vision captions now also cover diagrams drawn as shapes (PowerPoint, Keynote, TikZ) and pages whose math extracts as unmapped glyphs, not only pages that are mostly images; `(cid:…)` glyph placeholders are removed from page text. On the four test courses this captions 390 slides instead of 170 (migration 30 adds `source_page.shapes` and `garbled`)
 - README and docs show the new interface (screenshots in `docs/assets/screenshots/`); the favicon and README mark are the new Brain Notebook logo
@@ -25,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The notebook's grounding switch moved from the chat box to the notebook header; effort is a Quick / Standard / Deep toggle in the message box
 
 ### Fixed
+- The worker kept its peak memory after ingestion (2.3 GB idle after a 29-deck run, against 126 MB fresh): it now runs with `MALLOC_ARENA_MAX=2` and returns freed memory after each ingestion step
 - Jobs running when the worker stopped (a deploy, a crash) stayed "running" forever and their sources never finished; the worker now re-queues them when it starts (`OPEN_NOTEBOOK_REQUEUE_INTERRUPTED=false` for several workers on one database)
 - Re-running a source's processing (retry, or a job resumed after a restart) duplicated its default-transformation insights; they are replaced now
 - Pages whose math extracts as garbled glyphs were sent to the caption model but often came back empty; the prompt now asks for the equations in LaTeX

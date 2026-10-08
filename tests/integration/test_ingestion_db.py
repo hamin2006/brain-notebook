@@ -238,3 +238,33 @@ async def test_a_partly_failed_stage_is_stored_and_planned_for_a_retry(db):
     plan = await ingestion.plan_reprocessing()
     # Later stages finished: continue past the retry only if a caption is added.
     assert plan == {deck: ingestion.Restart("caption", "failed", True)}
+
+
+@pytest.mark.asyncio
+async def test_replacing_a_concept_graph_twice_leaves_one_copy(db):
+    from commands.concept_commands import replace_concept_graph
+    from open_notebook.domain import ingestion
+
+    repo_query, make_source = db
+    deck = ingestion.ensure_record_id(await make_source("deck.pdf"))
+    concept = (await repo_query("CREATE concept CONTENT {name: 'ReLU', key: 'relu'}"))[
+        0
+    ]
+    mention = {
+        "concept": ingestion.ensure_record_id(str(concept["id"])),
+        "source": deck,
+        "section": 0,
+        "page_start": 3,
+        "page_end": 3,
+        "context": None,
+    }
+    for _ in range(2):  # a rerun replaces, never appends
+        await replace_concept_graph(deck, [mention], [])
+    rows = await repo_query(
+        "SELECT * FROM concept_mention WHERE source = $s", {"s": deck}
+    )
+    assert len(rows) == 1
+    await replace_concept_graph(deck, [], [])
+    assert not await repo_query(
+        "SELECT * FROM concept_mention WHERE source = $s", {"s": deck}
+    )

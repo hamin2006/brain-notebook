@@ -20,6 +20,10 @@ services:
       - ./surreal_data:/mydata
     environment:
       - SURREAL_EXPERIMENTAL_GRAPHQL=true
+      # RocksDB sizes its block cache from the host's RAM by default (about
+      # 2 GB idle on a 16 GB machine); a notebook library is a few hundred MB.
+      - SURREAL_ROCKSDB_BLOCK_CACHE_SIZE=${SURREAL_ROCKSDB_BLOCK_CACHE_SIZE:-536870912}
+    mem_limit: ${SURREAL_MEM_LIMIT:-1536m}
     restart: always
     pull_policy: always
 

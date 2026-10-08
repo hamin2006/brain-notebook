@@ -141,6 +141,8 @@ database: **Settings → Research agent**, see [Research Agent Settings](researc
 | Variable | Default | Read by | Description |
 |----------|---------|---------|-------------|
 | `OPEN_NOTEBOOK_WORKER_MAX_TASKS` | `5` | Container / `make worker-start` | Jobs the worker runs at once. Set `1` for a local model on a single GPU. Passed to the worker as `--max-tasks` at launch |
+| `OPEN_NOTEBOOK_SECTION_CONCURRENCY` | `10` | Worker | Sections summarized or mined for concepts at once within one document. Lower for rate-limited providers |
+| `OPEN_NOTEBOOK_CAPTION_CONCURRENCY` | `8` | Worker | Pages captioned at once within one document |
 | `OPEN_NOTEBOOK_REQUEUE_INTERRUPTED` | `true` | Worker | On start, put jobs a stopped worker left *running* back in the queue. Set `false` when several workers share one database |
 | `OPEN_NOTEBOOK_AUTO_REPROCESS` | `true` | Worker | On start, retry failed ingestion steps, resume stalled ones and re-run steps an upgrade improved, each from that step ([How documents are ingested](../2-CORE-CONCEPTS/ingestion.md#re-processing)) |
 | `OPEN_NOTEBOOK_OFFICE_TO_PDF` | `auto` | Worker | Convert PowerPoint/Word uploads to PDF with LibreOffice so they get pages: `auto` (when `soffice` is on PATH), `off`, or the path of the `soffice` binary |

@@ -49,7 +49,8 @@ ANALYZE_RETRY_CONFIG = {
     "retry_log_level": "warning",
 }
 DOCUMENT_SUMMARY_INSIGHT = "Document Summary"
-MAX_CONCURRENT_SECTIONS = 4
+# Model calls are network-bound; sections are summarized this many at a time.
+MAX_CONCURRENT_SECTIONS = int(os.environ.get("OPEN_NOTEBOOK_SECTION_CONCURRENCY", "10"))
 
 
 class AnalyzeSourceInput(CommandInput):
@@ -223,13 +224,50 @@ async def _analyze_source(
 
     metadata, sections, outlined = await plan_outline(source, pages)
     title = metadata.title or source.title or "Untitled"
+    page_count = max(p.number for p in pages)
+
+    # Sections and metadata first: page images and concepts need only these,
+    # so they run while the summaries are written (summaries fill the rows in
+    # place below; replacing the rows later would hide them from the concepts
+    # job mid-read).
+    await repo_query("DELETE source_section WHERE source = $source", {"source": record})
+    await repo_insert(
+        "source_section",
+        [
+            {
+                "source": record,
+                "index": s.index,
+                "title": s.title,
+                "page_start": s.page_start,
+                "page_end": s.page_end,
+                "summary": "",
+            }
+            for s in sections
+        ],
+    )
+    await repo_query(
+        "UPDATE $source SET metadata = $metadata",
+        {
+            "source": record,
+            "metadata": {**metadata.model_dump(), "page_count": page_count},
+        },
+    )
+    # Visual search over rendered pages (skipped when the setting is off).
+    await stage_queued(input_data.source_id, "page_images")
+    submit_command("open_notebook", "embed_pages", {"source_id": input_data.source_id})
+    # Concept graph from the new sections (skipped when the setting is off).
+    await stage_queued(input_data.source_id, "concepts")
+    submit_command(
+        "open_notebook", "extract_concepts", {"source_id": input_data.source_id}
+    )
+
     fallbacks: List[int] = []
     summaries = await summarize_sections(title, pages, sections, fallbacks)
     overview = await _complete(
         Prompter(prompt_template="sources/document_summary").render(
             data={
                 "title": title,
-                "page_count": max(p.number for p in pages),
+                "page_count": page_count,
                 "sections": [
                     {**s.model_dump(), "summary": summary}
                     for s, summary in zip(sections, summaries)
@@ -248,32 +286,17 @@ async def _analyze_source(
         [f"{s.title}\n{summary}" for s, summary in zip(sections, summaries)]
     )
 
-    await repo_query("DELETE source_section WHERE source = $source", {"source": record})
-    await repo_insert(
-        "source_section",
-        [
+    for s, summary, embedding in zip(sections, summaries, embeddings):
+        await repo_query(
+            "UPDATE source_section SET summary = $summary, embedding = $embedding "
+            "WHERE source = $source AND index = $index RETURN NONE",
             {
                 "source": record,
                 "index": s.index,
-                "title": s.title,
-                "page_start": s.page_start,
-                "page_end": s.page_end,
                 "summary": summary,
                 "embedding": embedding,
-            }
-            for s, summary, embedding in zip(sections, summaries, embeddings)
-        ],
-    )
-    await repo_query(
-        "UPDATE $source SET metadata = $metadata",
-        {
-            "source": record,
-            "metadata": {
-                **metadata.model_dump(),
-                "page_count": max(p.number for p in pages),
             },
-        },
-    )
+        )
     await repo_query(
         "DELETE source_insight WHERE source = $source AND insight_type = $type",
         {"source": record, "type": DOCUMENT_SUMMARY_INSIGHT},
@@ -297,14 +320,6 @@ async def _analyze_source(
         problems.append("the document summary joins the section summaries")
     if problems:
         run.partly_failed("Model output missing: " + "; ".join(problems))
-    # Visual search over rendered pages (skipped when the setting is off).
-    await stage_queued(input_data.source_id, "page_images")
-    submit_command("open_notebook", "embed_pages", {"source_id": input_data.source_id})
-    # Concept graph from the new sections (skipped when the setting is off).
-    await stage_queued(input_data.source_id, "concepts")
-    submit_command(
-        "open_notebook", "extract_concepts", {"source_id": input_data.source_id}
-    )
     return AnalyzeSourceOutput(
         success=True,
         source_id=input_data.source_id,

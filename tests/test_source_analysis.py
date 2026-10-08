@@ -98,10 +98,13 @@ async def test_analyze_writes_sections_metadata_and_summary(submitted, stage_wri
         [json.dumps(outline), "Regularization summary", "Optimizer summary", "Overview"]
     )
     writes: list = []
+    summaries: list = []  # (index, summary, jobs queued by then)
 
     async def fake_query(query, params=None):
         if query.startswith("SELECT page, text, caption"):
             return PAGE_ROWS
+        if query.startswith("UPDATE source_section"):
+            summaries.append((params["index"], params["summary"], submitted.call_count))
         writes.append((query.split()[0], params))
         return []
 
@@ -133,13 +136,18 @@ async def test_analyze_writes_sections_metadata_and_summary(submitted, stage_wri
         ("open_notebook", "embed_pages", {"source_id": "source:l4"}),
         ("open_notebook", "extract_concepts", {"source_id": "source:l4"}),
     ]
+    # Sections are written first, so page images and concepts start while the
+    # summaries are written; the summaries then fill the same rows in place.
     assert [
         (r["title"], r["page_start"], r["page_end"], r["summary"]) for r in inserted
-    ] == [
-        ("Regularization", 1, 2, "Regularization summary"),
-        ("Optimizers", 3, 3, "Optimizer summary"),
+    ] == [("Regularization", 1, 2, ""), ("Optimizers", 3, 3, "")]
+    assert summaries == [
+        (0, "Regularization summary", 2),
+        (1, "Optimizer summary", 2),
     ]
-    metadata = next(p["metadata"] for verb, p in writes if verb == "UPDATE")
+    metadata = next(
+        p["metadata"] for verb, p in writes if verb == "UPDATE" and "metadata" in p
+    )
     assert (
         metadata["sequence"] == 4
         and metadata["course"] == "AI 360"

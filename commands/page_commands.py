@@ -44,7 +44,8 @@ CAPTION_RETRY_CONFIG = {
     "stop_on": [ValueError, ConfigurationError],
     "retry_log_level": "warning",
 }
-MAX_CONCURRENT_PAGES = 4
+# Vision calls are network-bound; pages are captioned this many at a time.
+MAX_CONCURRENT_PAGES = int(os.environ.get("OPEN_NOTEBOOK_CAPTION_CONCURRENCY", "8"))
 # A page checked at this caption version or later is not asked again. Raise it
 # to the new STAGE_VERSIONS["caption"] when a bump changes which pages get
 # captioned or what the model is asked; leave it when a bump only re-runs the

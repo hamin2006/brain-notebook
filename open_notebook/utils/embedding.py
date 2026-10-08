@@ -44,6 +44,7 @@ def _get_embedding_batch_size() -> int:
 
 EMBEDDING_BATCH_SIZE = _get_embedding_batch_size()
 EMBEDDING_MAX_RETRIES = 3
+EMBEDDING_CONCURRENCY = 3  # batches in flight at once
 EMBEDDING_RETRY_DELAY = 2  # seconds
 
 
@@ -163,39 +164,41 @@ async def generate_embeddings(
         lambda: _get_size_metrics()[3],
     )
 
-    all_embeddings: List[List[float]] = []
     total_batches = (len(texts) + EMBEDDING_BATCH_SIZE - 1) // EMBEDDING_BATCH_SIZE
+    # Batches are network-bound: send a few at once, keeping their order.
+    semaphore = asyncio.Semaphore(EMBEDDING_CONCURRENCY)
 
-    for batch_idx in range(total_batches):
+    async def embed_batch(batch_idx: int) -> List[List[float]]:
         start = batch_idx * EMBEDDING_BATCH_SIZE
-        end = start + EMBEDDING_BATCH_SIZE
-        batch = texts[start:end]
+        batch = texts[start : start + EMBEDDING_BATCH_SIZE]
+        async with semaphore:
+            for attempt in range(1, EMBEDDING_MAX_RETRIES + 1):
+                try:
+                    return await embedding_model.aembed(batch)
+                except Exception as e:
+                    cmd_context = f" (command: {command_id})" if command_id else ""
+                    if attempt < EMBEDDING_MAX_RETRIES:
+                        logger.debug(
+                            f"Embedding batch {batch_idx + 1}/{total_batches} "
+                            f"attempt {attempt}/{EMBEDDING_MAX_RETRIES} failed "
+                            f"using model '{model_name}'{cmd_context}: {e}. Retrying..."
+                        )
+                        await asyncio.sleep(EMBEDDING_RETRY_DELAY)
+                    else:
+                        logger.debug(
+                            f"Embedding batch {batch_idx + 1}/{total_batches} "
+                            f"failed after {EMBEDDING_MAX_RETRIES} attempts "
+                            f"using model '{model_name}'{cmd_context}: {e}"
+                        )
+                        raise RuntimeError(
+                            f"Failed to generate embeddings using model '{model_name}' "
+                            f"(batch {batch_idx + 1}/{total_batches}, "
+                            f"{len(batch)} texts): {e}"
+                        ) from e
+        raise AssertionError("unreachable")
 
-        for attempt in range(1, EMBEDDING_MAX_RETRIES + 1):
-            try:
-                batch_embeddings = await embedding_model.aembed(batch)
-                all_embeddings.extend(batch_embeddings)
-                break
-            except Exception as e:
-                cmd_context = f" (command: {command_id})" if command_id else ""
-                if attempt < EMBEDDING_MAX_RETRIES:
-                    logger.debug(
-                        f"Embedding batch {batch_idx + 1}/{total_batches} "
-                        f"attempt {attempt}/{EMBEDDING_MAX_RETRIES} failed "
-                        f"using model '{model_name}'{cmd_context}: {e}. Retrying..."
-                    )
-                    await asyncio.sleep(EMBEDDING_RETRY_DELAY)
-                else:
-                    logger.debug(
-                        f"Embedding batch {batch_idx + 1}/{total_batches} "
-                        f"failed after {EMBEDDING_MAX_RETRIES} attempts "
-                        f"using model '{model_name}'{cmd_context}: {e}"
-                    )
-                    raise RuntimeError(
-                        f"Failed to generate embeddings using model '{model_name}' "
-                        f"(batch {batch_idx + 1}/{total_batches}, "
-                        f"{len(batch)} texts): {e}"
-                    ) from e
+    batches = await asyncio.gather(*(embed_batch(i) for i in range(total_batches)))
+    all_embeddings: List[List[float]] = [v for batch in batches for v in batch]
 
     logger.debug(
         f"Generated {len(all_embeddings)} embeddings in {total_batches} batch(es)"

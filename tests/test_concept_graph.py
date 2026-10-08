@@ -133,6 +133,10 @@ async def test_extract_concepts_writes_mentions_and_relations():
                 {"page": p, "text": f"page {p} text", "caption": None}
                 for p in range(96, 109)
             ]
+        if sql.startswith("BEGIN TRANSACTION"):  # replace mentions and relations
+            inserted["concept_mention"] = params["mentions"]
+            inserted["concept_relation"] = params["relations"]
+            return []
         if sql.startswith("SELECT"):  # aliases, existing concepts: none yet
             return []
         if sql.startswith("UPSERT") and "name" in params:
@@ -144,7 +148,6 @@ async def test_extract_concepts_writes_mentions_and_relations():
     with (
         patch.object(cmd.AgentSettings, "load", new=AsyncMock(return_value=SimpleNamespace(knowledge_graph=True))),
         patch.object(cmd, "repo_query", new=fake_query),
-        patch.object(cmd, "repo_insert", new=AsyncMock(side_effect=lambda t, rows: inserted.setdefault(t, rows))),
         patch.object(cmd.Source, "get", new=AsyncMock(return_value=MagicMock(metadata={"title": "Lecture 3"}, title="L3"))),
         patch.object(cmd, "provision_langchain_model", new=AsyncMock(return_value=model)),
         patch.object(cmd, "limit_reasoning", side_effect=lambda m: m),
@@ -190,13 +193,14 @@ async def test_a_section_whose_extraction_fails_is_reported(stage_writes):
             return [
                 {"page": p, "text": f"page {p}", "caption": None} for p in range(1, 5)
             ]
+        if sql.startswith("BEGIN TRANSACTION"):
+            inserted["concept_mention"] = params["mentions"]
         return []
 
     inserted: dict = {}
     with (
         patch.object(cmd.AgentSettings, "load", new=AsyncMock(return_value=SimpleNamespace(knowledge_graph=True))),
         patch.object(cmd, "repo_query", new=fake_query),
-        patch.object(cmd, "repo_insert", new=AsyncMock(side_effect=lambda t, rows: inserted.setdefault(t, rows))),
         patch.object(cmd.Source, "get", new=AsyncMock(return_value=MagicMock(metadata={}, title="L5"))),
         patch.object(cmd, "provision_langchain_model", new=AsyncMock(return_value=model)),
         patch.object(cmd, "limit_reasoning", side_effect=lambda m: m),

@@ -7,6 +7,9 @@ A source goes through background stages, each a worker job:
                                                            → page_images (embed_pages)
                                                            → concepts (extract_concepts)
 
+(analyze queues page_images and concepts as soon as the outline is written, so
+they run while it writes the section summaries.)
+
 Each stage records its state in `source_stage` (one row per source and stage):
 queued / running / done / skipped / failed, with timestamps, the stage version
 that produced the current output, an error and a small detail object. The API
@@ -24,6 +27,7 @@ import asyncio
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
+from functools import lru_cache
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 from loguru import logger
@@ -233,10 +237,32 @@ async def tracked(source_id: str, stage: str) -> AsyncIterator[StageRun]:
     except BaseException as e:
         await stage_failed(source_id, stage, f"{type(e).__name__}: {e}")
         raise
+    finally:
+        release_memory()
     if run.incomplete:
         await stage_failed(source_id, stage, run.incomplete, run.detail)
     else:
         await stage_done(source_id, stage, run.detail, skipped=run.skipped)
+
+
+def release_memory() -> None:
+    """Hand memory freed by a finished stage back to the OS.
+
+    glibc keeps freed heap memory in its arenas (one per thread that touched it,
+    and PDF parsing and rendering run in threads), so without this the worker
+    stays at its peak: 2.3 GB idle after a 29-deck run, against 126 MB fresh.
+    """
+    try:
+        _libc().malloc_trim(0)
+    except Exception:  # not glibc (macOS, musl): nothing to do
+        pass
+
+
+@lru_cache(maxsize=1)
+def _libc() -> Any:
+    import ctypes
+
+    return ctypes.CDLL("libc.so.6")
 
 
 async def submit_stage(stage: str, source_id: str, **args: Any) -> str:
