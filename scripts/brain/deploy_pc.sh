@@ -60,3 +60,7 @@ systemctl --user restart brain-worker brain-frontend
 for unit in brain-api brain-worker brain-frontend; do
   echo "$unit: $(systemctl --user is-active "$unit")"
 done
+if ! command -v soffice >/dev/null 2>&1; then
+  echo "note: LibreOffice is not installed, so PowerPoint/Word uploads are ingested as text only" \
+    "(sudo apt install --no-install-recommends libreoffice-impress libreoffice-writer)"
+fi

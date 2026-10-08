@@ -40,7 +40,8 @@ embeddings and the concept graph. That's what makes page citations, "the 4th lec
 search work. Details: [How Documents Are Ingested](../2-CORE-CONCEPTS/ingestion.md).
 
 Lecture decks and papers as PDF give the best results. PowerPoint and Word files (PPTX, PPT, PPSX, ODP, DOCX, DOC,
-ODT, RTF) get the same pipeline when LibreOffice is installed on the machine running the worker: they're converted to
+ODT, RTF) get the same pipeline when LibreOffice is installed on the machine running the worker (the Docker image
+includes it): they're converted to
 a PDF on upload (the PDF replaces the original file). Without LibreOffice they're extracted as text only, with no
 pages, captions or outline; export them to PDF yourself instead. Keynote files need exporting to PDF.
 

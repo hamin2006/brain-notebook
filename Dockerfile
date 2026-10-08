@@ -70,10 +70,17 @@ FROM python:3.12-slim-trixie AS runtime-base
 
 # Install only runtime system dependencies (no build tools)
 # Add Node.js 22.x LTS for running the frontend
+# LibreOffice (Impress + Writer, headless) converts PowerPoint/Word uploads to
+# PDF so they get pages (open_notebook/utils/office_convert.py); the Liberation
+# and DejaVu fonts stand in for the Office fonts decks are made with.
 RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     ffmpeg \
     supervisor \
     curl \
+    libreoffice-impress \
+    libreoffice-writer \
+    fonts-liberation \
+    fonts-dejavu-core \
     && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
