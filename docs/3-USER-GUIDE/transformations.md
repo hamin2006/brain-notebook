@@ -30,7 +30,7 @@ A new install comes with six:
 |-------|------------------|
 | **Paper Analysis** | An analysis of a technical or scientific paper |
 | **Key Insights** | Important insights and actionable items |
-| **Dense Summary** | A rich, dense summary. Pre-selected for new sources |
+| **Dense Summary** | A dense summary written for another language model to read. Not pre-selected: every PDF already gets a Document Summary from analysis, which the research agent uses |
 | **Reflection Questions** | Questions to help explore the document further |
 | **Table of Contents** | The topics the document covers |
 | **Simple Summary** | A short summary |

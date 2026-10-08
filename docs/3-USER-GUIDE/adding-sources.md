@@ -24,7 +24,7 @@ Pick the notebooks to link the source to (optional). Opened from a notebook, tha
 
 ### Step 3: Process
 
-- **Transformations (optional)**: transformations to run on the source after extraction. Each one produces an [insight](../2-CORE-CONCEPTS/notebooks-sources-notes.md#insights). Transformations marked *Suggest by default on new sources* are pre-selected (on a new install, that's **Dense Summary**). See [Transformations](transformations.md).
+- **Transformations (optional)**: transformations to run on the source after extraction. Each one produces an [insight](../2-CORE-CONCEPTS/notebooks-sources-notes.md#insights). Transformations marked *Suggest by default on new sources* are pre-selected (none on a new install: analysis already writes each document's summary). See [Transformations](transformations.md).
 - **Enable embedding for search**: embeds the source so the research agent's `search` (and vector search) can find it. **Leave it on**: without embeddings the agent can only `grep` and `read` the source. Its default comes from **Settings → Embedding and Search → Default Embedding Option**: *Ask* shows this checkbox (checked), *Always* embeds without asking (recommended), *Never* skips embedding.
 
 Click **Done**. You can click **Done** on any step to submit with the current choices.

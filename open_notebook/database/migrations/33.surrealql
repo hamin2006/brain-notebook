@@ -1,0 +1,6 @@
+-- Migration 33: stop applying "Dense Summary" to every upload by default.
+-- It sends a document's whole text to the model in one prompt (minutes and the
+-- largest calls of an ingestion for a long deck), and nothing reads its output:
+-- the research agent works from pages, sections and the "Document Summary"
+-- insight that analysis writes. It stays available to run by hand.
+UPDATE transformation SET apply_default = false WHERE name = 'Dense Summary';

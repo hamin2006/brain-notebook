@@ -191,6 +191,7 @@ class AsyncMigrationManager:
                 "caption_version = caption_version ?? 0",
                 "shapes = NONE OR garbled = NONE OR caption_version = NONE",
             ),
+            AsyncMigration.from_file("open_notebook/database/migrations/33.surrealql"),
         ]
         self.down_migrations = [
             AsyncMigration.from_file(
@@ -288,6 +289,9 @@ class AsyncMigrationManager:
             ),
             AsyncMigration.from_file(
                 "open_notebook/database/migrations/32_down.surrealql"
+            ),
+            AsyncMigration.from_file(
+                "open_notebook/database/migrations/33_down.surrealql"
             ),
         ]
         self.runner = AsyncMigrationRunner(

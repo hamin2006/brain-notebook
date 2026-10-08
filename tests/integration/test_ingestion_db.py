@@ -268,3 +268,13 @@ async def test_replacing_a_concept_graph_twice_leaves_one_copy(db):
     assert not await repo_query(
         "SELECT * FROM concept_mention WHERE source = $s", {"s": deck}
     )
+
+
+@pytest.mark.asyncio
+async def test_dense_summary_is_not_applied_to_uploads_by_default(db):
+    """Migration 33: nothing reads Dense Summary, and it prompts with whole documents."""
+    repo_query, _ = db
+    rows = await repo_query(
+        "SELECT name, apply_default FROM transformation WHERE name = 'Dense Summary'"
+    )
+    assert rows and rows[0]["apply_default"] is False
