@@ -106,9 +106,13 @@ on these pages". Topics that only appear in an agenda or syllabus slide are skip
 
 ## Other source types
 
-Web pages, Office documents, plain text, YouTube, audio and video go through Open Notebook's extraction
-(content-core, optionally Docling or Crawl4AI) into one text, which is chunked and embedded. The agent can search,
-grep and read them by chunk (`source:abc#c12`). They don't get pages, captions, an outline or page images.
+PowerPoint and Word files (PPTX, PPT, PPSX, ODP, DOCX, DOC, ODT, RTF) are converted to PDF with LibreOffice when it's
+installed on the worker's machine, and then take the PDF pipeline above (`OPEN_NOTEBOOK_OFFICE_TO_PDF`).
+
+Web pages, spreadsheets, EPUB, plain text, YouTube, audio, video, and office files without LibreOffice go through
+Open Notebook's extraction (content-core, optionally Docling or Crawl4AI) into one text, which is chunked and
+embedded. The agent can search, grep and read them by chunk (`source:abc#c12`). They don't get pages, captions, an
+outline or page images.
 
 Transformations you select when adding a source still run and produce insights, as in Open Notebook.
 

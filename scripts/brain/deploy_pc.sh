@@ -10,9 +10,15 @@ export GIT_PAGER=cat PAGER=cat
 UV="$(command -v uv || echo "$HOME/.local/bin/uv")"
 
 branch=$(git rev-parse --abbrev-ref HEAD)
-before=$(git rev-parse --short HEAD)
-git fetch -q origin "$branch"
-git merge --ff-only -q "origin/$branch"
+if [ -z "${DEPLOY_FROM:-}" ]; then
+  before=$(git rev-parse --short HEAD)
+  git fetch -q origin "$branch"
+  git merge --ff-only -q "origin/$branch"
+  # Continue with the version of this script just pulled: bash reads a script
+  # as it runs, so the old copy would skip steps added since.
+  exec env DEPLOY_FROM="$before" bash "$0" "$@"
+fi
+before="$DEPLOY_FROM"
 after=$(git rev-parse --short HEAD)
 echo "code ($branch): $before -> $after"
 

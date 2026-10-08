@@ -27,6 +27,7 @@ from open_notebook.exceptions import (
     InvalidInputError,
 )
 from open_notebook.graphs.transformation import graph as transform_graph
+from open_notebook.utils.office_convert import convert_to_pdf, is_office_document
 from open_notebook.utils.pdf_pages import (
     PdfPage,
     extract_pdf_pages,
@@ -260,6 +261,18 @@ async def content_process(state: SourceState) -> dict:
 
     url = content_state.get("url") or ""
     file_path = content_state.get("file_path")
+    if file_path and is_office_document(file_path):
+        # Slides and documents get pages (and everything built on them) when
+        # LibreOffice can turn them into a PDF; the PDF becomes the source's
+        # file. Without it they are extracted as text below.
+        pdf = await asyncio.to_thread(convert_to_pdf, file_path)
+        if pdf:
+            try:
+                os.unlink(file_path)
+            except OSError as e:
+                logger.warning(f"Could not remove {file_path} after conversion: {e}")
+            file_path = pdf
+            content_state = {**content_state, "file_path": pdf}
     pages: List[PdfPage] = []
     if file_path and file_path.lower().endswith(".pdf"):
         pages = await _extract_pages(file_path)
@@ -309,7 +322,7 @@ async def content_process(state: SourceState) -> dict:
         except Exception as e:
             logger.warning(f"Failed to delete source file {file_path}: {e}")
 
-    return {"extraction": processed, "pages": pages}
+    return {"extraction": processed, "pages": pages, "content_state": content_state}
 
 
 async def _extract_pages(file_path: str) -> List[PdfPage]:

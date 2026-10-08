@@ -34,6 +34,10 @@ pipeline is [How Documents Are Ingested](../2-CORE-CONCEPTS/ingestion.md).
   their own command. `caption_pages` skips pages already checked at the current caption version
   (`source_page.caption_version`).
 - Ingestion re-runs replace a transformation's insight (`add_insight(replace=True)`) instead of duplicating it.
+- **Office documents** (`utils/office_convert.py`): `content_process` converts PPTX/PPT/PPSX/ODP/DOCX/DOC/ODT/RTF to
+  PDF with headless `soffice` (private `-env:UserInstallation` profile per call, 300 s timeout) when available, deletes
+  the original and continues with the PDF as the source's file (returned in `content_state`). No converter or a failed
+  conversion falls back to content-core text.
 
 ## Chunking (`utils/chunking.py`)
 

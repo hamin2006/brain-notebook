@@ -23,6 +23,8 @@ Both need the same preparation (steps 1–4).
 - **Node.js 22** (20.9 is the minimum Next.js 16 accepts)
 - **Docker**, for SurrealDB (and SearXNG). A SurrealDB v2 binary works too.
 - **git**, and **ffmpeg** if you'll add audio/video sources or make podcasts
+- Optional: **LibreOffice** (`sudo apt install --no-install-recommends libreoffice-impress libreoffice-writer`), so
+  PowerPoint and Word uploads are converted to PDF and get pages, captions and an outline
 
 ## 1. Clone and install dependencies
 

@@ -74,7 +74,7 @@ What we lack, roughly in priority order:
 2. **Latency**: 10–60 s per answer against a few seconds.
 3. **Zero setup and mobile**: we need a running host, Tailscale, API keys and a deploy script.
 4. **Sharing and collaboration**: single user, basic password auth, no shared notebooks or links.
-5. **Source breadth**: no Drive, Docs or Slides connectors or source discovery; PPTX isn't ingested slide by slide;
+5. **Source breadth**: no Drive, Docs or Slides connectors or source discovery; PPTX gets pages only when LibreOffice is installed (converted to PDF);
    scanned PDFs need OCR to get pages.
 6. **Source-anchored writing tools**: NotebookLM is adding AI Editing and Canvas.
 7. **Proven robustness**: the eval covers one course (seven decks); papers, books and mixed libraries are untested.
