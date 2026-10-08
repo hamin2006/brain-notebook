@@ -39,11 +39,12 @@ fi
 
 # The API applies migrations on start: restart it first and wait, so the worker
 # never runs jobs against the old schema. Jobs interrupted by the worker's
-# restart are re-queued when it starts.
+# restart are re-queued when it starts. /health is the one route outside the
+# password check, and the API serves nothing until its migrations succeed.
 systemctl --user restart brain-api
 api_up=0
 for _ in $(seq 1 90); do
-  if curl -fs -o /dev/null http://127.0.0.1:5055/api/models; then
+  if curl -fs -o /dev/null http://127.0.0.1:5055/health; then
     api_up=1
     echo "api up"
     break
@@ -51,7 +52,8 @@ for _ in $(seq 1 90); do
   sleep 2
 done
 if [ "$api_up" != 1 ]; then
-  echo "api did not come up; worker not restarted (journalctl --user -u brain-api)" >&2
+  echo "api did not come up; worker not restarted. Last API log lines:" >&2
+  journalctl --user -u brain-api -n 30 --no-pager >&2 || true
   exit 1
 fi
 systemctl --user restart brain-worker brain-frontend
