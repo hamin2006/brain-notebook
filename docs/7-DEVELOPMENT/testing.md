@@ -26,11 +26,15 @@ against real models (below).
 
 `tests/` is flat: one `test_<topic>.py` per feature or regression, for example `test_sources_api.py`, `test_agent_graph.py`, `test_page_search.py`, `test_concept_graph.py`. The one subfolder is `tests/integration/` (below). Name a new file after what it covers, or add to the existing file for that area.
 
-`tests/conftest.py` has no shared fixtures. It only:
+`tests/conftest.py`:
 
 - sets `OPEN_NOTEBOOK_PASSWORD=""` before anything is imported, so the auth middleware is disabled in tests;
 - loads the repo's `.env` if it exists;
-- puts the repo root on `sys.path`.
+- puts the repo root on `sys.path`;
+- has one autouse fixture, `stage_writes`: ingestion stage writes (`open_notebook/domain/ingestion.py`) are recorded
+  in a list instead of reaching a database. Request the fixture to assert on them (each entry is
+  `(source_id, stage, fields)`); tests that need the real writes (and the integration tests) are marked
+  `@pytest.mark.real_stage_writes`.
 
 pytest-asyncio runs in its default (strict) mode, so async tests need `@pytest.mark.asyncio`.
 
@@ -91,7 +95,8 @@ def test_delete_notebook_missing_returns_404(mock_get, client):
 ## Integration tests (real SurrealDB)
 
 `tests/integration/test_agent_tools_db.py` runs the agent's tools, the concept graph, memory, settings and the
-rebuild endpoint against a real SurrealDB with the full migrated schema. It catches SurrealQL behavior mocks can't
+rebuild endpoint against a real SurrealDB with the full migrated schema; `test_ingestion_db.py` covers stage
+tracking, the delete cascade, worker recovery and reprocessing plans. It catches SurrealQL behavior mocks can't
 (for example `IN` returning no rows on composite-indexed tables). It's skipped unless `SURREAL_TEST_URL` is set:
 
 ```bash

@@ -1,0 +1,32 @@
+-- Migration 31: ingestion tracking. One source_stage row per source and
+-- pipeline stage (extract, caption, embed, analyze, page_images, concepts):
+-- status, timestamps, the stage version that produced the current output, an
+-- error and a small detail object (open_notebook/domain/ingestion.py).
+-- source_page.caption_version records the caption stage version a page was
+-- last checked with, so pages without visual content aren't re-sent to the
+-- model until that version changes.
+
+DEFINE TABLE IF NOT EXISTS source_stage SCHEMAFULL;
+DEFINE FIELD IF NOT EXISTS source ON TABLE source_stage TYPE record<source>;
+DEFINE FIELD IF NOT EXISTS stage ON TABLE source_stage TYPE string;
+DEFINE FIELD IF NOT EXISTS status ON TABLE source_stage TYPE string;
+DEFINE FIELD IF NOT EXISTS version ON TABLE source_stage TYPE option<int>;
+DEFINE FIELD IF NOT EXISTS queued_at ON TABLE source_stage TYPE option<datetime>;
+DEFINE FIELD IF NOT EXISTS started_at ON TABLE source_stage TYPE option<datetime>;
+DEFINE FIELD IF NOT EXISTS finished_at ON TABLE source_stage TYPE option<datetime>;
+DEFINE FIELD IF NOT EXISTS updated ON TABLE source_stage TYPE option<datetime>;
+DEFINE FIELD IF NOT EXISTS error ON TABLE source_stage TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS detail ON TABLE source_stage FLEXIBLE TYPE option<object>;
+DEFINE INDEX IF NOT EXISTS idx_source_stage_source ON TABLE source_stage COLUMNS source;
+
+DEFINE FIELD IF NOT EXISTS caption_version ON TABLE source_page TYPE int DEFAULT 0;
+
+DEFINE EVENT OVERWRITE source_delete ON TABLE source WHEN ($after == NONE) THEN {
+    delete source_embedding where source == $before.id;
+    delete source_insight where source == $before.id;
+    delete source_page where source == $before.id;
+    delete source_section where source == $before.id;
+    delete concept_mention where source == $before.id;
+    delete concept_relation where source == $before.id;
+    delete source_stage where source == $before.id;
+};

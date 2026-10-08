@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { addressLocator, firstPage, parseReferenceHref } from './Citations'
 import { traceStats } from './ResearchTimeline'
+import { formatDuration, ingestionProgress } from './IngestionProgress'
+import type { NotebookIngestion, StageStatus } from '@/lib/api/ingestion'
 import { collectReferences, convertReferencesToCompactMarkdown } from '@/lib/utils/source-references'
 
 describe('citations', () => {
@@ -38,5 +40,32 @@ describe('traceStats', () => {
       { tool: 'grep', args: { pattern: 'x', addresses: ['source:a', 'source:c'] } },
     ])
     expect(stats).toEqual({ steps: 4, documents: 3, pagesViewed: 1 })
+  })
+})
+
+describe('ingestion progress', () => {
+  const stage = (status: StageStatus['status']): StageStatus => ({ stage: 'caption', status, current_version: 2 })
+
+  it('counts finished and skipped stages across sources', () => {
+    const data: NotebookIngestion = {
+      complete: false,
+      sources: 2,
+      sources_complete: 1,
+      sources_failed: 0,
+      active: { caption: 1 },
+      items: [
+        { source_id: 'source:a', complete: true, failed: false, stages: [stage('done'), stage('skipped')] },
+        { source_id: 'source:b', complete: false, failed: false, stages: [stage('done'), stage('running')] },
+      ],
+    }
+    expect(ingestionProgress(data)).toBe(0.75)
+    expect(ingestionProgress({ ...data, items: [] })).toBe(1)
+  })
+
+  it('formats durations in seconds, then minutes', () => {
+    const t = (key: string, options?: Record<string, unknown>) => `${key}:${JSON.stringify(options)}`
+    expect(formatDuration(t, 0.2)).toBe('brain.durationSeconds:{"seconds":1}')
+    expect(formatDuration(t, 42.4)).toBe('brain.durationSeconds:{"seconds":42}')
+    expect(formatDuration(t, 135)).toBe('brain.durationMinutes:{"minutes":"2.3"}')
   })
 })

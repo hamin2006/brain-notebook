@@ -29,6 +29,16 @@ upload
 
 A 100-page deck takes a few minutes end to end, and costs a few cents with the recommended OpenRouter models. The
 source is searchable as soon as step 3 finishes; steps 4–6 add the outline, summaries, visual search and graph.
+Measured with a two-job worker: a 7-deck course of 89 LaTeX slides took 10 minutes, 8 decks (276 pages) 17 minutes,
+and 7 decks with 738 pages of animation builds 17 minutes.
+
+### Following progress
+
+The notebook's **Sources** list shows an indexing strip while anything is running (how many documents are ready and
+which steps are active), and each source shows its current step. A source's **Structure** tab lists every step with
+how long it took. If a step fails after extraction (a model outage, say), the source shows *failed* with **Retry**,
+which re-runs it from that step; the rest of the document stays usable. The same data is at
+`GET /api/notebooks/{id}/ingestion` and `GET /api/sources/{id}/ingestion`.
 
 ### 1. Pages
 
@@ -104,6 +114,11 @@ Transformations you select when adding a source still run and produce insights, 
 
 ## Re-processing
 
+- **After an upgrade that improves a step**, existing documents are brought up to date automatically: when the
+  worker starts, sources processed by an older version of a step are re-run from that step (only what changed is
+  redone; captions, insights and page images are kept). Set `OPEN_NOTEBOOK_AUTO_REPROCESS=false` to turn this off.
+- **A restart during ingestion** (a deploy, a crash) loses nothing: the worker re-queues the interrupted jobs when it
+  starts.
 - **A source added before Brain Notebook** (or by upstream Open Notebook) has no pages. Delete it and add the file
   again to get the full pipeline.
 - **After turning on visual page search or the concept graph**, or changing the page-embedding model: **Settings →
@@ -114,5 +129,5 @@ Transformations you select when adding a source still run and produce insights, 
 ## Where it's stored
 
 All layers live in SurrealDB tables tied to the source (`source_page`, `source_embedding`, `source_section`,
-`concept_mention`, …) and are deleted with it. Uploaded files are in the app's data folder. See
+`concept_mention`, `source_stage` for progress, …) and are deleted with it. Uploaded files are in the app's data folder. See
 [Database](../5-CONFIGURATION/database.md).

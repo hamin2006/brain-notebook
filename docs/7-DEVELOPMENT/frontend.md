@@ -40,9 +40,12 @@ Reusable research UI lives in `components/brain/`:
 | `ConceptGraphView` | The Graph view's Map / 3D switch; `ConceptGraph3D` (3d-force-graph + three.js, CSS2D labels, bloom in dark) is loaded with `next/dynamic` only when 3D is opened |
 | `ConceptGraph` | `ConceptGraph2D`, the map: d3-force layout on a canvas (columns per document, relation and co-occurrence links, hover focus, search, zoom, legend filter) from `GET /notebooks/{id}/graph` |
 | `SourceStructure` | The source view's Structure tab |
+| `IngestionProgress` | `IngestionStrip` (the library's indexing strip), `IngestionTimeline` (a source's stages on the Structure tab), `stageLabel` (stage names for cards) |
 | `AskBar` | The home page's ask-everywhere box (opens `/search?mode=ask&q=…`) |
 
-Data for these comes from `lib/api/explore.ts` / `lib/hooks/use-explore.ts` (overview, concept, structure, page images).
+Data for these comes from `lib/api/explore.ts` / `lib/hooks/use-explore.ts` (overview, concept, structure, page images)
+and `lib/api/ingestion.ts` / `lib/hooks/use-ingestion.ts` (progress; polls only while something is unfinished, keys
+under `['sources', …]` so source invalidations refresh it, and invalidates `['explore']` when a notebook finishes).
 
 ## Flow walkthrough: notebook chat (research agent)
 

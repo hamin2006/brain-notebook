@@ -7,6 +7,7 @@ import { useTranslation } from '@/lib/hooks/use-translation'
 import type { SourceStructure } from '@/lib/api/explore'
 import { MarkdownRenderer } from '@/components/ui/markdown-renderer'
 import { PagePreviewDialog, type PageTarget } from '@/components/sources/PagePreviewDialog'
+import { IngestionTimeline } from './IngestionProgress'
 import { PageThumb } from './PageThumb'
 
 const META_KEYS = ['doc_type', 'course', 'sequence', 'date', 'authors'] as const
@@ -167,6 +168,10 @@ export function SourceStructureView({ structure, onOpenSource }: { structure: So
           )}
         </section>
       )}
+
+      <section className="max-w-sm">
+        <IngestionTimeline sourceId={structure.id} />
+      </section>
 
       <PagePreviewDialog
         target={pageTarget}

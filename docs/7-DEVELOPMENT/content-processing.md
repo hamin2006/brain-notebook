@@ -25,6 +25,15 @@ pipeline is [How Documents Are Ingested](../2-CORE-CONCEPTS/ingestion.md).
 - **PDFium is not thread-safe**: every pypdfium2 call holds `PDFIUM_LOCK` (it crashed the worker with heap corruption
   when captions rendered pages in parallel).
 - Model calls in these jobs use `limit_reasoning()` so reasoning models can't return empty replies.
+- **Tracking and versions** (`open_notebook/domain/ingestion.py`, [ADR-019](decisions/ADR-019-tracked-versioned-ingestion.md)):
+  each command runs inside `tracked(source_id, stage)` (running → done / skipped / failed, with a `detail` dict) and
+  queues the next stage with `stage_queued()` beside its `submit_command()`. `STAGE_VERSIONS` holds each stage's
+  version; bump it (with a reason in the comment) when existing sources should get a change. The worker entrypoint
+  then restarts outdated sources: `reprocess()` maps extract/caption to `caption_pages(refresh=…, reprocess=True)`,
+  which updates pages in place and continues the chain only if captions or text changed; other stages re-submit
+  their own command. `caption_pages` skips pages already checked at the current caption version
+  (`source_page.caption_version`).
+- Ingestion re-runs replace a transformation's insight (`add_insight(replace=True)`) instead of duplicating it.
 
 ## Chunking (`utils/chunking.py`)
 

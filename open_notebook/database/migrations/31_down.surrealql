@@ -1,0 +1,12 @@
+-- Down migration 31: drop ingestion tracking.
+
+DEFINE EVENT OVERWRITE source_delete ON TABLE source WHEN ($after == NONE) THEN {
+    delete source_embedding where source == $before.id;
+    delete source_insight where source == $before.id;
+    delete source_page where source == $before.id;
+    delete source_section where source == $before.id;
+    delete concept_mention where source == $before.id;
+    delete concept_relation where source == $before.id;
+};
+REMOVE FIELD IF EXISTS caption_version ON TABLE source_page;
+REMOVE TABLE IF EXISTS source_stage;

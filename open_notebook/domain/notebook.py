@@ -10,6 +10,7 @@ from surrealdb import RecordID
 
 from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.domain.base import ObjectModel
+from open_notebook.domain.ingestion import stage_queued
 from open_notebook.exceptions import (
     DatabaseOperationError,
     InvalidInputError,
@@ -564,6 +565,7 @@ class Source(ObjectModel):
                 raise ValueError(f"Source {self.id} has no text to vectorize")
 
             # Submit the embed_source command
+            await stage_queued(str(self.id), "embed")
             command_id = submit_command(
                 "open_notebook",
                 "embed_source",
@@ -585,7 +587,9 @@ class Source(ObjectModel):
             logger.exception(e)
             raise DatabaseOperationError(e)
 
-    async def add_insight(self, insight_type: str, content: str) -> str:
+    async def add_insight(
+        self, insight_type: str, content: str, replace: bool = False
+    ) -> str:
         """
         Submit insight creation as an async command (fire-and-forget).
 
@@ -600,6 +604,9 @@ class Source(ObjectModel):
         Args:
             insight_type: Type/category of the insight
             content: The insight content text
+            replace: Delete the source's existing insights of this type first
+                (ingestion re-runs replace their insights instead of adding
+                duplicates)
 
         Returns:
             command_id for optional tracking
@@ -616,6 +623,12 @@ class Source(ObjectModel):
         """
         if not insight_type or not content:
             raise InvalidInputError("Insight type and content must be provided")
+
+        if replace:
+            await repo_query(
+                "DELETE source_insight WHERE source = $source AND insight_type = $type",
+                {"source": ensure_record_id(str(self.id)), "type": insight_type},
+            )
 
         try:
             # Submit create_insight command (fire-and-forget)

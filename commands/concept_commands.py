@@ -19,6 +19,7 @@ from surreal_commands import CommandInput, CommandOutput, command
 from open_notebook.ai.provision import limit_reasoning, provision_langchain_model
 from open_notebook.database.repository import ensure_record_id, repo_insert, repo_query
 from open_notebook.domain.agent_settings import AgentSettings
+from open_notebook.domain.ingestion import StageRun, tracked
 from open_notebook.domain.notebook import Source
 from open_notebook.exceptions import ConfigurationError, NotFoundError
 from open_notebook.utils import clean_thinking_content
@@ -171,6 +172,13 @@ async def _resolve_concepts(raw_names: List[str]) -> Dict[str, str]:
 async def extract_concepts_command(
     input_data: ExtractConceptsInput,
 ) -> ExtractConceptsOutput:
+    async with tracked(input_data.source_id, "concepts") as run:
+        return await _extract_concepts(input_data, run)
+
+
+async def _extract_concepts(
+    input_data: ExtractConceptsInput, run: StageRun
+) -> ExtractConceptsOutput:
     start = time.time()
 
     def result(concepts: int = 0, relations: int = 0) -> ExtractConceptsOutput:
@@ -184,6 +192,7 @@ async def extract_concepts_command(
 
     settings = await AgentSettings.load()
     if not settings.knowledge_graph:
+        run.skip("concept graph is off")
         return result()
     record = ensure_record_id(input_data.source_id)
     section_rows = await repo_query(
@@ -191,6 +200,7 @@ async def extract_concepts_command(
         {"s": record},
     )
     if not section_rows:
+        run.skip("no outline sections")
         return result()
     page_rows = await repo_query(
         "SELECT page, text, caption FROM source_page WHERE source = $s ORDER BY page",
@@ -280,6 +290,7 @@ async def extract_concepts_command(
     if relations:
         await repo_insert("concept_relation", relations)
     concepts = len({str(m["concept"]) for m in mentions})
+    run.detail = {"concepts": concepts, "relations": len(relations)}
     logger.info(
         f"Concept graph for {input_data.source_id}: {len(mentions)} mentions of "
         f"{concepts} concepts, {len(relations)} relations"

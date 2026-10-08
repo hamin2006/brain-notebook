@@ -22,6 +22,16 @@ if [ ! -f frontend/.next/standalone/server.js ] || ! git diff --quiet "$before" 
   echo "frontend rebuilt"
 fi
 
+# Units written by an older install_services.sh start the worker without its
+# startup recovery (re-queue interrupted jobs, reprocess outdated sources).
+unit="$HOME/.config/systemd/user/brain-worker.service"
+if [ -f "$unit" ] && grep -q "surreal-commands-worker" "$unit"; then
+  sed -i 's#surreal-commands-worker --import-modules commands#python -m commands.worker#' "$unit"
+  systemctl --user daemon-reload
+  echo "brain-worker.service now runs python -m commands.worker"
+fi
+
+# Jobs interrupted by this restart are re-queued when the worker starts.
 systemctl --user restart brain-api brain-worker brain-frontend
 for _ in $(seq 1 60); do
   if curl -fs -o /dev/null http://127.0.0.1:5055/api/models; then

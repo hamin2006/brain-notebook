@@ -97,7 +97,7 @@ Providers that need several config fields (like `azure`, `vertex`, `openai_compa
 | Step | File(s) | What to do |
 |------|---------|------------|
 | 1 | `commands/<area>_commands.py` | Define `CommandInput` / `CommandOutput` subclasses and an `async` function decorated with `@command("<name>", app="open_notebook", retry={...})`. |
-| 2 | `commands/__init__.py` | Import the command. The worker starts with `--import-modules commands`, so a command that isn't imported there is never registered. |
+| 2 | `commands/__init__.py` | Import the command. The worker (`python -m commands.worker`) imports the `commands` package, so a command that isn't imported there is never registered. |
 | 3 | API | Submit it: `await CommandService.submit_command_job("open_notebook", "<name>", input.model_dump())`. This returns a job id immediately. |
 | 4 | Frontend | Poll `GET /api/commands/jobs/{job_id}` for status. Sources also have `GET /api/sources/{source_id}/status`. |
 | 5 | `tests/` | Call the command function directly with mocked dependencies. |

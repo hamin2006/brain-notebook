@@ -50,6 +50,7 @@ Use `/docs` for request and response shapes. This map shows where things are:
 | Chat (research agent) | `/api/chat/sessions`, `/api/chat/execute/stream` (SSE), `/api/chat/execute`; source chat under `/api/sources/{id}/chat/sessions` |
 | Research agent | `/api/agent/settings` (GET/PUT), `/api/agent/memories` (GET), `/api/agent/memories/{id}` (DELETE), `/api/agent/rebuild` (POST: `page_embeddings` / `concepts`) |
 | Explore (what ingestion built) | `/api/notebooks/{id}/overview` (counts, most shared concepts; `limit`), `/api/notebooks/{id}/concepts/{concept_id}` (mentions, relations), `/api/notebooks/{id}/graph` (top concepts, relations, co-occurrences for drawing), `/api/sources/{id}/structure` (metadata, page count, summary, outline, concepts) |
+| Ingestion progress | `/api/notebooks/{id}/ingestion` (per source: stages with status, timing, errors; counts and active stages), `/api/sources/{id}/ingestion`, `POST /api/sources/{id}/ingestion/retry` (re-run from the first failed or outdated stage) |
 | MCP | `/mcp` (streamable HTTP, not under `/api`): see [MCP Integration](../5-CONFIGURATION/mcp-integration.md) |
 | Search and Ask | `/api/search`, `/api/search/ask` (streaming), `/api/search/ask/simple` |
 | Transformations | `/api/transformations`, `/api/transformations/execute`, `/api/transformations/default-prompt` |
@@ -64,7 +65,7 @@ Use `/docs` for request and response shapes. This map shows where things are:
 
 Source processing, embedding and podcast generation run on the background worker (see [architecture.md](architecture.md#ingestion-worker)). The endpoint that starts them returns right away with a record and/or a job id:
 
-- Creating a source with `async_processing=true` (the UI does this) saves it, submits a `process_source` job and returns at once; poll `GET /api/sources/{id}/status` until it is `completed` or `failed`. Without it (the default), the request waits until processing finishes.
+- Creating a source with `async_processing=true` (the UI does this) saves it, submits a `process_source` job and returns at once; poll `GET /api/sources/{id}/status` until it is `completed` or `failed`. Without it (the default), the request waits until processing finishes. Either way the later stages (captions, outline, page images, concepts) keep running: `GET /api/sources/{id}/ingestion` reports `complete: true` once every stage is done or skipped.
 - `POST /api/podcasts/generate` returns a job id; poll `GET /api/podcasts/jobs/{job_id}` or list `GET /api/podcasts/episodes`.
 - Any job: `GET /api/commands/jobs/{job_id}`.
 

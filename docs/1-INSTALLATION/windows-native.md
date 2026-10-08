@@ -59,7 +59,7 @@ This guide runs Brain Notebook on Windows **natively, without Docker or WSL**. I
 
    REM Terminal 3 — Worker (module form avoids the Windows "canonicalize" error, see Issue 3)
    set PYTHONPATH=%CD%
-   uv run --env-file .env python -m surreal_commands.cli.worker --import-modules commands
+   uv run --env-file .env python -m commands.worker
 
    REM Terminal 4 — Frontend
    cd frontend && npm run dev
@@ -91,7 +91,7 @@ cd /d %ROOT%
 
 start "SurrealDB" surreal start --user root --pass root --bind 127.0.0.1:8000 "rocksdb:%DB_DIR%"
 start "API" cmd /k "uv run --env-file .env run_api.py"
-start "Worker" cmd /k "uv run --env-file .env python -m surreal_commands.cli.worker --import-modules commands"
+start "Worker" cmd /k "uv run --env-file .env python -m commands.worker"
 start "Frontend" cmd /k "cd /d %ROOT%\frontend && npm run dev"
 ```
 
@@ -181,7 +181,7 @@ Failed to canonicalize script path
 
 ```batch
 set PYTHONPATH=%ROOT%
-uv run --env-file .env python -m surreal_commands.cli.worker --import-modules commands
+uv run --env-file .env python -m commands.worker
 ```
 
 ## Upgrading
@@ -250,11 +250,10 @@ Run the `docker compose` commands below from the folder that contains your
    -- through host.docker.internal now run on the same machine:
    UPDATE credential SET base_url = string::replace(base_url, 'host.docker.internal', '127.0.0.1')
      WHERE base_url CONTAINS 'host.docker.internal';
-
-   -- A job that was running when the container stopped stays 'running' forever;
-   -- put it back in the queue (the worker picks up 'new' jobs on startup):
-   UPDATE command SET status = 'new' WHERE status = 'running';
    ```
+
+   Jobs that were running when the container stopped are re-queued by the worker
+   when it starts.
 
 6. **Start the API, worker and frontend** as described above.
 

@@ -15,6 +15,7 @@ from surreal_commands import CommandInput, CommandOutput, command, submit_comman
 
 from open_notebook.ai.models import model_manager
 from open_notebook.database.repository import ensure_record_id, repo_insert, repo_query
+from open_notebook.domain.ingestion import stage_done, stage_failed, stage_running
 from open_notebook.domain.notebook import Note, Source, SourceInsight
 from open_notebook.exceptions import (
     ConfigurationError,
@@ -457,12 +458,21 @@ async def embed_source_command(input_data: EmbedSourceInput) -> EmbedSourceOutpu
 
         return {"chunks_created": total_chunks}, f": {total_chunks} chunks"
 
-    extra_fields, processing_time, error_message = await _embed_record(
-        input_data,
-        kind="source",
-        record_id=input_data.source_id,
-        embed=embed,
-    )
+    await stage_running(input_data.source_id, "embed")
+    try:
+        extra_fields, processing_time, error_message = await _embed_record(
+            input_data,
+            kind="source",
+            record_id=input_data.source_id,
+            embed=embed,
+        )
+    except BaseException as e:  # transient: the retry layer runs it again
+        await stage_failed(input_data.source_id, "embed", f"{type(e).__name__}: {e}")
+        raise
+    if error_message is None:
+        await stage_done(input_data.source_id, "embed", extra_fields)
+    else:
+        await stage_failed(input_data.source_id, "embed", error_message)
 
     return EmbedSourceOutput(
         success=error_message is None,

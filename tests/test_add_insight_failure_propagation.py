@@ -38,6 +38,25 @@ class TestAddInsightRaisesOnSubmissionFailure:
         assert result == "command:abc123"
 
     @pytest.mark.asyncio
+    async def test_replace_deletes_earlier_insights_of_the_type_first(self):
+        source = make_source()
+        with (
+            patch(
+                "open_notebook.domain.notebook.repo_query",
+                new=AsyncMock(return_value=[]),
+            ) as query,
+            patch(
+                "open_notebook.domain.notebook.submit_command",
+                return_value="command:abc123",
+            ),
+        ):
+            await source.add_insight("Summary", "new content", replace=True)
+        assert query.await_args is not None
+        sql, params = query.await_args.args
+        assert sql.startswith("DELETE source_insight")
+        assert params["type"] == "Summary"
+
+    @pytest.mark.asyncio
     async def test_raises_database_operation_error_on_submission_failure(self):
         source = make_source()
         with patch(

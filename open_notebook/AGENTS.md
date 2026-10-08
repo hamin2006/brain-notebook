@@ -5,7 +5,7 @@ Normative rules for working on the Python backend. Architecture and design ratio
 ## Commands
 
 - Run API: `make api` (runs `run_api.py`: uvicorn with reload on 127.0.0.1:5055; Swagger at http://localhost:5055/docs)
-- Background jobs need the worker: `make worker-start` (`surreal-commands-worker --import-modules commands`)
+- Background jobs need the worker: `make worker-start` (`python -m commands.worker`: on start it re-queues jobs a stopped worker left `running` and reprocesses outdated sources, then runs the surreal-commands worker)
 - Tests: `uv run pytest tests/`
 - Lint/format/typecheck: `uv run ruff check . --fix`, `uv run ruff format .` and `uv run python -m mypy .` (CI runs `ruff format --check`)
 
@@ -61,16 +61,18 @@ Normative rules for working on the Python backend. Architecture and design ratio
 
 ## Database (`open_notebook/database/`)
 
-- New migration = new file `open_notebook/database/migrations/N.surrealql` (+ `N_down.surrealql`) **and** an edit to `AsyncMigrationManager` — migrations are hard-coded, not auto-discovered. They run automatically on API startup. The fork's are 26–29; a new source-scoped table also needs a line in the `source_delete` event.
+- New migration = new file `open_notebook/database/migrations/N.surrealql` (+ `N_down.surrealql`) **and** an edit to `AsyncMigrationManager` — migrations are hard-coded, not auto-discovered. They run automatically on API startup. The fork's are 26–31; a new source-scoped table also needs a line in the `source_delete` event.
 - No connection pooling — each `repo_*` call opens/closes a connection.
 - Transaction-conflict `RuntimeError`s are retriable and logged at DEBUG (don't "fix" the missing stack trace).
 - Bind values as `$params`, never f-string user input into SurrealQL ([security.md](../docs/7-DEVELOPMENT/security.md#database-queries-surrealql-injection)); see the [SurrealQL docs](https://surrealdb.com/docs/surrealql) for syntax.
 
 ## Background commands (`commands/`)
 
-- Commands are `@command("<name>", app="open_notebook", retry={...})` functions and must be imported from `commands/__init__.py` (the worker loads `--import-modules commands`).
+- Commands are `@command("<name>", app="open_notebook", retry={...})` functions and must be imported from `commands/__init__.py` (the worker imports that package).
 - Retry config uses a blocklist: exceptions in `stop_on` (`ValueError`, `ConfigurationError`, `NotFoundError`, … — check the command's list) fail the job permanently (no retry, job marked `failed`); any other exception auto-retries. Note the embed commands catch `ValueError` internally and return `success=False` (see the comment in `commands/embedding_commands.py`).
-- Submission is fire-and-forget via `submit_command()`; commands must be idempotent-ish under retry.
+- Submission is fire-and-forget via `submit_command()`; commands must be idempotent: a job may run again after a worker restart (the worker re-queues interrupted jobs) or a reprocess.
+- **Ingestion stages are tracked** ([ADR-019](../docs/7-DEVELOPMENT/decisions/ADR-019-tracked-versioned-ingestion.md)): a stage command runs inside `tracked(source_id, stage)` and records the next stage with `stage_queued()` beside its `submit_command()` (`open_notebook/domain/ingestion.py`). A change to a stage's code or prompt that existing sources should get **bumps that stage in `STAGE_VERSIONS`** (with the reason in the comment); the next worker start reprocesses outdated sources from that stage. Don't write one-off backfill scripts.
+- Prompt templates are cached per process: a prompt change reaches jobs only after the worker restarts (deploys restart it).
 - Podcast generation uses `max_attempts: 1` on purpose (prevents duplicate episodes); retry is the explicit `POST /api/podcasts/episodes/{id}/retry` endpoint.
 
 ## Prompts (`prompts/`)

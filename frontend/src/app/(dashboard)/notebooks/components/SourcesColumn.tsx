@@ -21,6 +21,9 @@ import { useModalManager } from '@/lib/hooks/use-modal-manager'
 import { ContextMode } from '../[id]/page'
 import type { SourceBulkAction } from '@/lib/utils/source-context'
 import { useTranslation } from '@/lib/hooks/use-translation'
+import { useNotebookIngestion, useRetryIngestion } from '@/lib/hooks/use-ingestion'
+import { IngestionStrip } from '@/components/brain/IngestionProgress'
+import type { SourceIngestion } from '@/lib/api/ingestion'
 
 interface SourcesColumnProps {
   sources?: SourceListResponse[]
@@ -62,6 +65,11 @@ export function SourcesColumn({
   const deleteSource = useDeleteSource()
   const retrySource = useRetrySource()
   const removeFromNotebook = useRemoveSourceFromNotebook()
+  const { data: ingestion } = useNotebookIngestion(notebookId)
+  const retryIngestion = useRetryIngestion()
+  const ingestionById = new Map<string, SourceIngestion>(
+    (ingestion?.items ?? []).map((item) => [item.source_id, item])
+  )
 
   // Scroll container ref for infinite scroll
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -183,6 +191,8 @@ export function SourcesColumn({
           )}
         </div>
 
+        <IngestionStrip data={ingestion} />
+
         <div ref={scrollContainerRef} className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-3">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
@@ -196,10 +206,16 @@ export function SourcesColumn({
             />
           ) : (
             <div className="space-y-0.5">
-              {sources.map((source) => (
+              {sources.map((source) => {
+                const item = ingestionById.get(source.id)
+                const failedStage = item?.stages.find((s) => s.status === 'failed')?.stage ?? null
+                return (
                 <SourceCard
                   key={source.id}
                   source={source}
+                  ingestionStage={item && !item.complete ? item.current_stage ?? null : null}
+                  ingestionFailedStage={failedStage}
+                  onRetryStage={(id) => retryIngestion.mutate(id)}
                   onClick={handleSourceClick}
                   onDelete={handleDeleteClick}
                   onRetry={handleRetry}
@@ -213,7 +229,8 @@ export function SourcesColumn({
                     : undefined
                   }
                 />
-              ))}
+                )
+              })}
               {/* Loading indicator for infinite scroll */}
               {isFetchingNextPage && (
                 <div className="flex items-center justify-center py-4">

@@ -17,6 +17,7 @@ from typing_extensions import Annotated, TypedDict
 from open_notebook.ai.models import Model, ModelManager
 from open_notebook.database.repository import ensure_record_id, repo_insert, repo_query
 from open_notebook.domain.content_settings import ContentSettings
+from open_notebook.domain.ingestion import stage_done, stage_queued
 from open_notebook.domain.notebook import Asset, Source
 from open_notebook.domain.transformation import Transformation
 from open_notebook.exceptions import (
@@ -372,28 +373,39 @@ async def save_source(state: SourceState) -> dict:
     # NOTE: Notebook associations are created by the API immediately for UI responsiveness
     # No need to create them here to avoid duplicate edges
 
+    source_id = str(state["source_id"])
     if state.get("pages") and pages_needing_captions(state["pages"]):
         # Caption visual pages first; the caption job embeds the source when
         # done (a second embed job now would race it and delete its chunks).
+        await stage_queued(source_id, "caption")
         submit_command(
             "open_notebook",
             "caption_pages",
-            {"source_id": str(source.id), "embed": bool(state["embed"])},
+            {"source_id": source_id, "embed": bool(state["embed"])},
         )
     else:
-        if state["embed"]:
-            if source.full_text and source.full_text.strip():
-                logger.debug("Embedding content for vector search")
-                await source.vectorize()
-            else:
+        if state.get("pages"):
+            await stage_done(
+                source_id, "caption", {"reason": "no visual pages"}, skipped=True
+            )
+        if state["embed"] and source.full_text and source.full_text.strip():
+            logger.debug("Embedding content for vector search")
+            await source.vectorize()
+        else:
+            if state["embed"]:
                 logger.warning(
                     f"Source {source.id} has no text content to embed, skipping vectorization"
                 )
+            await stage_done(
+                source_id,
+                "embed",
+                {"reason": "embedding off" if not state["embed"] else "no text"},
+                skipped=True,
+            )
         if state.get("pages"):
             # Paged source without visual pages: outline and summaries now.
-            submit_command(
-                "open_notebook", "analyze_source", {"source_id": str(source.id)}
-            )
+            await stage_queued(source_id, "analyze")
+            submit_command("open_notebook", "analyze_source", {"source_id": source_id})
 
     return {"source": source}
 
@@ -443,7 +455,10 @@ async def transform_content(state: TransformationState) -> Optional[dict]:
             f"Transformation '{transformation.name}' failed for source {source.id}: {e}"
         )
         return None
-    await source.add_insight(transformation.title, result["output"])
+    # Ingestion can run again for the same source (a retry, or a job re-queued
+    # after a worker restart): replace this transformation's earlier insight
+    # instead of adding a duplicate.
+    await source.add_insight(transformation.title, result["output"], replace=True)
     return {
         "transformation": [
             {

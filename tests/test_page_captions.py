@@ -7,6 +7,7 @@ import pytest
 from PIL import Image
 
 from commands.page_commands import CaptionPagesInput, caption_pages_command
+from open_notebook.domain.ingestion import STAGE_VERSIONS
 from open_notebook.graphs.source import SourceState, save_source
 from open_notebook.utils.pdf_pages import (
     PdfPage,
@@ -82,7 +83,13 @@ async def test_caption_job_captions_visual_pages_and_embeds_once(tmp_path):
         result = await caption_pages_command(CaptionPagesInput(source_id=SOURCE_ID))
 
     assert result.pages_captioned == 1
-    assert [u["page"] for u in updates] == [1]
+    # Both visual pages are recorded as checked; only page 1 got a caption, and
+    # page 3 isn't retried until the caption stage's version changes.
+    assert [(u["page"], u["caption"]) for u in updates] == [
+        (1, replies[1]),
+        (3, None),
+    ]
+    assert {u["version"] for u in updates} == {STAGE_VERSIONS["caption"]}
     source.vectorize.assert_awaited_once()
     submit.assert_called_once_with(
         "open_notebook", "analyze_source", {"source_id": SOURCE_ID}

@@ -20,7 +20,7 @@ Next.js frontend ── :3000 (dev or systemd), :8502 in the Docker image
    │  proxies /api/* and /mcp to INTERNAL_API_URL (default http://localhost:5055), 10 min timeout
    ▼
 FastAPI API ─────── :5055 (`api/main.py`)                    Background worker
-   │  REST, SSE chat streams, /mcp (FastMCP)                  (`surreal-commands-worker --import-modules commands`)
+   │  REST, SSE chat streams, /mcp (FastMCP)                  (`python -m commands.worker`)
    │  runs the research agent in-process                       ingestion, embeddings, analysis, page images,
    │  submits jobs ───────────► job queue in SurrealDB ◄──────  concept graph, transformations, podcasts
    ▼                                              │
@@ -119,17 +119,23 @@ analyze_source ─► outline + metadata ─► section summaries ─► documen
 embed_source / embed_note / embed_insight, run_transformation, create_insight, rebuild_embeddings, generate_podcast
 ```
 
+Each stage of a source (extract, caption, embed, analyze, page_images, concepts) records its state, timing and
+version in `source_stage` (`open_notebook/domain/ingestion.py`); the API serves it at `/sources/{id}/ingestion` and
+`/notebooks/{id}/ingestion`. The worker entrypoint (`commands/worker.py`) re-queues jobs a stopped worker left
+`running` and restarts sources whose stage versions are outdated ([ADR-019](decisions/ADR-019-tracked-versioned-ingestion.md)).
+
 Details: [content-processing.md](content-processing.md), [concept/ingestion](../2-CORE-CONCEPTS/ingestion.md).
 
 ## Data model
 
-From the migrations (read them for exact fields). Upstream tables plus Brain Notebook's (migrations 26–29):
+From the migrations (read them for exact fields). Upstream tables plus Brain Notebook's (migrations 26–31):
 
 | Table | Holds |
 |---|---|
 | `notebook` | Name, description, `archived`, `grounding` |
 | `source` | `title`, `full_text`, `asset` (file path or URL), `metadata` (doc type, course, sequence, topics, page count…), `command` |
-| `source_page` | Per page: `text`, `equations`, `image_ratio`, `shapes`, `garbled`, `caption`, `image_embedding`; unique `(source, page)` |
+| `source_page` | Per page: `text`, `equations`, `image_ratio`, `shapes`, `garbled`, `caption`, `caption_version`, `image_embedding`; unique `(source, page)` |
+| `source_stage` | Ingestion progress, one row per source and stage: `status`, `version`, `queued_at` / `started_at` / `finished_at`, `error`, `detail` |
 | `source_embedding` | Chunks: `order`, `content`, `embedding`, `page_start`, `page_end` |
 | `source_section` | Outline sections: `index`, `title`, `page_start`, `page_end`, `summary`, `embedding`; unique `(source, index)` |
 | `source_insight` | Transformation output, incl. the "Document Summary" from analysis |

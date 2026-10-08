@@ -6,6 +6,7 @@ from loguru import logger
 from surreal_commands import CommandInput, CommandOutput, command
 
 from open_notebook.database.repository import ensure_record_id
+from open_notebook.domain.ingestion import tracked
 from open_notebook.domain.notebook import Source
 from open_notebook.domain.transformation import Transformation
 from open_notebook.exceptions import (
@@ -122,15 +123,17 @@ async def process_source_command(
         # Execute source_graph with all notebooks.
         # LangGraph accepts a partial state dict at runtime, but its typed
         # overloads require the full state type (langgraph typing limitation).
-        result = await source_graph.ainvoke(  # type: ignore[call-overload]
-            {
-                "content_state": input_data.content_state,
-                "notebook_ids": input_data.notebook_ids,  # Use notebook_ids (plural) as expected by SourceState
-                "apply_transformations": transformations,
-                "embed": input_data.embed,
-                "source_id": input_data.source_id,  # Add the source_id to the state
-            }
-        )
+        async with tracked(input_data.source_id, "extract") as run:
+            result = await source_graph.ainvoke(  # type: ignore[call-overload]
+                {
+                    "content_state": input_data.content_state,
+                    "notebook_ids": input_data.notebook_ids,  # Use notebook_ids (plural) as expected by SourceState
+                    "apply_transformations": transformations,
+                    "embed": input_data.embed,
+                    "source_id": input_data.source_id,  # Add the source_id to the state
+                }
+            )
+            run.detail = {"pages": len(result.get("pages") or [])}
 
         processed_source = result["source"]
 

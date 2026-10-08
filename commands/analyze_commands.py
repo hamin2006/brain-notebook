@@ -24,6 +24,7 @@ from surreal_commands import CommandInput, CommandOutput, command, submit_comman
 
 from open_notebook.ai.provision import limit_reasoning, provision_langchain_model
 from open_notebook.database.repository import ensure_record_id, repo_insert, repo_query
+from open_notebook.domain.ingestion import StageRun, stage_queued, tracked
 from open_notebook.domain.notebook import Source
 from open_notebook.exceptions import ConfigurationError
 from open_notebook.utils import clean_thinking_content
@@ -173,6 +174,13 @@ def _extract_fallback(section: Section, text: str) -> str:
 
 @command("analyze_source", app="open_notebook", retry=ANALYZE_RETRY_CONFIG)
 async def analyze_source_command(input_data: AnalyzeSourceInput) -> AnalyzeSourceOutput:
+    async with tracked(input_data.source_id, "analyze") as run:
+        return await _analyze_source(input_data, run)
+
+
+async def _analyze_source(
+    input_data: AnalyzeSourceInput, run: StageRun
+) -> AnalyzeSourceOutput:
     start = time.time()
     source = await Source.get(input_data.source_id)
     record = ensure_record_id(input_data.source_id)
@@ -188,6 +196,7 @@ async def analyze_source_command(input_data: AnalyzeSourceInput) -> AnalyzeSourc
         for r in rows
     ]
     if not pages or not any(p.text for p in pages):
+        run.skip("no page text")
         return AnalyzeSourceOutput(
             success=True,
             source_id=input_data.source_id,
@@ -252,9 +261,12 @@ async def analyze_source_command(input_data: AnalyzeSourceInput) -> AnalyzeSourc
     logger.info(
         f"Analyzed {input_data.source_id}: {len(sections)} sections, metadata {metadata.model_dump()}"
     )
+    run.detail = {"sections": len(sections)}
     # Visual search over rendered pages (skipped when the setting is off).
+    await stage_queued(input_data.source_id, "page_images")
     submit_command("open_notebook", "embed_pages", {"source_id": input_data.source_id})
     # Concept graph from the new sections (skipped when the setting is off).
+    await stage_queued(input_data.source_id, "concepts")
     submit_command(
         "open_notebook", "extract_concepts", {"source_id": input_data.source_id}
     )

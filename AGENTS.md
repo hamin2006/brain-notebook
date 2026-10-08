@@ -12,7 +12,7 @@ Start in this order — each tier depends on the one below:
 
 1. `make database` — SurrealDB (API fails without it)
 2. `make api` — FastAPI; **schema migrations run automatically on startup** (check logs)
-3. `make worker-start` — surreal-commands worker. **Required**: source processing, page captions, analysis, embeddings, page images, the concept graph and podcasts are async jobs that silently queue forever without it
+3. `make worker-start` — the worker (`python -m commands.worker`). **Required**: source processing, page captions, analysis, embeddings, page images, the concept graph and podcasts are async jobs that silently queue forever without it
 4. `make frontend` — UI (depends on the API for all data)
 
 Or all at once: `make start-all` (status: `make status`, stop: `make stop-all`). First-time setup (`uv sync`, `npm install`, a `.env` with `SURREAL_URL=ws://localhost:8000/rpc`): [development-setup.md](docs/7-DEVELOPMENT/development-setup.md).
@@ -39,6 +39,7 @@ Or all at once: `make start-all` (status: `make status`, stop: `make stop-all`).
 - **`frontend/package-lock.json` must be written by npm 10** (the deploy host's `npm ci` rejects lockfiles from npm 11): add packages with `npx -y npm@10.9.2 install <pkg>`.
 - **Visible UI changes refresh the screenshots** in `docs/assets/screenshots/` (README tour, docs index, user guide): WebP, about 2000 px wide, taken from a real notebook.
 - **Every user-visible change adds a CHANGELOG entry** under `## [Unreleased]`, in the one section for its type (`### Added` / `### Changed` / `### Deprecated` / `### Removed` / `### Fixed` / `### Security`); never create a duplicate section. Details: [contributing.md](docs/7-DEVELOPMENT/contributing.md#changelog).
+- **Ingestion changes ship with a stage version bump** when existing notebooks should get them (`STAGE_VERSIONS` in `open_notebook/domain/ingestion.py`; [ADR-019](docs/7-DEVELOPMENT/decisions/ADR-019-tracked-versioned-ingestion.md)): the worker reprocesses outdated sources when it starts, and re-queues jobs a restart interrupted, so deploys don't wait for ingestion. No hand-run backfill scripts. Time real ingestion with `scripts/brain/ingest_folder.py --wait`.
 - **No prompt stuffing.** No feature pastes whole documents into a prompt; the agent reads through its tools, and whole-document questions use stored summaries ([ADR-014](docs/7-DEVELOPMENT/decisions/ADR-014-agentic-notebook-chat.md)).
 - **Agent tools are general primitives** that take and return addresses (`source:abc#p12-18`), never shortcuts for one kind of question; tool output is untrusted input to the model ([playbook](docs/7-DEVELOPMENT/change-playbooks.md#playbook-add-an-agent-tool)).
 - Upstream's `.maintainer/` release, triage and discussions workflows don't apply to this fork.

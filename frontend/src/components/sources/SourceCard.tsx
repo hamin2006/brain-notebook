@@ -30,6 +30,8 @@ import type { TFunction } from 'i18next'
 import { cn } from '@/lib/utils'
 import { ContextToggle } from '@/components/common/ContextToggle'
 import { ContextMode } from '@/app/(dashboard)/notebooks/[id]/page'
+import { stageLabel } from '@/components/brain/IngestionProgress'
+import type { IngestionStage } from '@/lib/api/ingestion'
 
 interface SourceCardProps {
   source: SourceListResponse
@@ -43,6 +45,11 @@ interface SourceCardProps {
   showRemoveFromNotebook?: boolean
   contextMode?: ContextMode
   onContextModeChange?: (mode: ContextMode) => void
+  /** The ingestion stage in progress after extraction (captions, concepts…). */
+  ingestionStage?: IngestionStage | null
+  /** A stage that failed after extraction, retried with onRetryStage. */
+  ingestionFailedStage?: IngestionStage | null
+  onRetryStage?: (sourceId: string) => void
 }
 
 const SOURCE_TYPE_ICONS = {
@@ -118,7 +125,10 @@ function SourceCardImpl({
   className,
   showRemoveFromNotebook = false,
   contextMode,
-  onContextModeChange
+  onContextModeChange,
+  ingestionStage,
+  ingestionFailedStage,
+  onRetryStage
 }: SourceCardProps) {
   const { t } = useTranslation()
   const statusConfigMap = getStatusConfig(t)
@@ -265,6 +275,30 @@ function SourceCardImpl({
             )}
           </div>
         )}
+
+        {isCompleted && ingestionFailedStage ? (
+          <div className="mt-1 flex items-center gap-1.5 text-[11px] text-warn">
+            <AlertTriangle className="h-3 w-3 shrink-0" />
+            <span className="truncate">{t('brain.stageFailed', { stage: stageLabel(t, ingestionFailedStage) })}</span>
+            {onRetryStage && (
+              <button
+                type="button"
+                className="ml-1 shrink-0 font-medium text-foreground hover:underline"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onRetryStage(source.id)
+                }}
+              >
+                {t('brain.retryStage')}
+              </button>
+            )}
+          </div>
+        ) : isCompleted && ingestionStage ? (
+          <div className="mt-1 flex items-center gap-1.5 text-[11px] text-iris">
+            <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
+            <span className="truncate">{stageLabel(t, ingestionStage)}</span>
+          </div>
+        ) : null}
 
         {statusData?.message && (isProcessing || isFailed) && (
           <p className="mt-1 text-[11px] italic text-muted-foreground">{statusData.message}</p>
@@ -421,6 +455,8 @@ function areEqual(prev: SourceCardProps, next: SourceCardProps): boolean {
     p.asset?.file_path === n.asset?.file_path &&
     topicsEqual(p.topics, n.topics) &&
     prev.contextMode === next.contextMode &&
+    prev.ingestionStage === next.ingestionStage &&
+    prev.ingestionFailedStage === next.ingestionFailedStage &&
     prev.showRemoveFromNotebook === next.showRemoveFromNotebook &&
     prev.className === next.className
   )

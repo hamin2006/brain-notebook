@@ -34,6 +34,7 @@ from api.models import (
 from commands.source_commands import SourceProcessingInput
 from open_notebook.config import UPLOADS_FOLDER
 from open_notebook.database.repository import ensure_record_id, repo_query
+from open_notebook.domain.ingestion import stage_queued
 from open_notebook.domain.notebook import Asset, Notebook, Source
 from open_notebook.domain.transformation import Transformation
 from open_notebook.exceptions import (
@@ -519,6 +520,7 @@ async def _create_source_async_path(
             embed=source_data.embed,
         )
 
+        await stage_queued(str(source.id), "extract")
         command_id = await CommandService.submit_command_job(
             "open_notebook",  # app name
             "process_source",  # command name
@@ -1008,6 +1010,7 @@ async def retry_source_processing(source_id: str):
                 embed=True,  # Always embed on retry
             )
 
+            await stage_queued(str(source.id), "extract")
             command_id = await CommandService.submit_command_job(
                 "open_notebook",  # app name
                 "process_source",  # command name

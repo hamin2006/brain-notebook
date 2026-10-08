@@ -12,16 +12,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Concept graph view.** **Graph** in the notebook header (or *Open the concept graph* in the Concepts tab) draws the notebook's concepts as a live map: one column per document in course order, each concept placed between the documents that mention it and coloured by the one that introduces it, stated relations as curved links and shared sections as faint ones. Hover to focus a concept and its neighbours (relation labels appear), click to open it in the evidence panel, search to fly to one, drag, zoom, and filter by document from the legend. A **3D** mode (WebGL, loaded only when opened) shows the same graph as an orbiting scene with glow in the dark theme and particles flowing along a focused concept's relations. API: `GET /api/notebooks/{id}/graph`
 - `GET /api/notebooks/{id}/overview` (document, page, section, note and concept counts plus the most shared concepts), `GET /api/notebooks/{id}/concepts/{concept_id}` (a concept's mentions and relations) and `GET /api/sources/{id}/structure` (metadata, page count, summary, outline, concepts)
 - Page images take `format=jpeg` for small thumbnails (`/api/sources/{id}/pages/{n}/image?max_side=480&format=jpeg`)
-- `scripts/brain/recaption_pages.py --notebook NAME` captions the newly qualifying pages of PDFs ingested earlier (then re-embeds and re-analyzes those sources)
+- **Ingestion progress.** Every processing step of a source (reading pages, describing visuals, indexing text, outlining, page images, concepts) records its status, timing and errors. The Sources library shows an indexing strip (documents ready, steps running) and each source its current or failed step with **Retry**; the Structure tab lists every step with its duration. API: `GET /api/notebooks/{id}/ingestion`, `GET /api/sources/{id}/ingestion`, `POST /api/sources/{id}/ingestion/retry`. `scripts/brain/ingest_folder.py --wait` follows a folder's ingestion and prints per-step timing ([ADR-019](docs/7-DEVELOPMENT/decisions/ADR-019-tracked-versioned-ingestion.md))
+- **Existing documents get pipeline improvements automatically.** Steps carry versions; when the worker starts, sources processed by an older version of a step are re-run from that step, redoing only what changed (captions, insights and page images are kept). `OPEN_NOTEBOOK_AUTO_REPROCESS=false` turns it off
 - `API_URL=relative` makes the UI call the API through its own origin; `scripts/brain/install_services.sh` sets it, so a systemd install whose API listens on 127.0.0.1 works from other machines. Existing installs: add `Environment=API_URL=relative` to `brain-frontend.service`
 
 ### Changed
+- The worker starts with `python -m commands.worker` (Makefile, `dev-init.sh`, systemd units, supervisord). Systemd installs from `scripts/brain/install_services.sh`: re-run it or change `ExecStart` in `brain-worker.service` to `... python -m commands.worker --max-tasks 2`
 - Vision captions now also cover diagrams drawn as shapes (PowerPoint, Keynote, TikZ) and pages whose math extracts as unmapped glyphs, not only pages that are mostly images; `(cid:…)` glyph placeholders are removed from page text. On the four test courses this captions 390 slides instead of 170 (migration 30 adds `source_page.shapes` and `garbled`)
 - README and docs show the new interface (screenshots in `docs/assets/screenshots/`); the favicon and README mark are the new Brain Notebook logo
 - In the chat and Ask boxes **Enter** sends and **Shift+Enter** adds a line (Cmd/Ctrl+Enter still sends)
 - The notebook's grounding switch moved from the chat box to the notebook header; effort is a Quick / Standard / Deep toggle in the message box
 
 ### Fixed
+- Jobs running when the worker stopped (a deploy, a crash) stayed "running" forever and their sources never finished; the worker now re-queues them when it starts (`OPEN_NOTEBOOK_REQUEUE_INTERRUPTED=false` for several workers on one database)
+- Re-running a source's processing (retry, or a job resumed after a restart) duplicated its default-transformation insights; they are replaced now
+- Pages whose math extracts as garbled glyphs were sent to the caption model but often came back empty; the prompt now asks for the equations in LaTeX
+- `scripts/brain/ingest_folder.py` uploaded macOS `._name.pdf` metadata files as sources
 - Notebook chat failed with HTTP 422 on every message: the API required a legacy `context` field the UI no longer sends
 - Opening a link to a notebook or source in a fresh browser (no saved session) bounced through the login page to the notebook list
 

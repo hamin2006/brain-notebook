@@ -13,6 +13,7 @@ other's chunks).
 
 import asyncio
 import base64
+import os
 import time
 from typing import Optional
 
@@ -23,11 +24,13 @@ from surreal_commands import CommandInput, CommandOutput, command, submit_comman
 
 from open_notebook.ai.provision import limit_reasoning, provision_langchain_model
 from open_notebook.database.repository import ensure_record_id, repo_query
+from open_notebook.domain.ingestion import STAGE_VERSIONS, stage_queued, tracked
 from open_notebook.domain.notebook import Source
 from open_notebook.exceptions import ConfigurationError
 from open_notebook.utils import clean_thinking_content
 from open_notebook.utils.pdf_pages import (
     PdfPage,
+    extract_pdf_pages,
     pages_needing_captions,
     render_page_png,
 )
@@ -48,6 +51,12 @@ NO_VISUAL_CONTENT = "NO_VISUAL_CONTENT"
 class CaptionPagesInput(CommandInput):
     source_id: str
     embed: bool = True
+    # Re-extract page text and signals from the PDF first (extract stage
+    # upgrade), keeping captions and page-image embeddings.
+    refresh: bool = False
+    # Reprocessing an ingested source: re-embed and re-analyze only when the
+    # pages changed. A first ingestion always continues the pipeline.
+    reprocess: bool = False
 
 
 class CaptionPagesOutput(CommandOutput):
@@ -84,75 +93,139 @@ async def _caption_page(model, path: str, title: str, page: PdfPage) -> Optional
     return None if not caption or caption == NO_VISUAL_CONTENT else caption
 
 
+async def _refresh_pages(source_id: str, path: str) -> bool:
+    """Re-extract page text and caption signals in place. True if any text changed."""
+    record = ensure_record_id(source_id)
+    rows = await repo_query(
+        "SELECT page, text FROM source_page WHERE source = $s", {"s": record}
+    )
+    old = {r["page"]: r.get("text") or "" for r in rows}
+    changed = False
+    for page in await asyncio.to_thread(extract_pdf_pages, path):
+        if page.number not in old:
+            continue
+        changed = changed or page.text != old[page.number]
+        await repo_query(
+            "UPDATE source_page SET text = $text, equations = $equations, "
+            "image_ratio = $ratio, shapes = $shapes, garbled = $garbled "
+            "WHERE source = $s AND page = $page",
+            {
+                "s": record,
+                "page": page.number,
+                "text": page.text,
+                "equations": page.equations,
+                "ratio": page.image_ratio,
+                "shapes": page.shapes,
+                "garbled": page.garbled,
+            },
+        )
+    return changed
+
+
 @command("caption_pages", app="open_notebook", retry=CAPTION_RETRY_CONFIG)
 async def caption_pages_command(input_data: CaptionPagesInput) -> CaptionPagesOutput:
-    """Caption the visual pages of a PDF source, then (optionally) embed it."""
+    """Caption the visual pages of a PDF source, then embed and analyze it.
+
+    A page is checked once per caption version: pages the model found nothing
+    visual on are retried only after the caption stage's version is bumped,
+    and existing captions are kept.
+    """
     start = time.time()
-    source = await Source.get(input_data.source_id)
+    source_id = input_data.source_id
+    source = await Source.get(source_id)
     path = source.asset.file_path if source and source.asset else None
-    record = ensure_record_id(input_data.source_id)
+    has_file = bool(path) and os.path.isfile(str(path))
+    record = ensure_record_id(source_id)
+    version = STAGE_VERSIONS["caption"]
 
-    rows = await repo_query(
-        "SELECT page, text, image_ratio, shapes, garbled, caption FROM source_page WHERE source = $source ORDER BY page",
-        {"source": record},
-    )
-    pages = [
-        PdfPage(
-            r["page"],
-            r.get("text") or "",
-            image_ratio=r.get("image_ratio") or 0.0,
-            shapes=r.get("shapes") or 0,
-            garbled=bool(r.get("garbled")),
+    text_changed = False
+    if input_data.refresh:
+        async with tracked(source_id, "extract") as run:
+            if has_file:
+                text_changed = await _refresh_pages(source_id, str(path))
+                run.detail = {"refreshed": True, "text_changed": text_changed}
+            else:
+                run.skip("original file missing; kept the stored pages")
+
+    async with tracked(source_id, "caption") as run:
+        rows = await repo_query(
+            "SELECT page, text, image_ratio, shapes, garbled, caption, caption_version "
+            "FROM source_page WHERE source = $source ORDER BY page",
+            {"source": record},
         )
-        for r in rows
-    ]
-    already = {r["page"] for r in rows if r.get("caption")}
-    targets = (
-        [n for n in pages_needing_captions(pages) if n not in already] if path else []
-    )
+        pages = [
+            PdfPage(
+                r["page"],
+                r.get("text") or "",
+                image_ratio=r.get("image_ratio") or 0.0,
+                shapes=r.get("shapes") or 0,
+                garbled=bool(r.get("garbled")),
+            )
+            for r in rows
+        ]
+        checked = {
+            r["page"]
+            for r in rows
+            if r.get("caption") or (r.get("caption_version") or 0) >= version
+        }
+        visual = pages_needing_captions(pages)
+        targets = [n for n in visual if n not in checked] if has_file else []
 
-    captioned = 0
-    if targets:
-        model = limit_reasoning(
-            await provision_langchain_model("", None, "transformation", max_tokens=2048)
-        )
-        by_number = {p.number: p for p in pages}
-        semaphore = asyncio.Semaphore(MAX_CONCURRENT_PAGES)
-        title = (source.title if source else None) or "Untitled"
-
-        async def run(number: int) -> bool:
-            async with semaphore:
-                try:
-                    caption = await _caption_page(
-                        model, str(path), title, by_number[number]
-                    )
-                except Exception as e:
-                    # One unreadable page or refused image shouldn't lose the others.
-                    logger.warning(
-                        f"Caption failed for {input_data.source_id} p{number}: {e}"
-                    )
-                    return False
-            if caption:
-                await repo_query(
-                    "UPDATE source_page SET caption = $caption WHERE source = $source AND page = $page",
-                    {"caption": caption, "source": record, "page": number},
+        captioned = 0
+        if targets:
+            model = limit_reasoning(
+                await provision_langchain_model(
+                    "", None, "transformation", max_tokens=2048
                 )
-            return bool(caption)
+            )
+            by_number = {p.number: p for p in pages}
+            semaphore = asyncio.Semaphore(MAX_CONCURRENT_PAGES)
+            title = (source.title if source else None) or "Untitled"
 
-        captioned = sum(await asyncio.gather(*(run(n) for n in targets)))
-        logger.info(
-            f"Captioned {captioned}/{len(targets)} visual pages of {input_data.source_id}"
-        )
+            async def caption_one(number: int) -> bool:
+                async with semaphore:
+                    try:
+                        caption = await _caption_page(
+                            model, str(path), title, by_number[number]
+                        )
+                    except Exception as e:
+                        # One unreadable page or refused image shouldn't lose
+                        # the others; it stays unchecked and is retried later.
+                        logger.warning(f"Caption failed for {source_id} p{number}: {e}")
+                        return False
+                await repo_query(
+                    "UPDATE source_page SET caption = $caption, caption_version = $version "
+                    "WHERE source = $source AND page = $page",
+                    {
+                        "caption": caption,
+                        "version": version,
+                        "source": record,
+                        "page": number,
+                    },
+                )
+                return bool(caption)
 
-    if input_data.embed and source is not None:
-        await source.vectorize()
-    # Outline, metadata and summaries read the captions, so they run after.
-    submit_command(
-        "open_notebook", "analyze_source", {"source_id": input_data.source_id}
-    )
+            captioned = sum(await asyncio.gather(*(caption_one(n) for n in targets)))
+            logger.info(
+                f"Captioned {captioned}/{len(targets)} visual pages of {source_id}"
+            )
+        run.detail = {
+            "visual_pages": len(visual),
+            "checked": len(targets),
+            "captioned": captioned,
+        }
+        if not has_file:
+            run.skip("original file missing")
+
+    if not input_data.reprocess or captioned or text_changed:
+        if input_data.embed and source is not None:
+            await source.vectorize()
+        # Outline, metadata and summaries read the captions, so they run after.
+        await stage_queued(source_id, "analyze")
+        submit_command("open_notebook", "analyze_source", {"source_id": source_id})
     return CaptionPagesOutput(
         success=True,
-        source_id=input_data.source_id,
+        source_id=source_id,
         pages_captioned=captioned,
         processing_time=time.time() - start,
     )

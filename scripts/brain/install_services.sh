@@ -49,7 +49,7 @@ After=brain-api.service
 
 [Service]
 WorkingDirectory=$REPO
-ExecStart=$UV run --env-file .env surreal-commands-worker --import-modules commands --max-tasks 2
+ExecStart=$UV run --env-file .env python -m commands.worker --max-tasks 2
 Restart=on-failure
 RestartSec=5
 MemoryMax=3G

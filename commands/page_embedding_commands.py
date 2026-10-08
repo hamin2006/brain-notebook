@@ -22,6 +22,7 @@ from surreal_commands import CommandInput, CommandOutput, command
 from open_notebook.ai.openrouter import embed_multimodal, image_input
 from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.domain.agent_settings import AgentSettings
+from open_notebook.domain.ingestion import StageRun, tracked
 from open_notebook.domain.notebook import Source
 from open_notebook.exceptions import ConfigurationError, NotFoundError
 from open_notebook.utils.pdf_pages import PdfPage, group_builds, render_page_png
@@ -57,6 +58,11 @@ def _data_url(png: bytes) -> str:
 
 @command("embed_pages", app="open_notebook", retry=PAGE_EMBED_RETRY_CONFIG)
 async def embed_pages_command(input_data: EmbedPagesInput) -> EmbedPagesOutput:
+    async with tracked(input_data.source_id, "page_images") as run:
+        return await _embed_pages(input_data, run)
+
+
+async def _embed_pages(input_data: EmbedPagesInput, run: StageRun) -> EmbedPagesOutput:
     start = time.time()
 
     def done(count: int = 0) -> EmbedPagesOutput:
@@ -70,10 +76,12 @@ async def embed_pages_command(input_data: EmbedPagesInput) -> EmbedPagesOutput:
     settings = await AgentSettings.load()
     model = (settings.page_embedding_model or "").strip()
     if not model:
+        run.skip("page image search is off")
         return done()
     source = await Source.get(input_data.source_id)
     path = source.asset.file_path if source and source.asset else None
     if not path:
+        run.skip("no original file")
         return done()
 
     record = ensure_record_id(input_data.source_id)
@@ -106,6 +114,7 @@ async def embed_pages_command(input_data: EmbedPagesInput) -> EmbedPagesOutput:
                 {"v": vector, "s": record, "a": group.start, "b": group.end},
             )
             count += group.end - group.start + 1
+    run.detail = {"pages": count, "renders": len(todo)}
     logger.info(
         f"Embedded {count} page images of {input_data.source_id} ({len(todo)} renders, {model})"
     )
