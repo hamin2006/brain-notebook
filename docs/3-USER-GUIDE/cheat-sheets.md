@@ -5,6 +5,8 @@ you pick, laid out to fit the paper, written in the course's own notation, with 
 from. You review it, comment on lines, and **Revise** applies your comments. It prints from the browser and exports
 to LaTeX.
 
+![A two-page cheat sheet over a 72-lecture course, a selected line with its comment and the review panel](../assets/screenshots/cheat-sheet.webp)
+
 It needs the documents to have finished processing (their outline in particular: see
 [Adding Sources](adding-sources.md)) and the Tools and Chat models ([API Configuration](api-configuration.md)).
 
@@ -21,6 +23,8 @@ It needs the documents to have finished processing (their outline in particular:
      skeletons, common pitfalls.
    - **Instructions**, e.g. *"The exam covers lectures 1–6; skip proofs."*
 3. **Build sheet** opens the sheet's page, which shows progress while it's built.
+
+![The New cheat sheet dialog: documents in course order, length, columns, paper, kinds and instructions](../assets/screenshots/cheat-sheet-new.webp)
 
 The first sheet over a set of documents reads every outline section of them (one model call per section; a few
 minutes for a course) and keeps what it found, so later sheets over the same documents only lay out the sheet
@@ -42,6 +46,8 @@ The sheet is shown at its printed size; what you see is what prints.
 - **Print** uses the browser's print dialog (choose *Save as PDF* for a file); set margins to *None* if your browser
   adds its own. **.tex** downloads a LaTeX document of the same sheet (`multicols`, `amsmath`) for Overleaf or a
   local TeX install.
+
+![The first printed page of the sheet](../assets/screenshots/cheat-sheet-print.webp)
 
 ## Reviewing and revising
 

@@ -315,7 +315,12 @@ async def export_tex(
         raise InvalidInputError("The cheat sheet has no version yet")
     layout = (await sheets.load_version(sheet_id, number))["layout"]
     labels = await sheets.source_labels(sheet["sources"])
-    tex = to_tex(layout, SheetOptions(**sheet["options"]), labels, citations)
+    tex = to_tex(
+        {**layout, "title": sheet["title"]},
+        SheetOptions(**sheet["options"]),
+        labels,
+        citations,
+    )
     filename = (
         "".join(
             ch if ch.isalnum() or ch in "-_" else "-" for ch in sheet["title"]

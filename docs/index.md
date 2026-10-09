@@ -14,7 +14,7 @@ New here? Start with **[0-START-HERE](0-START-HERE/index.md)**. For a tour of th
 | **[0-START-HERE](0-START-HERE/index.md)** | Install for the first time and get a cited answer from your own PDFs |
 | **[1-INSTALLATION](1-INSTALLATION/index.md)** | Choose an install route: Docker Compose (builds this repo) or from source with systemd services |
 | **[2-CORE-CONCEPTS](2-CORE-CONCEPTS/index.md)** | Understand the research agent, how documents are ingested, notebooks/sources/notes |
-| **[3-USER-GUIDE](3-USER-GUIDE/index.md)** | Add sources, chat with the agent, read citations, search and Ask, take notes |
+| **[3-USER-GUIDE](3-USER-GUIDE/index.md)** | Add sources, chat with the agent, read citations, search and Ask, take notes, make [cheat sheets](3-USER-GUIDE/cheat-sheets.md) |
 | **[4-AI-PROVIDERS](4-AI-PROVIDERS/index.md)** | Connect a provider and pick the models the agent uses |
 | **[5-CONFIGURATION](5-CONFIGURATION/index.md)** | Research agent settings (rerank, visual search, concept graph, memory, web search), MCP, environment variables, security |
 | **[6-TROUBLESHOOTING](6-TROUBLESHOOTING/index.md)** | Fix something that isn't working |

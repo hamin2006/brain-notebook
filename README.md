@@ -83,6 +83,24 @@ summaries, its concepts and every page as a thumbnail.
 
 </td>
 </tr>
+<tr>
+<td width="50%" valign="top">
+
+**Cheat sheets for the exam.** Pick the lectures; get a dense, page-budgeted recall sheet in the course's notation,
+every line cited to its slide. Comment on lines, pin or edit them, and **Revise**; the page measures whether it fits.
+
+<img src="docs/assets/screenshots/cheat-sheet.webp" alt="A two-page cheat sheet over 72 lectures, a selected line with its comment and the review panel">
+
+</td>
+<td width="50%" valign="top">
+
+**It prints as a real sheet.** Letter or A4, 2–4 columns, rendered math; or export `.tex`. Every formula comes
+from the slides: a request for something the course doesn't teach is declined, not invented.
+
+<img src="docs/assets/screenshots/cheat-sheet-print.webp" alt="The first printed page of a Calculus 2 cheat sheet">
+
+</td>
+</tr>
 </table>
 
 <p align="center">
@@ -124,6 +142,9 @@ summaries, its concepts and every page as a thumbnail.
   starter questions from the notebook's own concepts; **New chat** and saved sessions.
 - An interactive **concept graph** of the whole notebook, and a **Structure** view of every document.
 - Ask across all notebooks from the home page; paste or drop images into chat.
+- **Cheat sheets**: a printable one- or two-page recall sheet of the formulas, definitions and methods in the
+  lectures you pick, every line cited to its slide, revised from your comments; about $0.05 for a 72-lecture
+  course, then a cent per sheet or revision.
 
 **Everything Open Notebook already had**: notebooks, sources of many types (PDF, web, audio, video, Office), notes,
 transformations, podcasts, 20+ AI providers, REST API, 14 UI languages.

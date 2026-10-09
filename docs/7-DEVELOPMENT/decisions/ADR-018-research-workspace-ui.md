@@ -1,6 +1,6 @@
 # ADR-018: The UI is a research workspace that shows its evidence ("Ink & Signal")
 
-- **Status**: Accepted (Brain Notebook)
+- **Status**: Accepted (Brain Notebook); titles amended 2026-10 (see below)
 - **Date**: 2026-10
 - **Related**: [ADR-011](ADR-011-design-token-system.md) (token contract, kept), [ADR-014](ADR-014-agentic-notebook-chat.md) (agentic chat), [ADR-015](ADR-015-page-aware-ingestion.md) (pages, outline, concepts), [frontend.md](../frontend.md)
 
@@ -35,8 +35,8 @@ no presence.
   `gold` = amber (evidence), `fern` = emerald (included / ok). New aliases `iris`, `amber`, `surface-*`, `ink-*`,
   `on-agent`. **Laws**: ink acts (primary buttons are ink) · iris is the agent's voice (live state, focus) · amber
   is evidence (citations, pages) · emerald confirms · red only destroys · paper surfaces, hairlines and soft
-  layered shadows · radii 6–18 px · Instrument Serif for titles, Geist for interface, Geist Mono for data and
-  addresses.
+  layered shadows · radii 6–18 px · Geist for interface and titles (titles semibold, tight tracking; originally Instrument Serif, see
+  the amendment below), Geist Mono for data and addresses.
 
 ## Alternatives considered
 
@@ -56,3 +56,9 @@ no presence.
 - Page images are fetched with auth and cached for the session (`usePageImage`); grids use lazy loading. Thumbnail
   rendering runs on the API under the PDFium lock, so very large grids load progressively.
 - ADR-011's palette laws are superseded by the ones above; its contract and `/dev/design` remain the reference.
+
+## Amendment (2026-10): titles in the interface sans
+
+Instrument Serif for titles read as hard to read and out of character in use (a single-weight display serif at
+20–56 px next to a sans interface). `--font-display` is now Geist at weight 600 with -0.022em tracking; the
+`font-display` class and the token stay, so no component changed, and the serif is no longer downloaded.

@@ -209,7 +209,7 @@ function Sheet() {
           Display — Bricolage Grotesque 700
         </div>
         <div className="text-sm">
-          Body — Instrument Sans. Reading text stays on neutral surfaces;
+          Body — Geist (titles: Geist semibold). Reading text stays on neutral surfaces;
           color is information, never decoration.
         </div>
         <div className="font-mono text-xs">

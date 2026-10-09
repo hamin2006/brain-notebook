@@ -18,6 +18,8 @@ export interface SheetFit {
 }
 
 interface SheetPreviewProps {
+  /** The sheet's title (renaming it doesn't touch stored layouts). */
+  title: string
   layout: SheetLayout
   options: SheetOptions
   names: Record<string, string>
@@ -51,7 +53,7 @@ function Flow({
   showCites,
   printCites,
   onCiteClick,
-}: Omit<SheetPreviewProps, 'options' | 'onMeasure'>) {
+}: Omit<SheetPreviewProps, 'options' | 'onMeasure' | 'title'>) {
   const line = (l: SheetLine) => (
     <div
       key={l.id}
@@ -177,7 +179,7 @@ export function SheetPreview(props: SheetPreviewProps) {
         >
           {page === 0 && (
             <div className="mb-[0.3em] text-center font-bold" style={{ fontSize: `${g.font + 2}pt` }}>
-              {layout.title}
+              {props.title}
             </div>
           )}
           <div className="relative overflow-hidden" style={{ width: `${g.contentWidth}in`, height: flowHeight }}>

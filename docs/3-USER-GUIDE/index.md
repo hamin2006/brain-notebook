@@ -61,6 +61,7 @@ What each feature needs:
 | Find a passage or term you remember | [Text search](search.md#search) |
 | Find content about an idea, whatever the wording | [Vector search](search.md#search) |
 | Get the same summary or extraction for each source | [Transformations](transformations.md) |
+| Make a printable cheat sheet for an exam | [Cheat Sheets](cheat-sheets.md) |
 | Listen to your research | [Podcasts](creating-podcasts.md) |
 
 ---

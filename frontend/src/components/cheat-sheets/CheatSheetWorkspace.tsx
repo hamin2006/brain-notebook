@@ -262,6 +262,7 @@ export function CheatSheetWorkspace({ notebookId, sheetId }: { notebookId: strin
 
           {layout ? (
             <SheetPreview
+              title={sheet.title}
               layout={layout}
               options={options}
               names={sheet.source_names}
@@ -290,6 +291,7 @@ export function CheatSheetWorkspace({ notebookId, sheetId }: { notebookId: strin
           <div className="cheat-print-portal">
             <style>{`@page { size: ${options.paper === 'a4' ? 'A4' : 'letter'}; margin: 0; }`}</style>
             <SheetPreview
+              title={sheet.title}
               layout={layout}
               options={options}
               names={sheet.source_names}
