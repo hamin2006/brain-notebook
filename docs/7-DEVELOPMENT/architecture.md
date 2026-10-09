@@ -109,13 +109,13 @@ typed exceptions the API maps to status codes.
 ## Ingestion (worker)
 
 ```
-process_source ─► graphs/source.py: extract (PDF → per-page via pdfplumber; others → content-core)
+process_source ─► graphs/source.py: extract (PDF → per-page via pdfplumber in a process pool; others → content-core)
                     └─ save_source: store source_page rows
                          ├─ visual pages? ─► caption_pages ─► vectorize ─► analyze_source
                          └─ otherwise ─────► vectorize ─────────────────► analyze_source (paged sources)
-analyze_source ─► outline + metadata ─► section summaries ─► document summary insight
-                    ├─► embed_pages        (page-image embeddings)
-                    └─► extract_concepts   (concept graph)
+analyze_source ─► outline + metadata ─┬─► section summaries ─► document summary insight
+                                      ├─► embed_pages        (page-image embeddings)
+                                      └─► extract_concepts   (concept graph)
 embed_source / embed_note / embed_insight, run_transformation, create_insight, rebuild_embeddings, generate_podcast
 ```
 
@@ -123,12 +123,14 @@ Each stage of a source (extract, caption, embed, analyze, page_images, concepts)
 version in `source_stage` (`open_notebook/domain/ingestion.py`); the API serves it at `/sources/{id}/ingestion` and
 `/notebooks/{id}/ingestion`. The worker entrypoint (`commands/worker.py`) re-queues jobs a stopped worker left
 `running` and restarts sources whose stage versions are outdated ([ADR-019](decisions/ADR-019-tracked-versioned-ingestion.md)).
+Throughput and memory (8 job slots, per-document concurrency, the parser pool, caps per service) are in
+[ADR-020](decisions/ADR-020-ingestion-throughput-and-memory.md).
 
 Details: [content-processing.md](content-processing.md), [concept/ingestion](../2-CORE-CONCEPTS/ingestion.md).
 
 ## Data model
 
-From the migrations (read them for exact fields). Upstream tables plus Brain Notebook's (migrations 26–31):
+From the migrations (read them for exact fields). Upstream tables plus Brain Notebook's (migrations 26–33):
 
 | Table | Holds |
 |---|---|

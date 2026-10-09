@@ -28,7 +28,7 @@ docker compose logs open_notebook | grep -E "spawned: 'worker'|worker entered|ex
 
 **Running but still nothing happens:** the API and the worker must use the same database. Make sure all five `SURREAL_*` variables are set explicitly (the shipped compose file does): the job queue falls back to namespace and database `test` when they're missing, while the API uses `open_notebook`. See [Database](../5-CONFIGURATION/database.md).
 
-**Many sources at once:** the worker runs `OPEN_NOTEBOOK_WORKER_MAX_TASKS` jobs at a time (default 5); the rest stay Queued until a slot frees up. That's normal.
+**Many sources at once:** the worker runs `OPEN_NOTEBOOK_WORKER_MAX_TASKS` jobs at a time (default 5; the systemd install runs 8); the rest stay Queued until a slot frees up. That's normal.
 
 ---
 
@@ -132,8 +132,8 @@ after switching the Transformation Model if outlines matter to you.
 ### Visual page search says it's off, or finds nothing
 
 `Visual page search is turned off` means **Settings → Research agent → Page image embedding model** is empty.
-"No page images are indexed" means pages haven't been embedded yet: they're embedded after analysis, a few minutes
-after the source shows Completed. For sources added before the feature was on, click **Embed pages of existing
+"No page images are indexed" means pages haven't been embedded yet: they're embedded once analysis has written the
+outline, usually within a few minutes of the upload. For sources added before the feature was on, click **Embed pages of existing
 documents**. Errors mentioning OpenRouter mean no OpenRouter credential (or credit).
 
 ### The concept graph is empty or misses a document

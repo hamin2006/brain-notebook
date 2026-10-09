@@ -102,8 +102,13 @@ Check them with `systemctl --user status brain-api brain-worker brain-frontend` 
 `journalctl --user -u brain-worker -f`.
 
 **Updating** an installed checkout: `bash scripts/brain/deploy_pc.sh`. It fast-forwards the current branch, syncs
-dependencies, rebuilds the UI when `frontend/` changed, restarts the services (migrations run on API start) and waits
-for the API.
+dependencies, rebuilds the UI when `frontend/` changed, moves units written by an older installer to the current
+settings, restarts the API and waits for it (up to 10 minutes; migrations run on start), then restarts the worker and
+the UI. It says when LibreOffice is missing.
+
+The units cap memory: API 1 GB, worker 2.5 GB (with its PDF parsers), UI 512 MB; SurrealDB from `docker-compose.yml`
+is limited to 1.5 GB. Peaks during a large upload are about 2 GB in total. After pulling a change to
+`docker-compose.yml`, apply it with `docker compose up -d surrealdb`.
 
 ## 5b. Development mode
 

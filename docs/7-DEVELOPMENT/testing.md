@@ -129,6 +129,25 @@ repository. Latest results are in the [plan](plans/agentic-rag.md#7b-phase-5-as-
 When a question fails, read its answer before changing code: several "failures" so far were grader patterns too
 strict for a correct answer (LaTeX, wording), fixed in `questions.json`.
 
+## Timing an ingestion
+
+Ingestion changes are measured on real decks with the running stack:
+
+```bash
+uv run python scripts/brain/ingest_folder.py --notebook "<name> (speed test)" path/to/pdfs --wait
+```
+
+`--wait` prints the total time and, per stage, the summed run time, the slowest source and when the stage finished
+(the latest stage to finish is the bottleneck). Watch memory in a second terminal with
+`systemctl --user show brain-worker -p MemoryPeak` (and the API, and `docker stats` for SurrealDB); peaks must fit the
+budget in [ADR-020](decisions/ADR-020-ingestion-throughput-and-memory.md). Delete the speed-test notebook afterwards:
+its concepts otherwise count twice in the graph.
+
+A stage's `seconds` covers everything inside its job, so a slow "extract" can be a transformation run after the pages
+(compare `Extracted N PDF pages` and `Successfully processed source` in the worker log). Two code versions can be
+compared without real models: point `OPENROUTER_BASE_URL` at a stand-in OpenAI-compatible server that sleeps the
+measured per-call latencies, and run both against fresh databases (how ADR-020's 13:50 → 2:59 was measured).
+
 ## Frontend layout
 
 Tests are colocated with the code as `*.test.ts` / `*.test.tsx` (for example `src/lib/locales/index.test.ts`, `src/components/common/ConfirmDialog.test.tsx`). `frontend/src/test/` holds only the shared setup (`setup.ts`: jest-dom matchers and mocks for `next/navigation`, `matchMedia` and `@/lib/hooks/use-translation`, whose `t()` returns the key itself, so assert on keys rather than English text).

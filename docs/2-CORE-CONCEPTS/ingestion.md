@@ -10,7 +10,8 @@ embeddings and a concept graph. PDFs get all of these; other sources get chunks 
 upload
   │
   ▼
-1. pages          text per page (pdfplumber), equations recovered, junk removed      → source_page
+1. pages          text per page (pdfplumber, in parallel processes), equations       → source_page
+                   recovered, junk removed
   │
   ▼
 2. captions       visual pages (images, drawn diagrams, math) → vision model       → source_page.caption
@@ -27,17 +28,21 @@ upload
                                                                                         concept_relation
 ```
 
-A 100-page deck takes a few minutes end to end, and costs a few cents with the recommended OpenRouter models. The
-source is searchable as soon as step 3 finishes; steps 4–6 add the outline, summaries, visual search and graph.
-Measured with a two-job worker: a 7-deck course of 89 LaTeX slides took 10 minutes, 8 decks (276 pages) 17 minutes,
-and 7 decks with 738 pages of animation builds 17 minutes.
+Steps 5 and 6 start as soon as analysis has written the outline, while it is still writing the section summaries.
+Many steps run at once (8 jobs, 10 sections and 8 caption pages at a time), so a whole course ingests in minutes:
+7 NLP decks with 738 pages of animation builds took 4.5 minutes, pages parsed in about 10 seconds (it was 17 minutes
+with the earlier two-job worker; [ADR-020](../7-DEVELOPMENT/decisions/ADR-020-ingestion-throughput-and-memory.md)).
+A deck costs a few cents with the recommended OpenRouter models. The source is searchable as soon as step 3
+finishes; steps 4–6 add the outline, summaries, visual search and graph.
 
 ### Following progress
 
 The notebook's **Sources** list shows an indexing strip while anything is running (how many documents are ready and
 which steps are active), and each source shows its current step. A source's **Structure** tab lists every step with
 how long it took. If a step fails after extraction (a model outage, say), the source shows *failed* with **Retry**,
-which re-runs it from that step; the rest of the document stays usable. The same data is at
+which re-runs it from that step; the rest of the document stays usable. A step also shows *failed* when only part
+of it failed (a page whose caption request timed out, a section the model couldn't read): the rest is kept, the
+reason names what's missing, and the step is retried when the worker restarts or with **Retry**. The same data is at
 `GET /api/notebooks/{id}/ingestion` and `GET /api/sources/{id}/ingestion`.
 
 ### 1. Pages

@@ -5,8 +5,9 @@ pipeline is [How Documents Are Ingested](../2-CORE-CONCEPTS/ingestion.md).
 
 ## Page-aware PDF ingestion (`utils/pdf_pages.py`, `graphs/source.py`, `commands/`)
 
-- `extract_pdf_pages(path)` reads each page with pdfplumber into `PdfPage(number, text, equations, image_ratio,
-  shapes, garbled)` (`shapes` = vector lines + curves + rects; `garbled` = 3+ `(cid:N)` placeholders).
+- `extract_pdf_pages(path)` reads each page with pdfplumber (`_read_page`; large PDFs in 25-page ranges on a shared
+  spawn-process pool, `OPEN_NOTEBOOK_PDF_PROCESSES`, since pdfplumber is pure Python and threads would share one
+  core) into `PdfPage(number, text, equations, image_ratio, shapes, garbled)` (`shapes` = vector lines + curves + rects; `garbled` = 3+ `(cid:N)` placeholders).
   `clean_page_text` removes residual junk and `(cid:N)`; `latexit_source()` decodes LaTeXiT payloads (base64 → 4-byte qCompress
   length + zlib → binary plist, `source` key) so the 4×-repeated invisible text becomes `$…$`.
 - `group_builds(pages)` merges animation builds: a page is a build step of the previous one when it covers ≥ 90% of
@@ -14,8 +15,9 @@ pipeline is [How Documents Are Ingested](../2-CORE-CONCEPTS/ingestion.md).
 - `graphs/source.py` uses page extraction for PDFs with a text layer (others go through content-core), stores
   `source_page` rows, and chains the jobs: `caption_pages` (`pages_needing_captions`: `image_ratio ≥ 0.25`, or ≥ 12 shapes over the
   document's median, or garbled; Transformation Model,
-  4 concurrent, `NO_VISUAL_CONTENT` sentinel) → `embed_source` → `analyze_source` → `embed_pages` +
-  `extract_concepts`.
+  `OPEN_NOTEBOOK_CAPTION_CONCURRENCY` (8) at a time, `NO_VISUAL_CONTENT` sentinel) → `embed_source` and
+  `analyze_source`; analyze writes the sections first and queues `embed_pages` + `extract_concepts` before its
+  summaries, which it then writes into the section rows in place ([ADR-020](decisions/ADR-020-ingestion-throughput-and-memory.md)).
 - `embed_source` builds **page-ranged chunks** (`_paged_chunks`: page text + caption, header `Title — pp. N–M`,
   `page_start` / `page_end` on each `source_embedding`) instead of the generic splitter when pages exist.
 - `analyze_source` (`commands/analyze_commands.py`): `plan_outline` (page index → `OutlinePlan` JSON; on failure,
