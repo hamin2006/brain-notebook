@@ -21,6 +21,7 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { useSourceStructure } from '@/lib/hooks/use-explore'
 import { SourceStructureView } from '@/components/brain/SourceStructure'
+import { FileViewer } from '@/components/brain/FileViewer'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   DropdownMenu,
@@ -131,6 +132,9 @@ function SourceDetailContentInner({
   const hasStructure = !!structure && (structure.page_count > 0 || structure.sections.length > 0)
   const [tab, setTab] = useState<string | null>(null)
   const activeTab = tab ?? (hasStructure ? 'structure' : 'content')
+
+  // The original file, viewable in the File tab (not for links or pasted text)
+  const hasFile = !!source?.asset?.file_path && fileAvailable !== false
 
   // file_available comes from the source payload; downloads may flip it later,
   // so keep it as local state synced from the query data.
@@ -528,6 +532,7 @@ function SourceDetailContentInner({
         <Tabs value={activeTab} onValueChange={setTab} className="w-full">
           <TabsList className="w-full sticky top-0 z-10 bg-background">
             {hasStructure && <TabsTrigger value="structure">{t('brain.structure')}</TabsTrigger>}
+            {hasFile && <TabsTrigger value="file">{t('brain.fileTab')}</TabsTrigger>}
             <TabsTrigger value="content">{t('sources.content')}</TabsTrigger>
             <TabsTrigger value="insights">
               {t('common.insights')} {insights.length > 0 && `(${insights.length})`}
@@ -538,6 +543,12 @@ function SourceDetailContentInner({
           {hasStructure && structure && (
             <TabsContent value="structure" className="mt-5">
               <SourceStructureView structure={structure} />
+            </TabsContent>
+          )}
+
+          {hasFile && (
+            <TabsContent value="file" className="mt-5">
+              <FileViewer sourceId={source.id} onDownload={handleDownloadFile} />
             </TabsContent>
           )}
 

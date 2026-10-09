@@ -51,13 +51,13 @@ source, `scripts/brain/install_services.sh` runs them as systemd user services.
 | Path | What lives there |
 |---|---|
 | `api/main.py` | App setup: middleware (CORS, body-size limit, password auth), exception handlers, routers (`prefix="/api"`), the `/mcp` route, startup migrations, lifespan (MCP session manager, checkpointer shutdown) |
-| `api/routers/` | One module per resource. Agent-related: `chat.py` (`/chat/execute`, `/chat/execute/stream`), `source_chat.py`, `search.py` (Ask), `agent.py` (`/agent/settings`, `/agent/memories`, `/agent/rebuild`), `sources.py` (incl. `/sources/{id}/pages/{page}/image`) |
+| `api/routers/` | One module per resource. Agent-related: `chat.py` (`/chat/execute`, `/chat/execute/stream`), `source_chat.py`, `search.py` (Ask), `agent.py` (`/agent/settings`, `/agent/memories`, `/agent/rebuild`), `sources.py` (incl. `/sources/{id}/pages/{page}/image` and the file viewer's `/preview` and `/file`) |
 | `api/mcp_server.py` | FastMCP server: `ask` + the agent's primitives, scoped by notebook |
 | `open_notebook/agent/` | **The research agent** (below) |
 | `open_notebook/domain/` | Domain models on `ObjectModel` / `RecordModel`: `Notebook` (incl. `grounding`), `Source` (incl. `metadata`), `Note`, `SourceInsight`, `ChatSession`, `Transformation`, `Credential`, settings singletons incl. `AgentSettings` |
 | `open_notebook/ai/` | Provider registry, `Model` / `DefaultModels` / `ModelManager`, `provision.py` (`provision_langchain_model`, `limit_reasoning`), `openrouter.py` (rerank and multimodal embeddings over HTTP), key provider, discovery |
 | `open_notebook/graphs/` | `source.py` (ingestion graph), `transformation.py`, `prompt.py`, `checkpoint.py`; `chat.py`, `source_chat.py`, `ask.py` are upstream's pre-agent graphs, no longer used by the routers |
-| `open_notebook/utils/` | `pdf_pages.py` (page extraction, LaTeXiT decoding, build grouping, rendering), `sections.py` (outline models), `concepts.py` (concept extraction models, aliases), chunking, embedding, encryption, error classification, URL validation |
+| `open_notebook/utils/` | `pdf_pages.py` (page extraction, LaTeXiT decoding, build grouping, rendering), `file_preview.py` (the file viewer's previews by type), `sections.py` (outline models), `concepts.py` (concept extraction models, aliases), chunking, embedding, encryption, error classification, URL validation |
 | `open_notebook/database/` | `repository.py` (`repo_query` etc.; one connection per call) and migrations (`N.surrealql` + `N_down.surrealql`, registered in `async_migrate.py`) |
 | `commands/` | Background commands (below) |
 | `prompts/` | Jinja templates: `agent/` (system, subagent, review, compact), `sources/` (page caption, outline, section/document summary, concepts), plus upstream's ask/chat/transformation/podcast templates |

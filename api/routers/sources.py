@@ -842,6 +842,68 @@ async def download_source_file(source_id: str):
         raise HTTPException(status_code=500, detail="Failed to download source file")
 
 
+@router.get("/sources/{source_id}/preview")
+async def preview_source_file(source_id: str):
+    """How the viewer shows the original file, with its content when small.
+
+    `kind` picks the viewer (see `open_notebook/utils/file_preview.py`); text,
+    tables, document HTML and archive listings come inline, pages and media are
+    fetched separately (page images, `/file`).
+    """
+    from open_notebook.utils.file_preview import build_preview
+
+    full_id = source_id if source_id.startswith("source:") else f"source:{source_id}"
+    try:
+        resolved_path, _ = await _resolve_source_file(full_id)
+        pages = None
+        if resolved_path.lower().endswith(".pdf"):
+            rows = await repo_query(
+                "SELECT count() AS n FROM source_page WHERE source = $s GROUP ALL",
+                {"s": ensure_record_id(full_id)},
+            )
+            pages = rows[0]["n"] if rows else None
+        return await asyncio.to_thread(build_preview, resolved_path, pages)
+    except HTTPException:
+        raise
+    except OpenNotebookError:
+        raise
+    except Exception as e:
+        logger.error(f"Error previewing file for source {source_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to preview source file")
+
+
+@router.get("/sources/{source_id}/file")
+async def view_source_file(source_id: str):
+    """The original file inline with its media type (audio and video players).
+
+    Served with a sandbox CSP and nosniff so an uploaded HTML file opened
+    directly can't run scripts on the app's origin.
+    """
+    from open_notebook.utils.file_preview import media_type
+
+    full_id = source_id if source_id.startswith("source:") else f"source:{source_id}"
+    try:
+        resolved_path, filename = await _resolve_source_file(full_id)
+        return FileResponse(
+            path=resolved_path,
+            filename=filename,
+            media_type=media_type(resolved_path),
+            content_disposition_type="inline",
+            headers={
+                "Content-Security-Policy": "sandbox",
+                "X-Content-Type-Options": "nosniff",
+                "Cache-Control": "private, max-age=3600",
+            },
+        )
+    except HTTPException:
+        raise
+    except OpenNotebookError:
+        raise
+    except Exception as e:
+        logger.error(f"Error serving file for source {source_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to serve source file")
+
+
 @router.get("/sources/{source_id}/status", response_model=SourceStatusResponse)
 async def get_source_status(source_id: str):
     """Get processing status for a source."""

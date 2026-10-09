@@ -113,7 +113,7 @@ The specific reason is stored with the job. You can read it in the worker log (w
 
 ## Managing Sources
 
-- **Open a source**: click its card for the Content, Insights and Details tabs. See [Interface Overview](interface-overview.md#the-source-view).
+- **Open a source**: click its card for the File (the original), Content, Insights and Details tabs. See [Interface Overview](interface-overview.md#the-source-view).
 - **Add it to another notebook**: in that notebook, **Add Source → Add Existing Sources**, or from the source's Details tab, **Manage Notebooks**.
 - **Remove from Notebook** (⋮ menu): unlinks the source from this notebook only.
 - **Delete Source** (⋮ menu): deletes the source everywhere, with its insights, embeddings and uploaded file. This can't be undone.

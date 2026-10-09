@@ -17,6 +17,11 @@ Investigated adding an extension/MIME allowlist and decided against it:
   and either give false confidence or block legitimate uploads.
 - Upload size is already bounded (see api/middleware.py).
 
+The file viewer's `/sources/{id}/file` serves the original inline with its
+real type (audio and video players need it), so it always carries
+`Content-Security-Policy: sandbox` and `nosniff`: an uploaded HTML file
+opened directly gets an opaque origin and can't run scripts against the app.
+
 So arbitrary bytes can still be written to disk under a
 server-controlled filename (a generically accepted property of file
 upload services), but not served in a way a browser would render/execute,
@@ -88,6 +93,50 @@ class TestDownloadsAlwaysServedAsOctetStream:
 
         assert response.status_code == 200
         assert response.headers["content-type"] == "application/octet-stream"
+
+
+class TestViewerServesFilesSandboxed:
+    def test_inline_html_is_sandboxed_and_not_sniffed(
+        self, client, tmp_path, monkeypatch
+    ):
+        real_root = tmp_path / "uploads"
+        real_root.mkdir()
+        monkeypatch.setattr("api.routers.sources.UPLOADS_FOLDER", str(real_root))
+        page = real_root / "page.html"
+        page.write_text("<script>alert(document.cookie)</script>")
+
+        source = make_source(file_path=str(page))
+        with patch(
+            "api.routers.sources.Source.get", new=AsyncMock(return_value=source)
+        ):
+            response = client.get("/api/sources/source:test123/file")
+
+        assert response.status_code == 200
+        assert response.headers["content-security-policy"] == "sandbox"
+        assert response.headers["x-content-type-options"] == "nosniff"
+        assert response.headers["content-disposition"].startswith("inline")
+
+    def test_viewer_accepts_ids_without_the_table_prefix(
+        self, client, tmp_path, monkeypatch
+    ):
+        """The UI sends bare ids (`abc`), as it does for page images."""
+        real_root = tmp_path / "uploads"
+        real_root.mkdir()
+        monkeypatch.setattr("api.routers.sources.UPLOADS_FOLDER", str(real_root))
+        notes = real_root / "notes.txt"
+        notes.write_text("hello")
+
+        get = AsyncMock(return_value=make_source(file_path=str(notes)))
+        with patch("api.routers.sources.Source.get", new=get):
+            preview = client.get("/api/sources/test123/preview")
+            served = client.get("/api/sources/test123/file")
+
+        assert preview.status_code == 200
+        assert preview.json()["kind"] == "text"
+        assert preview.json()["text"] == "hello"
+        assert served.status_code == 200
+        assert served.content == b"hello"
+        assert {c.args[0] for c in get.call_args_list} == {"source:test123"}
 
 
 class TestContentCoreRejectsUnrecognizedContent:

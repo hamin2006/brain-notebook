@@ -45,7 +45,7 @@ Use `/docs` for request and response shapes. This map shows where things are:
 | Area | Paths |
 |---|---|
 | Notebooks | `/api/notebooks` (incl. `grounding`), `/api/notebooks/{id}/sources/{source_id}` (link/unlink), `/api/recently-viewed` |
-| Sources | `/api/sources` (multipart create with optional file upload), `/api/sources/json`, `/api/sources/{id}/status`, `/api/sources/{id}/retry`, `/api/sources/{id}/insights`, `/api/sources/{id}/download`, `/api/sources/{id}/pages/{page}/image` (a rendered PDF page, PNG; `format=jpeg` and `max_side` for thumbnails) |
+| Sources | `/api/sources` (multipart create with optional file upload), `/api/sources/json`, `/api/sources/{id}/status`, `/api/sources/{id}/retry`, `/api/sources/{id}/insights`, `/api/sources/{id}/download`, `/api/sources/{id}/preview` (how the file viewer shows the original: `kind` plus inline text, sheets, document HTML or archive entries, bounded), `/api/sources/{id}/file` (the original inline with its media type, `Content-Security-Policy: sandbox` and `nosniff`; range requests), `/api/sources/{id}/pages/{page}/image` (a rendered PDF page, PNG; `format=jpeg` and `max_side` for thumbnails) |
 | Notes, insights | `/api/notes`, `/api/insights/{id}`, `/api/insights/{id}/save-as-note` |
 | Chat (research agent) | `/api/chat/sessions`, `/api/chat/execute/stream` (SSE), `/api/chat/execute`; source chat under `/api/sources/{id}/chat/sessions` |
 | Research agent | `/api/agent/settings` (GET/PUT), `/api/agent/memories` (GET), `/api/agent/memories/{id}` (DELETE), `/api/agent/rebuild` (POST: `page_embeddings` / `concepts`) |

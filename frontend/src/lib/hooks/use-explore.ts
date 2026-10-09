@@ -39,6 +39,17 @@ export function useSourceStructure(sourceId: string | null) {
   })
 }
 
+/** How to show a source's original file; fetched when the File tab opens. */
+export function useFilePreview(sourceId: string | null) {
+  return useQuery({
+    queryKey: ['explore', 'preview', sourceId],
+    queryFn: () => exploreApi.preview(sourceId as string),
+    enabled: !!sourceId,
+    staleTime: 5 * 60_000,
+    retry: false,
+  })
+}
+
 /**
  * A page image as an object URL. Cached for the session (pages don't change),
  * so a thumbnail shown in a citation, a card and the viewer is fetched once.

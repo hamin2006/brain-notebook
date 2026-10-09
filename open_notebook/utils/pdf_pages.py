@@ -337,6 +337,18 @@ def pages_needing_captions(pages: List[PdfPage]) -> List[int]:
     return targets
 
 
+def pdf_page_count(path: str) -> int:
+    """Number of pages in a PDF."""
+    import pypdfium2 as pdfium
+
+    with PDFIUM_LOCK:
+        pdf = pdfium.PdfDocument(path)
+        try:
+            return len(pdf)
+        finally:
+            pdf.close()
+
+
 def render_page_png(path: str, page: int, max_side: int = 1400) -> bytes:
     """Render one PDF page (1-based) to PNG, longest side `max_side` px."""
     import io

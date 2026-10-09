@@ -87,6 +87,46 @@ export interface ConceptGraphData {
   total_concepts: number
 }
 
+export type FilePreviewKind =
+  | 'pages'
+  | 'image'
+  | 'audio'
+  | 'video'
+  | 'text'
+  | 'markdown'
+  | 'html'
+  | 'table'
+  | 'document'
+  | 'archive'
+  | 'none'
+
+export interface PreviewSheet {
+  name: string
+  rows: string[][]
+  total_rows: number
+  truncated: boolean
+}
+
+export interface ArchiveEntry {
+  name: string
+  size: number
+  dir: boolean
+}
+
+/** How the file viewer shows a source's original file (`/sources/{id}/preview`). */
+export interface FilePreview {
+  kind: FilePreviewKind
+  filename: string
+  media_type: string
+  size: number
+  pages?: number
+  text?: string
+  truncated?: boolean
+  sheets?: PreviewSheet[]
+  html?: string
+  entries?: ArchiveEntry[]
+}
+
 const enc = encodeURIComponent
 
 /** What ingestion built: counts, the concept graph and document structure. */
@@ -114,6 +154,19 @@ export const exploreApi = {
 
   structure: async (sourceId: string) => {
     const response = await apiClient.get<SourceStructure>(`/sources/${enc(sourceId)}/structure`)
+    return response.data
+  },
+
+  preview: async (sourceId: string) => {
+    const id = sourceId.replace(/^source:/, '')
+    const response = await apiClient.get<FilePreview>(`/sources/${enc(id)}/preview`)
+    return response.data
+  },
+
+  /** The original file's bytes (players need them; auth header included). */
+  file: async (sourceId: string) => {
+    const id = sourceId.replace(/^source:/, '')
+    const response = await apiClient.get<Blob>(`/sources/${enc(id)}/file`, { responseType: 'blob' })
     return response.data
   },
 

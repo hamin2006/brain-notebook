@@ -40,6 +40,7 @@ Reusable research UI lives in `components/brain/`:
 | `ConceptGraphView` | The Graph view's Map / 3D switch; `ConceptGraph3D` (3d-force-graph + three.js, CSS2D labels, bloom in dark) is loaded with `next/dynamic` only when 3D is opened |
 | `ConceptGraph` | `ConceptGraph2D`, the map: d3-force layout on a canvas (columns per document, relation and co-occurrence links, hover focus, search, zoom, legend filter) from `GET /notebooks/{id}/graph` |
 | `SourceStructure` | The source view's Structure tab |
+| `FileViewer` | The source view's File tab: the original file shown by the `kind` `/sources/{id}/preview` returns (pages, image, player, text, Markdown, sandboxed HTML, table, document text, archive listing) |
 | `IngestionProgress` | `IngestionStrip` (the library's indexing strip), `IngestionTimeline` (a source's stages on the Structure tab), `stageLabel` (stage names for cards) |
 | `AskBar` | The home page's ask-everywhere box (opens `/search?mode=ask&q=…`) |
 
