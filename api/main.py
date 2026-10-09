@@ -28,6 +28,7 @@ from api.routers import (
     auth,
     capabilities,
     chat,
+    cheat_sheets,
     config,
     credentials,
     embedding,
@@ -414,6 +415,7 @@ app.include_router(speaker_profiles.router, prefix="/api", tags=["speaker-profil
 app.include_router(chat.router, prefix="/api", tags=["chat"])
 app.include_router(agent.router, prefix="/api", tags=["agent"])
 app.include_router(explore.router, prefix="/api", tags=["explore"])
+app.include_router(cheat_sheets.router, prefix="/api", tags=["cheat-sheets"])
 app.include_router(ingestion.router, prefix="/api", tags=["ingestion"])
 app.include_router(source_chat.router, prefix="/api", tags=["source-chat"])
 app.include_router(credentials.router, prefix="/api", tags=["credentials"])

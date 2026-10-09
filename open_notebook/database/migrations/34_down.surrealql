@@ -1,0 +1,18 @@
+-- Down migration 34: drop cheat sheets and recall items.
+
+DEFINE EVENT OVERWRITE source_delete ON TABLE source WHEN ($after == NONE) THEN {
+    delete source_embedding where source == $before.id;
+    delete source_insight where source == $before.id;
+    delete source_page where source == $before.id;
+    delete source_section where source == $before.id;
+    delete concept_mention where source == $before.id;
+    delete concept_relation where source == $before.id;
+    delete source_stage where source == $before.id;
+};
+REMOVE EVENT IF EXISTS notebook_delete_cheat_sheets ON TABLE notebook;
+REMOVE EVENT IF EXISTS cheat_sheet_delete ON TABLE cheat_sheet;
+REMOVE TABLE IF EXISTS cheat_sheet_comment;
+REMOVE TABLE IF EXISTS cheat_sheet_version;
+REMOVE TABLE IF EXISTS cheat_sheet;
+REMOVE FIELD IF EXISTS recall_version ON TABLE source_section;
+REMOVE TABLE IF EXISTS recall_item;

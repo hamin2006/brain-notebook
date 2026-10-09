@@ -1,0 +1,80 @@
+-- Migration 34: cheat sheets (docs/7-DEVELOPMENT/plans/cheat-sheet.md).
+--
+-- recall_item: what a student must recall from one outline section (formula,
+-- definition, theorem, method, example, pitfall), extracted on demand when a
+-- cheat sheet first covers the source and reused by every later sheet.
+-- source_section.recall_version records the extraction version a section was
+-- read with; analysis rewrites the section rows, which clears it, so a new
+-- outline is re-read on the next build.
+--
+-- cheat_sheet (one per sheet the user asked for), cheat_sheet_version (each
+-- composed or revised layout) and cheat_sheet_comment (review comments on a
+-- line or the whole sheet).
+
+DEFINE TABLE IF NOT EXISTS recall_item SCHEMAFULL;
+DEFINE FIELD IF NOT EXISTS source ON TABLE recall_item TYPE record<source>;
+DEFINE FIELD IF NOT EXISTS section ON TABLE recall_item TYPE int;
+DEFINE FIELD IF NOT EXISTS index ON TABLE recall_item TYPE int;
+DEFINE FIELD IF NOT EXISTS kind ON TABLE recall_item TYPE string;
+DEFINE FIELD IF NOT EXISTS title ON TABLE recall_item TYPE string;
+DEFINE FIELD IF NOT EXISTS body ON TABLE recall_item TYPE string;
+DEFINE FIELD IF NOT EXISTS priority ON TABLE recall_item TYPE int;
+DEFINE FIELD IF NOT EXISTS page_start ON TABLE recall_item TYPE int;
+DEFINE FIELD IF NOT EXISTS page_end ON TABLE recall_item TYPE int;
+DEFINE FIELD IF NOT EXISTS version ON TABLE recall_item TYPE int;
+-- One row per (source, section, index) through the record id
+-- (`<source key>_<section>_<index>`), not a composite unique index: SurrealDB 2
+-- mis-plans filters on such tables (`IN`, `>=`, part of the key).
+DEFINE INDEX IF NOT EXISTS idx_recall_item_source ON TABLE recall_item COLUMNS source;
+
+DEFINE FIELD IF NOT EXISTS recall_version ON TABLE source_section TYPE option<int>;
+
+DEFINE TABLE IF NOT EXISTS cheat_sheet SCHEMAFULL;
+DEFINE FIELD IF NOT EXISTS notebook ON TABLE cheat_sheet TYPE record<notebook>;
+DEFINE FIELD IF NOT EXISTS title ON TABLE cheat_sheet TYPE string;
+DEFINE FIELD IF NOT EXISTS sources ON TABLE cheat_sheet TYPE array<record<source>>;
+DEFINE FIELD IF NOT EXISTS options ON TABLE cheat_sheet FLEXIBLE TYPE object;
+DEFINE FIELD IF NOT EXISTS status ON TABLE cheat_sheet TYPE string;
+DEFINE FIELD IF NOT EXISTS error ON TABLE cheat_sheet TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS detail ON TABLE cheat_sheet FLEXIBLE TYPE option<object>;
+DEFINE FIELD IF NOT EXISTS current_version ON TABLE cheat_sheet TYPE option<int>;
+DEFINE FIELD IF NOT EXISTS created ON TABLE cheat_sheet TYPE datetime DEFAULT time::now();
+DEFINE FIELD IF NOT EXISTS updated ON TABLE cheat_sheet TYPE datetime DEFAULT time::now();
+DEFINE INDEX IF NOT EXISTS idx_cheat_sheet_notebook ON TABLE cheat_sheet COLUMNS notebook;
+
+DEFINE TABLE IF NOT EXISTS cheat_sheet_version SCHEMAFULL;
+DEFINE FIELD IF NOT EXISTS sheet ON TABLE cheat_sheet_version TYPE record<cheat_sheet>;
+DEFINE FIELD IF NOT EXISTS number ON TABLE cheat_sheet_version TYPE int;
+DEFINE FIELD IF NOT EXISTS layout ON TABLE cheat_sheet_version FLEXIBLE TYPE object;
+DEFINE FIELD IF NOT EXISTS created ON TABLE cheat_sheet_version TYPE datetime DEFAULT time::now();
+DEFINE INDEX IF NOT EXISTS idx_cheat_sheet_version_unique ON TABLE cheat_sheet_version COLUMNS sheet, number UNIQUE;
+
+DEFINE TABLE IF NOT EXISTS cheat_sheet_comment SCHEMAFULL;
+DEFINE FIELD IF NOT EXISTS sheet ON TABLE cheat_sheet_comment TYPE record<cheat_sheet>;
+DEFINE FIELD IF NOT EXISTS version ON TABLE cheat_sheet_comment TYPE int;
+DEFINE FIELD IF NOT EXISTS line ON TABLE cheat_sheet_comment TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS text ON TABLE cheat_sheet_comment TYPE string;
+DEFINE FIELD IF NOT EXISTS status ON TABLE cheat_sheet_comment TYPE string;
+DEFINE FIELD IF NOT EXISTS note ON TABLE cheat_sheet_comment TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS created ON TABLE cheat_sheet_comment TYPE datetime DEFAULT time::now();
+DEFINE INDEX IF NOT EXISTS idx_cheat_sheet_comment_sheet ON TABLE cheat_sheet_comment COLUMNS sheet;
+
+DEFINE EVENT OVERWRITE cheat_sheet_delete ON TABLE cheat_sheet WHEN ($after == NONE) THEN {
+    delete cheat_sheet_version where sheet == $before.id;
+    delete cheat_sheet_comment where sheet == $before.id;
+};
+
+DEFINE EVENT OVERWRITE notebook_delete_cheat_sheets ON TABLE notebook WHEN ($after == NONE) THEN {
+    delete cheat_sheet where notebook == $before.id;
+};
+
+DEFINE EVENT OVERWRITE source_delete ON TABLE source WHEN ($after == NONE) THEN {
+    delete source_embedding where source == $before.id;
+    delete source_insight where source == $before.id;
+    delete source_page where source == $before.id;
+    delete source_section where source == $before.id;
+    delete concept_mention where source == $before.id;
+    delete concept_relation where source == $before.id;
+    delete source_stage where source == $before.id;
+    delete recall_item where source == $before.id;
+};

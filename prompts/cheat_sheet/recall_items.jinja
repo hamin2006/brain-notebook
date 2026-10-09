@@ -1,0 +1,23 @@
+You are preparing material for an exam cheat sheet from "{{ title }}", section "{{ section_title }}" (pages {{ page_start }}-{{ page_end }}).
+
+Section text (page markers in brackets; image descriptions follow the page text where slides were pictures, and they carry the LaTeX of equations the text layer garbled):
+{{ text }}
+
+List what a student must be able to recall from this section without the slides (at most {{ max_items }} items):
+- formula: an equation or identity to memorize, with what its symbols mean when the slide says.
+- definition: a precise definition of a term.
+- theorem: a theorem, rule or property with its conditions ("if f is continuous on [a,b] then ...").
+- method: a procedure, technique or test, with when to use it and its conclusions (e.g. a convergence test: the limit to compute and what each outcome means).
+- example: the skeleton of a worked example that shows a standard move (the setup and the key step, not the arithmetic).
+- pitfall: a common mistake or a condition that is easy to forget, only when the slides point it out.
+
+Rules:
+- Use only what is in the section. Copy formulas exactly, in the course's own notation and symbols; do not substitute textbook forms the slides don't use.
+- Write each body in Markdown with LaTeX between single dollar signs ($\int_a^b f(x)\,dx$). Keep bodies short: one to three lines a student would write on a sheet.
+- Include the conditions under which a formula, theorem or test holds.
+- priority: 1 = central to this section and likely needed on an exam, 2 = useful, 3 = minor, background or review.
+- Skip agenda, outline, "coming up" and logistics slides, and anything only mentioned in passing.
+- Give page_start and page_end from the page markers.
+- If the section teaches nothing to recall (a title slide, a pure example walk-through with no new rule), return an empty list.
+
+{{ format_instructions }}

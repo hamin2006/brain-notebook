@@ -1,0 +1,22 @@
+You are laying out an exam cheat sheet titled "{{ title }}" from a pool of recall items extracted from the course's slides.
+
+The sheet prints on {{ pages }} page(s) in {{ columns }} columns. It holds about {{ budget }} characters of Markdown/LaTeX source in total, counting topic titles and line text. Stay under that budget: a sheet that overflows is useless, and the student can ask for more later.
+
+Include these kinds: {{ kinds }}.
+{% if instructions %}
+The student's instructions (follow them; they override the defaults above where they conflict):
+{{ instructions }}
+{% endif %}
+
+Items, one per line: id · kind · priority (p1 = most important) · title · body · where it is in the course
+{{ pool }}
+
+How to build the sheet:
+- Group lines into topics in a sensible study order (usually course order). Topic titles are short ("Integration by parts", "Series tests").
+- Each line is one thing to recall, written densely as a student would on a sheet: start with the name in bold, then the formula or statement, e.g. "**Ratio test**: $L=\lim_{n\to\infty}\left|\frac{a_{n+1}}{a_n}\right|$; $L<1$ converges abs., $L>1$ diverges, $L=1$ inconclusive".
+- Every line lists each id of the items it covers in "items" (["r3", "r4"], not ranges). You may merge items that say the same thing (the same formula in two lectures) into one line, condense wording and drop redundant words. Never add a formula, condition or fact that is not in the items you list.
+- Keep formulas exactly as the items give them, in the course's notation, with LaTeX between single dollar signs.
+- Choose what to keep by priority: p1 items first, then p2; use p3 only if room remains. Leave out items of kinds not listed above.
+- Prefer many short lines over a few long ones; don't repeat the topic title inside each line.
+
+{{ format_instructions }}

@@ -1,0 +1,28 @@
+You are revising an exam cheat sheet titled "{{ title }}" after the student reviewed it.
+
+The sheet prints on {{ pages }} page(s) in {{ columns }} columns and holds about {{ budget }} characters of Markdown/LaTeX source in total, counting topic titles and line text. Stay under that budget.
+
+Kinds the sheet includes: {{ kinds }}.
+{% if instructions %}
+The student's standing instructions:
+{{ instructions }}
+{% endif %}
+
+The current sheet, one line per row as "- id: text  <flags; items ...>". The id, flags and item list are not part of the text; pinned or edited lines must be kept exactly as they are; "items" lists the recall items a line covers:
+{{ current }}
+
+The student's comments. Each applies to the line it names, or to the whole sheet:
+{% for c in comments %}- {{ c.key }}{% if c.line %} on {{ c.line }}{% else %} on the whole sheet{% endif %}: {{ c.text }}
+{% endfor %}
+Items not on the sheet yet, which you may add (id · kind · priority · title · body · where it is in the course):
+{{ pool if pool else "(none)" }}
+
+Return the whole revised sheet:
+- To keep a current line, give its id in "line" and its text (unchanged or reworded per a comment), without the id or the <...> part. Keep every line no comment asks you to change. Keep pinned and edited lines; you may move them but not change them.
+- To add a line, leave "line" empty and list each id of the items it covers in "items" (["r3", "r4"], not ranges), from the pool above or from the current lines' items. Never add a formula, condition or fact that is not in an item.
+- To remove a line, leave it out.
+- Apply every comment ("too long" means condense it, "missing the ratio test" means add it from the pool if it is there, "drop this" means remove it). If a comment can't be applied (the item isn't in the pool), say so in its note.
+- For each comment give a one-sentence note in "comments" ({"id": "c1", "note": "..."}) saying what changed.
+- Keep formulas exactly as the items give them, with LaTeX between single dollar signs.
+
+{{ format_instructions }}
