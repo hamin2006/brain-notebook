@@ -1,6 +1,6 @@
 # Plan: cheat sheets
 
-- **Status**: Proposed (2026-10), not started
+- **Status**: Built (2026-10): milestones 1–5 on the Calc 2 deck set; the second-course check (milestone 5, step 3) is still to do. Decisions: [ADR-021](../decisions/ADR-021-cheat-sheets.md)
 - **Vision**: extends unique feature #4 (formula sheet) in [VISION.md](../../../VISION.md#focus-stem-students-in-slide-heavy-courses-decided-2026-10)
 - **Builds on**: outlines with page ranges and recovered equations ([content-processing.md](../content-processing.md)),
   the concept-extraction pattern (`commands/concept_commands.py`), KaTeX rendering in the UI
@@ -115,3 +115,37 @@ A Calculus II deck set (integration techniques, applications, sequences and seri
 | 3 | Sheet page: render, print layout, overflow measuring, `.tex` export, creation dialog | 2 days |
 | 4 | Comments, edits, pins, Revise, version switcher | 1–2 days |
 | 5 | Calc 2 validation and tuning; docs, screenshots | 1 day |
+
+## Findings (built 2026-10)
+
+Built and measured on the University of Waterloo MATH 138 slides (Calculus 2: 72 decks, 793 pages, 150 outline
+sections; no parametric or polar lectures) with GLM 5.3 Flash (chat) and Qwen 3.7 Flash (tools).
+
+| Build | Time | Cost |
+|---|---|---|
+| First sheet, series unit (32 decks, 73 sections read, 195 items) | 201 s (121 s reading) | $0.024 |
+| First sheet, whole course (77 more sections read, 412 items) | 223 s | $0.027 |
+| Compose again from cached items, 2 pages (3 parts) | 1–5 min | $0.007–0.009 |
+| Revise (2 comments) | 25 s | $0.0007 |
+
+Eval (`evals/cheat_sheet/`, after two Shortens): checklist recall 21/22 of the entries the course teaches (the
+missing one, 1/(1−x), was shortened away), 0 uncited lines, 0 citations to missing pages; 21 key formulas
+hand-checked correct. Not yet run on a second course.
+
+What changed from the design above:
+
+- **Composing in parts.** One composer reply tops out around 16K characters of sheet, whatever the budget asks, and a
+  two-page sheet at 7 pt holds about 24K (measured: 23.1K fit, 24.4K overflowed). Budgets over `PART_CHARS` (9K) are
+  split into contiguous parts of the course, composed in parallel and joined. Composer calls are capped at 10K output
+  tokens and 200 s per attempt: an uncapped part ran past the 180 s HTTP timeout and retried silently for minutes.
+- **Revision as edit operations** (`remove`, `edit`, `add` with item ids and placement), applied by the job, instead
+  of returning the whole sheet: a rewrite hit the same output ceiling and copied the prompt's line markup into the
+  text. Shorten and Add more are revisions with a built-in request and a smaller or larger budget, so pinned and edited
+  lines survive them too.
+- **The page budget** is `CHARS_PER_PAGE_AT_7PT = 12000` (the first guess, 8K, left sheets half empty), scaled by type
+  size; the composer is told to fill 90–100% of it.
+- **`recall_item` is keyed by record id**, not a composite unique index: SurrealDB 2 returned nothing for an equality on
+  two columns of a three-column key, and deleting and re-inserting the same key in one transaction failed.
+- The creation dialog lists documents in course order from `GET /notebooks/{id}/cheat-sheets/sources`; Rebuild
+  (Compose again) recomposes from the cached items.
+

@@ -9,14 +9,17 @@ import pytest
 
 from open_notebook.utils.cheat_sheet import (
     SheetOptions,
+    apply_revision,
     budget_chars,
     build_layout,
     layout_chars,
     markdown_to_tex,
     parse_recall_items,
+    part_budgets,
     pool_lines,
     revision_lines,
     short_ids,
+    split_items,
     to_tex,
 )
 
@@ -92,8 +95,8 @@ def test_layout_drops_lines_without_known_items_and_cites_from_items():
             ],
         }
     )  # fmt: skip
-    layout = build_layout(raw, IDS, BY_ID, "fallback")
-    assert layout["title"] == "Series" and layout["dropped_lines"] == 3
+    layout = build_layout([raw], IDS, BY_ID, "fallback")
+    assert layout["title"] == "fallback" and layout["dropped_lines"] == 3
     [topic] = layout["topics"]
     [line] = topic["lines"]
     assert line["id"] == "l1" and topic["id"] == "t1"
@@ -108,7 +111,7 @@ def test_layout_drops_lines_without_known_items_and_cites_from_items():
 def test_a_layout_without_cited_lines_is_an_error():
     with pytest.raises(ValueError):
         build_layout(
-            '{"topics": [{"title": "T", "lines": [{"text": "x"}]}]}', IDS, BY_ID, "t"
+            ['{"topics": [{"title": "T", "lines": [{"text": "x"}]}]}'], IDS, BY_ID, "t"
         )
 
 
@@ -125,29 +128,78 @@ PREVIOUS: Dict[str, Any] = {
 }  # fmt: skip
 
 
-def test_revision_keeps_ids_protects_edited_and_pinned_lines_and_numbers_new_ones():
+def test_revision_applies_ops_but_never_to_pinned_or_edited_lines():
     raw = json.dumps(
         {
-            "topics": [
-                {"title": "Tests", "lines": [
-                    {"line": "l1", "text": "**Ratio test** shorter"},
-                    {"line": "l2", "text": "the model rewrote this"},
-                    {"items": ["r3"], "text": "**Geometric**: $\\frac{a}{1-r}$"},
-                ]},
+            "remove": ["l7", "l3", "l99"],
+            "edit": [
+                {"line": "l1", "text": "- l1: **Ratio test** shorter  <items r1>"},
+                {"line": "l2", "text": "the model rewrote this"},
+            ],
+            "add": [
+                {"topic": "Tests", "after": "l1", "items": ["r3"], "text": "**Geometric**: $x$"},
+                {"topic": "New topic", "items": ["r2"], "text": "**Root**"},
+                {"topic": "Tests", "items": ["r42"], "text": "invented"},
             ],
             "comments": [{"id": "c1", "note": "Shortened the ratio test."}],
         }
     )  # fmt: skip
-    layout = build_layout(raw, IDS, BY_ID, "fallback", previous=PREVIOUS)
-    lines = {line["id"]: line for line in layout["topics"][0]["lines"]}
+    layout = apply_revision(PREVIOUS, raw, IDS, BY_ID)
+    tests, new = layout["topics"]
+    assert [line["id"] for line in tests["lines"]] == ["l1", "l8", "l2", "l3"]
+    lines = {line["id"]: line for line in tests["lines"]}
     assert lines["l1"]["text"] == "**Ratio test** shorter"
     assert lines["l1"]["cites"] == PREVIOUS["topics"][0]["lines"][0]["cites"]
     assert lines["l2"]["text"] == "my own words"  # edited: verbatim
-    assert lines["l3"]["text"] == "keep me"  # pinned, left out by the model: put back
-    assert "l7" not in lines  # dropped as asked
+    assert lines["l3"]["text"] == "keep me"  # pinned: not removed
     assert lines["l8"]["items"] == ["recall_item:c"]  # new ids follow the highest
-    assert layout["title"] == "Series"
+    assert new["title"] == "New topic" and new["lines"][0]["id"] == "l9"
+    assert [t["id"] for t in layout["topics"]] == ["t1", "t2"]
+    assert layout["dropped_lines"] == 1 and layout["title"] == "Series"
     assert layout["comment_notes"] == {"c1": "Shortened the ratio test."}
+    assert PREVIOUS["topics"][0]["lines"][0]["text"] == "ratio"  # not mutated
+
+
+def test_items_split_into_parts_between_documents_with_budgets_by_weight():
+    items = [
+        {"id": f"recall_item:{s}{n}", "source": f"source:{s}", "kind": "formula", "title": "t", "body": "x" * 100, "priority": 1, "page_start": 1, "page_end": 1}
+        for s, count in (("a", 4), ("b", 4), ("c", 4))
+        for n in range(count)
+    ]  # fmt: skip
+    groups = split_items(items, 3)
+    assert [[i["source"] for i in g][0] for g in groups] == [
+        "source:a",
+        "source:b",
+        "source:c",
+    ]
+    assert all(len({i["source"] for i in g}) == 1 for g in groups)
+    assert split_items(items, 1) == [items]
+    assert part_budgets(groups, 9000) == [3000, 3000, 3000]
+
+
+def test_parts_are_joined_in_order_and_a_shared_topic_is_merged():
+    first = json.dumps(
+        {
+            "title": "Series",
+            "topics": [{"title": "Tests", "lines": [{"items": ["r1"], "text": "a"}]}],
+        }
+    )
+    second = json.dumps(
+        {
+            "topics": [
+                {"title": "tests", "lines": [{"items": ["r2"], "text": "b"}]},
+                {"title": "Taylor", "lines": [{"items": ["r3"], "text": "c"}]},
+            ]
+        }
+    )
+    layout = build_layout([first, second], IDS, BY_ID, "fallback")
+    assert [
+        (t["id"], t["title"], [x["id"] for x in t["lines"]]) for t in layout["topics"]
+    ] == [
+        ("t1", "Tests", ["l1", "l2"]),
+        ("t2", "Taylor", ["l3"]),
+    ]
+    assert layout["title"] == "fallback"  # the sheet's title, not a part's
 
 
 def test_revision_lines_show_ids_flags_and_item_refs():
@@ -164,7 +216,7 @@ def test_line_text_loses_echoed_ids_and_item_ranges_expand():
             {"items": ["r2"], "text": "- l9: **Root** $y$  <pinned; items r2>"},
         ]}]}
     )  # fmt: skip
-    first, second = build_layout(raw, IDS, BY_ID, "t")["topics"][0]["lines"]
+    first, second = build_layout([raw], IDS, BY_ID, "t")["topics"][0]["lines"]
     assert first["text"] == "**Table**: $x$"
     assert first["items"] == ["recall_item:a", "recall_item:b", "recall_item:c"]
     assert second["text"] == "**Root** $y$"
@@ -177,7 +229,7 @@ def test_markdown_to_tex_escapes_prose_and_keeps_math():
 
 def test_tex_document_has_columns_topics_and_optional_citations():
     layout = build_layout(
-        json.dumps({"topics": [{"title": "Tests", "lines": [{"items": ["r1"], "text": "**Ratio**"}]}]}),
+        [json.dumps({"topics": [{"title": "Tests", "lines": [{"items": ["r1"], "text": "**Ratio**"}]}]})],
         IDS, BY_ID, "Series sheet",
     )  # fmt: skip
     labels = {"source:l5": "Lecture 5"}
@@ -208,7 +260,7 @@ async def test_build_composes_from_items_and_records_version_and_cost():
         "id": "cheat_sheet:s",
         "title": "Series",
         "sources": ["source:l5"],
-        "options": {"pages": 1},
+        "options": {"pages": 1, "scale": 0.5},  # one composer part
         "current_version": None,
     }
     composed = json.dumps(

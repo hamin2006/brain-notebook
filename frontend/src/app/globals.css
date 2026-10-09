@@ -691,3 +691,58 @@
 .graph3d-label.is-dim {
   opacity: 0.3;
 }
+
+/* Cheat sheets (components/cheat-sheets). On screen the sheet is a preview at
+   its printed size; printing shows only the copy rendered under <body>. */
+.cheat-print-portal {
+  display: none;
+}
+
+@media screen {
+  .sheet-hidden-on-screen {
+    display: none;
+  }
+}
+
+@media print {
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+  body:has(.cheat-print-portal) > *:not(.cheat-print-portal) {
+    display: none !important;
+  }
+  .cheat-print-portal {
+    display: block;
+  }
+  .cheat-print-portal .cheat-sheet {
+    gap: 0 !important;
+  }
+  .cheat-print-portal .cheat-sheet-page {
+    box-shadow: none !important;
+    background: #fff !important;
+    color: #000 !important;
+    break-after: page;
+  }
+  .cheat-print-portal .cheat-sheet-page:last-child {
+    break-after: auto;
+  }
+  .cheat-print-portal .sheet-topic {
+    background: #e8e8e8 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .cheat-print-portal .sheet-line {
+    background: none !important;
+    box-shadow: none !important;
+  }
+  .cheat-print-portal .sheet-cites button {
+    color: #666 !important;
+  }
+  .sheet-screen-only,
+  .sheet-hidden-in-print {
+    display: none !important;
+  }
+}

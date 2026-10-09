@@ -129,6 +129,18 @@ repository. Latest results are in the [plan](plans/agentic-rag.md#7b-phase-5-as-
 When a question fails, read its answer before changing code: several "failures" so far were grader patterns too
 strict for a correct answer (LaTeX, wording), fixed in `questions.json`.
 
+## The cheat sheet eval
+
+`evals/cheat_sheet/run_eval.py` builds a cheat sheet through the running API (or scores an existing one with
+`--sheet`) and reports checklist recall (`calc2.json`: entries on the sheet out of those the documents teach, so a
+course without polar coordinates isn't penalised for them), lines without citations, citations to pages that don't
+exist, size against the budget, cost and time. Formulas are checked by hand against the cited slides. Run it after
+changing the cheat sheet prompts or job:
+
+```bash
+uv run --env-file .env python evals/cheat_sheet/run_eval.py --notebook "Calculus 2 (UW MATH 138)"
+```
+
 ## Timing an ingestion
 
 Ingestion changes are measured on real decks with the running stack:

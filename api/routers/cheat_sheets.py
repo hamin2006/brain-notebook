@@ -146,6 +146,15 @@ async def list_cheat_sheets(notebook_id: str):
     return await sheets.list_sheets(notebook_id)
 
 
+@router.get("/notebooks/{notebook_id}/cheat-sheets/sources")
+async def cheat_sheet_sources(notebook_id: str):
+    """The notebook's documents in course order, for picking a sheet's sources."""
+    return [
+        {"id": s["id"], "title": s.get("title") or "Untitled"}
+        for s in await _notebook_sources(notebook_id)
+    ]
+
+
 @router.get("/cheat-sheets/{sheet_id}")
 async def get_cheat_sheet(sheet_id: str, version: Optional[int] = Query(None)):
     """The sheet with one version's layout (the current one by default), its
@@ -187,15 +196,16 @@ async def rebuild_cheat_sheet(sheet_id: str):
 
 @router.post("/cheat-sheets/{sheet_id}/resize")
 async def resize_cheat_sheet(sheet_id: str, request: ResizeRequest):
-    """Shorten (the sheet overflows) or Add more (room is left): recompose with
-    a smaller or larger budget."""
+    """Shorten (the sheet overflows) or Add more (room is left): revise the
+    current version to a smaller or larger budget."""
     sheet = await sheets.load_sheet(sheet_id)
     options = SheetOptions(**sheet["options"])
     factor = SHORTEN_FACTOR if request.direction == "shorten" else ADD_MORE_FACTOR
     options.scale = round(min(max(options.scale * factor, 0.3), 2.0), 3)
     await sheets.update_sheet(sheet_id, {"options": options.model_dump()})
     sheet["options"] = options.model_dump()
-    return await _start_build(sheet, "compose")
+    # A revision of the current version, so pinned and edited lines stay.
+    return await _start_build(sheet, request.direction)
 
 
 @router.post("/cheat-sheets/{sheet_id}/revise")

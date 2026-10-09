@@ -80,7 +80,7 @@ On phones the panes become tabs: **Chat**, **Sources**, **Notes** and **Concepts
 The notebook name and description (click to edit), the notebook's size (documents, pages, concepts; click the
 concept count to open the Concepts tab), the **grounding** switch (**Notebook only**, or **+ General knowledge**,
 which also allows web search when it's on; see [grounding](chat-effectively.md#the-controls))
-and **⋯** with **Archive** and **Delete**.
+and **⋯** with **New cheat sheet…** and the notebook's existing [cheat sheets](cheat-sheets.md), **Archive** and **Delete**.
 
 ### Library: Sources
 

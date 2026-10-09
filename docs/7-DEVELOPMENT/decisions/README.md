@@ -61,6 +61,7 @@ What this makes easier, what it makes harder, what to watch. (bullets)
 | [ADR-018](ADR-018-research-workspace-ui.md) | The UI is a research workspace that shows its evidence ("Ink & Signal") | Accepted (Brain Notebook) |
 | [ADR-019](ADR-019-tracked-versioned-ingestion.md) | Ingestion stages are tracked and versioned; the worker recovers and reprocesses on start | Accepted (Brain Notebook) |
 | [ADR-020](ADR-020-ingestion-throughput-and-memory.md) | Ingestion runs wide, parses PDFs in processes and fits a memory budget | Accepted (Brain Notebook) |
+| [ADR-021](ADR-021-cheat-sheets.md) | Cheat sheets are built from cached recall items, composed in parts and revised by edit operations | Accepted (Brain Notebook) |
 | [PDR-001](PDR-001-single-user-first.md) | Single-user first; don't preclude multi-user | Accepted |
 | [PDR-002](PDR-002-provider-agnostic-core.md) | Provider-agnostic core by default | Accepted |
 | [PDR-003](PDR-003-personal-fork.md) | Brain Notebook is a personal fork that keeps upstream's identifiers | Accepted |

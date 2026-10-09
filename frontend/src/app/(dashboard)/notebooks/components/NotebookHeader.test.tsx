@@ -13,6 +13,14 @@ vi.mock('./NotebookDeleteDialog', () => ({
   NotebookDeleteDialog: () => null,
 }))
 
+vi.mock('@/lib/hooks/use-cheat-sheets', () => ({
+  useCheatSheets: () => ({ data: [] }),
+}))
+
+vi.mock('@/components/cheat-sheets/CreateCheatSheetDialog', () => ({
+  CreateCheatSheetDialog: () => null,
+}))
+
 const notebook: NotebookResponse = {
   id: 'notebook:n1',
   name: 'My notebook',

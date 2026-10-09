@@ -36,6 +36,7 @@ What each feature needs:
 | [Citations](citations.md) | Page citations and page previews |
 | [Working with Notes](working-with-notes.md) | Writing notes and saving AI answers |
 | [Search and Ask](search.md) | Text and vector search, and Ask across your knowledge base |
+| [Cheat Sheets](cheat-sheets.md) | A printable, cited recall sheet from your slides: building, reviewing, revising, printing |
 | [Creating Podcasts](creating-podcasts.md) | Generating episodes, episode and speaker profiles |
 
 ---

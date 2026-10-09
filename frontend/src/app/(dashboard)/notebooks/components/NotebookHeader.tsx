@@ -5,11 +5,13 @@ import { NotebookResponse } from '@/lib/types/api'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
-import { Archive, ArchiveRestore, Trash2, PanelLeft, Globe2, ShieldCheck, ChevronDown, MoreHorizontal, MessagesSquare, Waypoints } from 'lucide-react'
+import { Archive, ArchiveRestore, Trash2, PanelLeft, Globe2, ShieldCheck, ChevronDown, MoreHorizontal, MessagesSquare, Waypoints, ScrollText, FileText } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
@@ -21,6 +23,9 @@ import { formatDistanceToNow } from 'date-fns'
 import { getDateLocale } from '@/lib/utils/date-locale'
 import { InlineEdit } from '@/components/common/InlineEdit'
 import { useTranslation } from '@/lib/hooks/use-translation'
+import { useCheatSheets } from '@/lib/hooks/use-cheat-sheets'
+import { CreateCheatSheetDialog } from '@/components/cheat-sheets/CreateCheatSheetDialog'
+import { sheetHref } from '@/components/cheat-sheets/sheet-utils'
 
 interface NotebookHeaderProps {
   notebook: NotebookResponse
@@ -36,6 +41,9 @@ export function NotebookHeader({ notebook, overview }: NotebookHeaderProps) {
   const { t, language } = useTranslation()
   const dfLocale = getDateLocale(language)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [showCheatSheetDialog, setShowCheatSheetDialog] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const { data: cheatSheets } = useCheatSheets(notebook.id, menuOpen)
   
   const updateNotebook = useUpdateNotebook()
 
@@ -185,13 +193,31 @@ export function NotebookHeader({ notebook, overview }: NotebookHeaderProps) {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <DropdownMenu>
+        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon-sm" className="text-muted-foreground" aria-label={t('common.actions')}>
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuContent align="end" className="w-64">
+            <DropdownMenuItem onClick={() => setShowCheatSheetDialog(true)}>
+              <ScrollText className="h-4 w-4 mr-2" />
+              {t('cheatSheet.newMenu')}
+            </DropdownMenuItem>
+            {!!cheatSheets?.length && (
+              <>
+                <DropdownMenuLabel className="text-[11px] font-normal text-muted-foreground">{t('cheatSheet.yourSheets')}</DropdownMenuLabel>
+                {cheatSheets.slice(0, 6).map((sheet) => (
+                  <DropdownMenuItem key={sheet.id} asChild>
+                    <Link href={sheetHref(notebook.id, sheet.id)}>
+                      <FileText className="h-4 w-4 mr-2 text-muted-foreground" />
+                      <span className="truncate">{sheet.title}</span>
+                    </Link>
+                  </DropdownMenuItem>
+                ))}
+              </>
+            )}
+            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleArchiveToggle}>
               {notebook.archived ? (
                 <>
@@ -215,6 +241,8 @@ export function NotebookHeader({ notebook, overview }: NotebookHeaderProps) {
           </DropdownMenuContent>
         </DropdownMenu>
       </header>
+
+      <CreateCheatSheetDialog notebookId={notebook.id} open={showCheatSheetDialog} onOpenChange={setShowCheatSheetDialog} />
 
       <NotebookDeleteDialog
         open={showDeleteDialog}

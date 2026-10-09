@@ -17,6 +17,7 @@ failed), progress, failed sections and the run's tokens and cost.
 """
 
 import asyncio
+import math
 import os
 import time
 from typing import Any, Dict, List, Optional, Tuple
@@ -39,16 +40,22 @@ from open_notebook.exceptions import ConfigurationError, NotFoundError
 from open_notebook.utils import clean_thinking_content
 from open_notebook.utils.cheat_sheet import (
     MAX_ITEMS_PER_SECTION,
+    PART_CHARS,
     ComposedSheet,
     RecallExtraction,
+    RevisionOps,
     SheetOptions,
+    apply_revision,
     budget_chars,
     build_layout,
+    json_object,
     layout_chars,
     parse_recall_items,
+    part_budgets,
     pool_lines,
     revision_lines,
     short_ids,
+    split_items,
     used_items,
 )
 from open_notebook.utils.pdf_pages import PdfPage, group_builds
@@ -71,13 +78,29 @@ CHEAT_SHEET_RETRY_CONFIG = {
 MAX_CONCURRENT_SECTIONS = int(os.environ.get("OPEN_NOTEBOOK_SECTION_CONCURRENCY", "10"))
 # A composed sheet this far over budget is recomposed once with a tighter one.
 OVERFLOW_RETRY_RATIO = 1.3
+# A composer or reviser reply (one part, about 9K characters of sheet in JSON)
+# needs about 6K tokens; the cap keeps a reply that runs on from outlasting
+# the call timeout, and an attempt past COMPOSE_CALL_SECONDS counts as failed
+# (the HTTP client's own timeout retries silently, for minutes).
+COMPOSE_MAX_TOKENS = 10000
+COMPOSE_CALL_SECONDS = 200
 
 
 class BuildCheatSheetInput(CommandInput):
     sheet_id: str
     # "compose" builds from the items; "revise" applies open comments to the
-    # current version.
+    # current version; "shorten" and "more" resize the current version to the
+    # sheet's (changed) budget, keeping pinned and edited lines.
     mode: str = "compose"
+
+
+RESIZE_REQUESTS = {
+    "shorten": "The sheet overflows its pages. Shorten it to fit the budget: "
+    "condense long lines and drop the least important (p3, then p2) ones.",
+    "more": "The sheet has room left. Fill the budget: add the most important "
+    "items from the pool that are not on the sheet yet until the sheet holds "
+    "about the budget.",
+}
 
 
 class BuildCheatSheetOutput(CommandOutput):
@@ -276,62 +299,113 @@ async def _compose(
     previous: Optional[Dict[str, Any]] = None,
     comments: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
+    """A new layout from the items, or the previous one revised."""
     ids = short_ids(items)
     items_by_id = {str(i["id"]): i for i in items}
     model = limit_reasoning(
         await provision_langchain_model(
-            "", None, "chat", max_tokens=16000, structured=dict(type="json")
+            "",
+            None,
+            "chat",
+            max_tokens=COMPOSE_MAX_TOKENS,
+            structured=dict(type="json"),
         ),
-        3072,
+        2048,
     )
-    parser: PydanticOutputParser[ComposedSheet] = PydanticOutputParser(
-        pydantic_object=ComposedSheet
-    )
+    common: Dict[str, Any] = {
+        "title": sheet["title"],
+        "pages": options.pages,
+        "columns": options.columns,
+        "kinds": ", ".join(options.kinds),
+        "instructions": options.instructions.strip(),
+    }
 
-    def prompt_for(budget: int) -> str:
-        data: Dict[str, Any] = {
-            "title": sheet["title"],
-            "pages": options.pages,
-            "columns": options.columns,
-            "budget": budget,
-            "kinds": ", ".join(options.kinds),
-            "instructions": options.instructions.strip(),
-        }
-        if previous is None:
-            data["pool"] = pool_lines(items, ids, labels)
-            template = "cheat_sheet/compose"
-        else:
-            unused = [i for i in items if str(i["id"]) not in used_items(previous)]
-            data["current"] = revision_lines(previous, {v: k for k, v in ids.items()})
-            data["comments"] = comments or []
-            data["pool"] = pool_lines(unused, ids, labels)
-            template = "cheat_sheet/revise"
-        return Prompter(prompt_template=template, parser=parser).render(data=data)  # type: ignore[arg-type]
-
-    async def attempt(budget: int) -> Dict[str, Any]:
+    async def ask(template: str, parser: Any, data: Dict[str, Any], read: Any) -> Any:
+        prompt = Prompter(prompt_template=template, parser=parser).render(
+            data={**common, **data}
+        )
         error: Exception = ValueError("no attempt")
-        for _ in range(2):  # one retry: replies vary
+        for attempt in range(2):  # one retry: replies vary
+            started = time.time()
             try:
-                raw = await _invoke(model, prompt_for(budget), usage)
-                return build_layout(
-                    raw, ids, items_by_id, sheet["title"], previous=previous
+                raw = await asyncio.wait_for(
+                    _invoke(model, prompt, usage), COMPOSE_CALL_SECONDS
                 )
-            except ValueError as e:
+                logger.debug(
+                    f"{template} ({data.get('part', 1)}/{data.get('parts', 1)}) "
+                    f"took {time.time() - started:.0f}s"
+                )
+                return read(raw)
+            except (ValueError, asyncio.TimeoutError) as e:
                 error = e
-        raise ValueError(f"The model's sheet could not be read: {error}")
+                logger.warning(
+                    f"{template} ({data.get('part', 1)}/{data.get('parts', 1)}) "
+                    f"attempt {attempt + 1} failed after {time.time() - started:.0f}s: {e!r}"
+                )
+        raise ValueError(f"The model's sheet could not be read: {error!r}")
 
     budget = budget_chars(options)
-    layout = await attempt(budget)
-    if layout_chars(layout) > budget * OVERFLOW_RETRY_RATIO:
-        logger.info(
-            f"Cheat sheet {sheet['id']} composed {layout_chars(layout)} chars for a "
-            f"budget of {budget}; recomposing tighter"
+
+    if previous is not None:
+        unused = [i for i in items if str(i["id"]) not in used_items(previous)]
+        layout = await ask(
+            "cheat_sheet/revise",
+            PydanticOutputParser(pydantic_object=RevisionOps),
+            {
+                "budget": budget,
+                "chars": layout_chars(previous),
+                "current": revision_lines(previous, {v: k for k, v in ids.items()}),
+                "comments": comments or [],
+                "pool": pool_lines(unused, ids, labels),
+            },
+            lambda raw: apply_revision(previous, raw, ids, items_by_id),
         )
-        tighter = int(budget * budget / layout_chars(layout))
-        layout = await attempt(tighter)
+    else:
+        # One reply holds at most about 16K characters of sheet: a bigger
+        # budget is composed in parts (contiguous runs of the course), in
+        # parallel, and the parts' topics are joined in order.
+        groups = split_items(items, max(1, math.ceil(budget / PART_CHARS)))
+        parser: PydanticOutputParser[ComposedSheet] = PydanticOutputParser(
+            pydantic_object=ComposedSheet
+        )
+
+        async def compose(target: int) -> Dict[str, Any]:
+            raws = await asyncio.gather(
+                *(
+                    ask(
+                        "cheat_sheet/compose",
+                        parser,
+                        {
+                            "budget": part_budget,
+                            "pool": pool_lines(group, ids, labels),
+                            "part": i + 1,
+                            "parts": len(groups),
+                        },
+                        _checked_json,
+                    )
+                    for i, (group, part_budget) in enumerate(
+                        zip(groups, part_budgets(groups, target))
+                    )
+                )
+            )
+            return build_layout(list(raws), ids, items_by_id, sheet["title"])
+
+        layout = await compose(budget)
+        if layout_chars(layout) > budget * OVERFLOW_RETRY_RATIO:
+            logger.info(
+                f"Cheat sheet {sheet['id']} composed {layout_chars(layout)} chars for "
+                f"a budget of {budget}; recomposing tighter"
+            )
+            layout = await compose(int(budget * budget / layout_chars(layout)))
     layout["budget_chars"] = budget
     layout["chars"] = layout_chars(layout)
     return layout
+
+
+def _checked_json(raw: str) -> str:
+    """A composer reply, checked to hold a readable sheet (parsed again when joined)."""
+    ComposedSheet.model_validate(json_object(raw))
+    return raw
 
 
 # ---------------------------------------------------------------- the job
@@ -417,6 +491,12 @@ async def _build(input_data: BuildCheatSheetInput) -> int:
     comments: List[Dict[str, Any]] = []
     if input_data.mode == "revise":
         previous, comments = await _revision_inputs(sheet)
+    elif input_data.mode in RESIZE_REQUESTS and sheet.get("current_version"):
+        previous, _ = await _revision_inputs(sheet)
+        # A request of the job's own, not a stored comment.
+        comments = [
+            {"key": "c1", "line": None, "text": RESIZE_REQUESTS[input_data.mode]}
+        ]
     layout = await _compose(sheet, options, items, labels, usage, previous, comments)
     detail["compose_seconds"] = round(time.time() - compose_start, 1)
 
@@ -425,6 +505,8 @@ async def _build(input_data: BuildCheatSheetInput) -> int:
     addressed = layout.pop("comment_notes", {})
     await save_version(input_data.sheet_id, number, layout)
     for comment in comments:
+        if "id" not in comment:
+            continue
         await repo_query(
             "UPDATE $id SET status = 'addressed', note = $note",
             {

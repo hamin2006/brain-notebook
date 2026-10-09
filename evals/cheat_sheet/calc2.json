@@ -1,0 +1,31 @@
+{
+  "name": "Calculus II",
+  "note": "What a Calc II exam sheet must contain (plans/cheat-sheet.md, Validation). Each entry passes when any pattern matches the sheet's text (lowercased, LaTeX commands kept). An entry that matches no recall item either is reported as not taught by the selected documents.",
+  "checklist": [
+    {"id": "ibp", "label": "Integration by parts", "patterns": ["integration by parts", "by parts"]},
+    {"id": "trig_int", "label": "Trigonometric integrals / identities", "patterns": ["\\\\sin\\^2.*\\\\cos\\^2", "trig(onometric)? (integral|identit)", "\\\\sec\\\\theta"]},
+    {"id": "trig_sub", "label": "Trigonometric substitution table", "patterns": ["trig(onometric)? sub"]},
+    {"id": "partial_fractions", "label": "Partial fractions", "patterns": ["partial fraction"]},
+    {"id": "improper", "label": "Improper integrals", "patterns": ["improper"]},
+    {"id": "arc_length", "label": "Arc length", "patterns": ["arc length", "arclength"]},
+    {"id": "surface_area", "label": "Surface area of revolution", "patterns": ["surface area"]},
+    {"id": "divergence_test", "label": "Divergence test", "patterns": ["divergence test", "n-?th term test"]},
+    {"id": "integral_test", "label": "Integral test", "patterns": ["integral test"]},
+    {"id": "comparison_test", "label": "Comparison test", "patterns": ["comparison test"]},
+    {"id": "limit_comparison", "label": "Limit comparison test", "patterns": ["limit comparison"]},
+    {"id": "alternating_test", "label": "Alternating series test", "patterns": ["alternating series test", "\\bast\\b", "leibniz"]},
+    {"id": "ratio_test", "label": "Ratio test", "patterns": ["ratio test"]},
+    {"id": "root_test", "label": "Root test", "patterns": ["root test"]},
+    {"id": "geometric", "label": "Geometric series and its sum", "patterns": ["geometric series"]},
+    {"id": "p_series", "label": "p-series", "patterns": ["p-series", "p series", "\\\\frac\\{1\\}\\{n\\^p\\}"]},
+    {"id": "taylor", "label": "Taylor / Maclaurin series", "patterns": ["taylor series", "maclaurin"]},
+    {"id": "exp_series", "label": "Series of e^x", "patterns": ["e\\^x\\s*=\\s*\\\\sum", "e\\^\\{?x\\}?=\\\\sum"]},
+    {"id": "sin_series", "label": "Series of sin x", "patterns": ["\\\\sin\\s*\\(?x\\)?\\s*=\\s*\\\\sum"]},
+    {"id": "cos_series", "label": "Series of cos x", "patterns": ["\\\\cos\\s*\\(?x\\)?\\s*=\\s*\\\\sum"]},
+    {"id": "ln_series", "label": "Series of ln(1+x)", "patterns": ["\\\\ln\\s*\\(1\\s*\\+\\s*x\\)"]},
+    {"id": "geometric_fn", "label": "Series of 1/(1-x)", "patterns": ["\\\\frac\\{1\\}\\{1\\s*-\\s*x\\}", "1/\\(1-x\\)"]},
+    {"id": "radius", "label": "Radius of convergence", "patterns": ["radius of convergence", "\\bR\\s*=", "radius"]},
+    {"id": "parametric", "label": "Parametric derivatives", "patterns": ["parametric", "\\\\frac\\{dy/dt\\}"]},
+    {"id": "polar_area", "label": "Polar area", "patterns": ["polar"]}
+  ]
+}

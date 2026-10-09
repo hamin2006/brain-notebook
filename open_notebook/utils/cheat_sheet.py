@@ -7,6 +7,7 @@ line names the items it covers, and its citations come from those items, never
 from the model. Lines that cover no known item are dropped.
 """
 
+import copy
 import json
 import re
 from typing import Any, Dict, Iterable, List, Literal, Optional
@@ -24,10 +25,11 @@ MAX_TITLE_CHARS = 120
 MAX_BODY_CHARS = 600
 
 # Characters of Markdown/LaTeX source that fill one printed page at 7 pt in the
-# sheet's print stylesheet (Letter or A4, narrow margins), after headings,
-# displayed formulas and ragged columns. The browser measures real overflow;
+# sheet's print stylesheet (Letter, narrow margins), after headings, inline
+# math (its source is longer than what it renders) and ragged columns:
+# a two-page calculus sheet fit 23.1K and overflowed at 24.4K. The browser measures real overflow;
 # this only steers the composer. Type size follows the column count.
-CHARS_PER_PAGE_AT_7PT = 8000
+CHARS_PER_PAGE_AT_7PT = 12000
 FONT_PT_BY_COLUMNS = {2: 8.0, 3: 7.0, 4: 6.0}
 # The composer reads at most this much item text (about 45K tokens); beyond
 # it, minor items are left out first, then bodies are shortened.
@@ -84,7 +86,7 @@ class RecallExtraction(BaseModel):
     items: List[ExtractedItem] = Field(default_factory=list)
 
 
-def _json_object(raw: str) -> Any:
+def json_object(raw: str) -> Any:
     """The JSON object in a model reply, tolerating fences, prose and LaTeX."""
     start, end = raw.find("{"), raw.rfind("}")
     if start < 0 or end <= start:
@@ -96,7 +98,7 @@ def parse_recall_items(
     raw: str, page_start: int, page_end: int
 ) -> List[Dict[str, Any]]:
     """Clean recall items from an extraction reply, pages clamped to the section."""
-    extraction = RecallExtraction.model_validate(_json_object(raw))
+    extraction = RecallExtraction.model_validate(json_object(raw))
     items: List[Dict[str, Any]] = []
     seen = set()
     for item in extraction.items:
@@ -226,26 +228,11 @@ def clean_line_text(text: str) -> str:
 class ComposedLine(BaseModel):
     items: List[str] = Field(default_factory=list)
     text: str = ""
-    # Revise only: the id of a current line this one keeps ("l5").
-    line: Optional[str] = None
 
     @field_validator("items", mode="before")
     @classmethod
     def _items(cls, v: Any) -> List[str]:
-        if isinstance(v, str):
-            v = re.split(r"[\s,;]+", v)
-        out: List[str] = []
-        for x in v or []:
-            x = str(x).strip()
-            # "r12-r15" (or an en dash) is a range of short ids.
-            match = re.fullmatch(r"r(\d+)\s*[-–—]\s*r?(\d+)", x)
-            if match and int(match.group(2)) - int(match.group(1)) < 200:
-                out += [
-                    f"r{n}" for n in range(int(match.group(1)), int(match.group(2)) + 1)
-                ]
-            elif x:
-                out.append(x)
-        return out
+        return _short_id_list(v)
 
     @field_validator("text", mode="before")
     @classmethod
@@ -258,16 +245,26 @@ class ComposedTopic(BaseModel):
     lines: List[ComposedLine] = Field(default_factory=list)
 
 
-class CommentNote(BaseModel):
-    id: str
-    note: str = ""
-
-
 class ComposedSheet(BaseModel):
     title: str = ""
     topics: List[ComposedTopic] = Field(default_factory=list)
-    # Revise only: what changed for each comment ("c1").
-    comments: List[CommentNote] = Field(default_factory=list)
+
+
+def _short_id_list(v: Any) -> List[str]:
+    """Short item ids from a model: a list or a string, "r12-r15" ranges expanded."""
+    if isinstance(v, str):
+        v = re.split(r"[\s,;]+", v)
+    out: List[str] = []
+    for x in v or []:
+        x = str(x).strip()
+        match = re.fullmatch(r"r(\d+)\s*[-–—]\s*r?(\d+)", x)
+        if match and int(match.group(2)) - int(match.group(1)) < 200:
+            out += [
+                f"r{n}" for n in range(int(match.group(1)), int(match.group(2)) + 1)
+            ]
+        elif x:
+            out.append(x)
+    return out
 
 
 def _merge_cites(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -294,6 +291,173 @@ def _merge_cites(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return cites
 
 
+def _new_line(
+    line_id: str,
+    text: str,
+    record_ids: List[str],
+    items_by_id: Dict[str, Dict[str, Any]],
+) -> Dict[str, Any]:
+    covered = [items_by_id[r] for r in record_ids]
+    return {
+        "id": line_id,
+        "text": text,
+        "items": record_ids,
+        "kind": covered[0]["kind"],
+        "cites": _merge_cites(covered),
+    }
+
+
+def _resolve(
+    short: List[str], ids: Dict[str, str], items_by_id: Dict[str, Dict[str, Any]]
+) -> List[str]:
+    return list(
+        dict.fromkeys(ids[s] for s in short if s in ids and ids[s] in items_by_id)
+    )
+
+
+def build_layout(
+    raws: List[str],
+    ids: Dict[str, str],
+    items_by_id: Dict[str, Dict[str, Any]],
+    fallback_title: str,
+) -> Dict[str, Any]:
+    """The stored layout from the composer's replies (one per part, in order).
+
+    Lines reference items by short id; unknown ids are ignored and a line left
+    with no item is dropped (the model may condense, never invent). Citations
+    are computed from the items."""
+    sheets = [ComposedSheet.model_validate(json_object(raw)) for raw in raws]
+    topics: List[Dict[str, Any]] = []
+    dropped = 0
+    n_line = 0
+    for sheet in sheets:
+        for topic in sheet.topics:
+            lines = []
+            for line in topic.lines:
+                record_ids = _resolve(line.items, ids, items_by_id)
+                if not record_ids or not line.text:
+                    dropped += 1
+                    continue
+                n_line += 1
+                lines.append(
+                    _new_line(f"l{n_line}", line.text, record_ids, items_by_id)
+                )
+            title = " ".join(topic.title.split()) or "Topic"
+            # Parts can end and start with the same topic.
+            if lines and topics and topics[-1]["title"].lower() == title.lower():
+                topics[-1]["lines"] += lines
+            elif lines:
+                topics.append({"title": title, "lines": lines})
+    if not topics:
+        raise ValueError("the composed sheet has no lines that cite an item")
+    for i, placed in enumerate(topics):
+        placed["id"] = f"t{i + 1}"
+    # The sheet's own title: a part's title only describes that part.
+    return {
+        "title": fallback_title,
+        "topics": topics,
+        "dropped_lines": dropped,
+    }
+
+
+# ---------------------------------------------------------------- composing in parts
+
+# One composer reply tops out around 16K characters of sheet, whatever the
+# budget; a larger sheet is composed in parts of about this size, in parallel.
+PART_CHARS = 9000
+
+
+def split_items(items: List[Dict[str, Any]], parts: int) -> List[List[Dict[str, Any]]]:
+    """Items (in course order) cut into `parts` contiguous groups of about equal
+    weight, cutting between documents where possible. Weight is body length of
+    the items likely to make the sheet (priority 1 and 2)."""
+    if parts <= 1 or len(items) <= parts:
+        return [items]
+
+    def weight(item: Dict[str, Any]) -> int:
+        return len(item["body"]) + 40 if item["priority"] < 3 else 10
+
+    total = sum(weight(i) for i in items)
+    boundaries = [
+        i for i in range(1, len(items)) if items[i]["source"] != items[i - 1]["source"]
+    ] or list(range(1, len(items)))
+    cumulative, running = [], 0
+    for item in items:
+        running += weight(item)
+        cumulative.append(running)
+    cuts: List[int] = []
+    for k in range(1, parts):
+        target = total * k / parts
+        best = min(
+            (b for b in boundaries if not cuts or b > cuts[-1]),
+            key=lambda b: abs(cumulative[b - 1] - target),
+            default=None,
+        )
+        if best is not None:
+            cuts.append(best)
+    edges = [0, *cuts, len(items)]
+    return [items[a:b] for a, b in zip(edges, edges[1:]) if b > a]
+
+
+def part_budgets(groups: List[List[Dict[str, Any]]], budget: int) -> List[int]:
+    weights = [
+        sum(len(i["body"]) + 40 for i in g if i["priority"] < 3) or 1 for g in groups
+    ]
+    total = sum(weights)
+    return [max(800, int(budget * w / total)) for w in weights]
+
+
+# ---------------------------------------------------------------- revising
+
+
+class LineEdit(BaseModel):
+    line: str
+    text: str = ""
+
+    @field_validator("text", mode="before")
+    @classmethod
+    def _text(cls, v: Any) -> str:
+        return clean_line_text(str(v or ""))
+
+
+class LineAdd(BaseModel):
+    topic: str = ""
+    after: Optional[str] = None
+    items: List[str] = Field(default_factory=list)
+    text: str = ""
+
+    @field_validator("items", mode="before")
+    @classmethod
+    def _items(cls, v: Any) -> List[str]:
+        return _short_id_list(v)
+
+    @field_validator("text", mode="before")
+    @classmethod
+    def _text(cls, v: Any) -> str:
+        return clean_line_text(str(v or ""))
+
+
+class CommentNote(BaseModel):
+    id: str
+    note: str = ""
+
+
+class RevisionOps(BaseModel):
+    remove: List[str] = Field(
+        default_factory=list, description="Ids of lines to remove"
+    )
+    edit: List[LineEdit] = Field(
+        default_factory=list, description="Lines to reword: id and new text"
+    )
+    add: List[LineAdd] = Field(
+        default_factory=list,
+        description="New lines: topic title, the line id to insert after (optional), item ids, text",
+    )
+    comments: List[CommentNote] = Field(
+        default_factory=list, description="For each comment id, what changed"
+    )
+
+
 def _line_number(line_id: str) -> int:
     match = re.fullmatch(r"l(\d+)", line_id or "")
     return int(match.group(1)) if match else 0
@@ -303,102 +467,65 @@ def _is_kept_verbatim(line: Dict[str, Any]) -> bool:
     return bool(line.get("pinned") or line.get("edited"))
 
 
-def build_layout(
+def apply_revision(
+    previous: Dict[str, Any],
     raw: str,
     ids: Dict[str, str],
     items_by_id: Dict[str, Dict[str, Any]],
-    fallback_title: str,
-    previous: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """The stored layout from a composer (or reviser) reply.
+    """The current layout with the reviser's operations applied.
 
-    Lines reference items by short id; unknown ids are ignored and a line left
-    with no item is dropped (the model may condense, never invent). Citations
-    are computed from the items. On revise, a line may keep a current line by
-    its id: it keeps that id and its citations, and pinned or hand-edited
-    lines keep their text verbatim; pinned or edited lines the model left out
-    are put back in their topic. New lines get ids after the highest one used,
-    so comments stay anchored across versions."""
-    sheet = ComposedSheet.model_validate(_json_object(raw))
-    prev_lines: Dict[str, Dict[str, Any]] = {}
-    prev_topic_of: Dict[str, str] = {}
-    if previous:
-        for topic in previous.get("topics", []):
-            for line in topic["lines"]:
-                prev_lines[line["id"]] = line
-                prev_topic_of[line["id"]] = topic["title"]
-    next_number = max((_line_number(i) for i in prev_lines), default=0)
-    topics: List[Dict[str, Any]] = []
-    placed: set = set()
+    Removals and edits skip pinned and hand-edited lines. Added lines must
+    cite items (unknown ids are ignored; a line left with none is dropped) and
+    get ids after the highest one used, so comments stay anchored; they go
+    after the line named in `after`, else at the end of the topic with that
+    title, else into a new topic at the end."""
+    ops = RevisionOps.model_validate(json_object(raw))
+    topics = copy.deepcopy(previous.get("topics", []))
+    lines_by_id = {line["id"]: line for t in topics for line in t["lines"]}
+    protected = {i for i, line in lines_by_id.items() if _is_kept_verbatim(line)}
+
+    removed = {i for i in ops.remove if i in lines_by_id and i not in protected}
+    for edit in ops.edit:
+        line = lines_by_id.get(edit.line)
+        if line is not None and edit.line not in protected and edit.text:
+            line["text"] = edit.text
+    for topic in topics:
+        topic["lines"] = [x for x in topic["lines"] if x["id"] not in removed]
+
+    next_number = max((_line_number(i) for i in lines_by_id), default=0)
     dropped = 0
-    for topic in sheet.topics:
-        lines = []
-        for line in topic.lines:
-            new_ids = list(
-                dict.fromkeys(
-                    ids[s] for s in line.items if s in ids and ids[s] in items_by_id
-                )
-            )
-            covered = [items_by_id[r] for r in new_ids]
-            base = prev_lines.get(line.line or "")
-            if base is not None and base["id"] not in placed:
-                placed.add(base["id"])
-                if _is_kept_verbatim(base):
-                    lines.append(dict(base))
-                    continue
-                cites = list(base.get("cites") or [])
-                for cite in _merge_cites(covered):
-                    if cite not in cites:
-                        cites.append(cite)
-                lines.append(
-                    {
-                        **base,
-                        "text": line.text or base["text"],
-                        "items": list(dict.fromkeys([*base["items"], *new_ids])),
-                        "cites": cites,
-                    }
-                )
-                continue
-            text = line.text
-            if not new_ids or not text:
-                dropped += 1
-                continue
-            next_number += 1
-            lines.append(
-                {
-                    "id": f"l{next_number}",
-                    "text": text,
-                    "items": new_ids,
-                    "kind": covered[0]["kind"],
-                    "cites": _merge_cites(covered),
-                }
-            )
-        if lines:
-            topics.append(
-                {"title": " ".join(topic.title.split()) or "Topic", "lines": lines}
-            )
-    for line_id, line in prev_lines.items():
-        if line_id in placed or not _is_kept_verbatim(line):
+    for add in ops.add:
+        record_ids = _resolve(add.items, ids, items_by_id)
+        if not record_ids or not add.text:
+            dropped += 1
             continue
-        title = prev_topic_of[line_id]
-        home = next((t for t in topics if t["title"] == title), None)
+        next_number += 1
+        line = _new_line(f"l{next_number}", add.text, record_ids, items_by_id)
+        home = next(
+            (t for t in topics if any(x["id"] == add.after for x in t["lines"])), None
+        )
+        if home is not None:
+            at = next(i for i, x in enumerate(home["lines"]) if x["id"] == add.after)
+            home["lines"].insert(at + 1, line)
+            continue
+        title = " ".join(add.topic.split()) or "More"
+        home = next((t for t in topics if t["title"].lower() == title.lower()), None)
         if home is None:
             home = {"title": title, "lines": []}
             topics.append(home)
-        home["lines"].append(dict(line))
+        home["lines"].append(line)
+
+    topics = [t for t in topics if t["lines"]]
     if not topics:
-        raise ValueError("the composed sheet has no lines that cite an item")
+        raise ValueError("the revision removed every line")
     for i, topic in enumerate(topics):
         topic["id"] = f"t{i + 1}"
     return {
-        "title": " ".join(sheet.title.split())
-        or (previous or {}).get("title")
-        or fallback_title,
+        "title": previous.get("title") or "Cheat sheet",
         "topics": topics,
         "dropped_lines": dropped,
-        "comment_notes": {
-            c.id: c.note.strip() for c in sheet.comments if c.note.strip()
-        },
+        "comment_notes": {c.id: c.note.strip() for c in ops.comments if c.note.strip()},
     }
 
 

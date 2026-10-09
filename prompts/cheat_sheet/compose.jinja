@@ -1,6 +1,6 @@
 You are laying out an exam cheat sheet titled "{{ title }}" from a pool of recall items extracted from the course's slides.
 
-The sheet prints on {{ pages }} page(s) in {{ columns }} columns. It holds about {{ budget }} characters of Markdown/LaTeX source in total, counting topic titles and line text. Stay under that budget: a sheet that overflows is useless, and the student can ask for more later.
+The sheet prints on {{ pages }} page(s) in {{ columns }} columns.{% if parts > 1 %} It is laid out in {{ parts }} parts that run in course order; this is part {{ part }}, covering only the items below (the other parts cover the rest of the course). This part has room for about {{ budget }} characters of Markdown/LaTeX source, counting topic titles and line text.{% else %} It holds about {{ budget }} characters of Markdown/LaTeX source in total, counting topic titles and line text.{% endif %} Fill it: aim for 90-100% of that budget (empty space on a cheat sheet is wasted), but don't go over it.
 
 Include these kinds: {{ kinds }}.
 {% if instructions %}
