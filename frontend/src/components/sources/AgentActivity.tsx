@@ -31,13 +31,37 @@ const TOOL_KEYS: Record<string, string> = {
 }
 
 /** "Searching for “adam optimizer”" from a tool name and its arguments. */
-export function describeStep(tool: string, args: Record<string, unknown>, t: Translate): string {
+/**
+ * "Reading “Lecture 6.pdf pp. 73–81”". `subject` is the server's readable form of
+ * the step (document names instead of record ids); args are the fallback.
+ */
+const RECORD_ADDRESS = /\b(?:source|note|source_insight):[A-Za-z0-9_]+(#p\d+(?:-\d+)?|#s\d+|\/summary|\/outline)?(?:#c\d+)?/g
+
+/**
+ * Trace text with any record address left in it replaced by "a document" and its
+ * page or section. The server sends readable text; this only guards against an id
+ * it couldn't resolve ever reaching the screen.
+ */
+export function withoutRecordIds(text: string, t: Translate): string {
+  const locator = localizedLocator(t)
+  return text.replace(RECORD_ADDRESS, (_match, where?: string) =>
+    where ? `${t('brain.traceDocument')} ${locator(where)}` : t('brain.traceDocument')
+  )
+}
+
+export function describeStep(
+  tool: string,
+  args: Record<string, unknown>,
+  t: Translate,
+  readable?: string | null
+): string {
   const label = TOOL_KEYS[tool] ? t(TOOL_KEYS[tool]) : tool
+  if (readable) return `${label} “${withoutRecordIds(readable, t)}”`
   const subject =
     args.query || args.pattern || args.address || args.source || args.like || args.title_contains ||
     args.concept || args.url || args.expression || args.task ||
     (args.sequence !== undefined && args.sequence !== null ? `#${args.sequence}` : '')
-  return subject ? `${label} “${String(subject)}”` : label
+  return subject ? `${label} “${withoutRecordIds(String(subject), t)}”` : label
 }
 
 export function AgentActivityView({ activity }: { activity: Activity }) {
@@ -58,8 +82,8 @@ export function AgentActivityView({ activity }: { activity: Activity }) {
                 <Check className="h-3 w-3 mt-0.5 flex-shrink-0 text-teal" />
               )}
               <span className="min-w-0 break-words">
-                {describeStep(step.tool, step.args, t)}
-                {step.summary && <span className="block opacity-75 truncate">{step.summary}</span>}
+                {describeStep(step.tool, step.args, t, step.subject)}
+                {step.summary && <span className="block opacity-75 truncate">{withoutRecordIds(step.summary, t)}</span>}
               </span>
             </li>
           ))}
@@ -88,8 +112,8 @@ export function ResearchSteps({ trace }: { trace: AgentStep[] }) {
         <ol className="mt-1 space-y-1 border-l pl-3">
           {trace.map((step, index) => (
             <li key={index} className="text-xs text-muted-foreground break-words">
-              {describeStep(step.tool, step.args, t)}
-              {step.result && <span className="block opacity-75 truncate">{step.result}</span>}
+              {describeStep(step.tool, step.args, t, step.subject)}
+              {step.result && <span className="block opacity-75 truncate">{withoutRecordIds(step.result, t)}</span>}
             </li>
           ))}
         </ol>

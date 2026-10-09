@@ -1057,6 +1057,7 @@ export const frFR = {
     traceDocuments: "{{count}} documents",
     tracePagesViewed: "{{count}} pages consultées",
     sourcesCited: "Sources · {{count}}",
+    traceDocument: "un document",
     starterTraceTitle: "Suivre une idée",
     starterTracePrompt: "Comment {{concept}} évolue-t-il au fil des documents ? Où est-il introduit et où est-il utilisé ensuite ?",
     starterEveryTitle: "Trouver chaque mention",

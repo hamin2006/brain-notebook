@@ -16,6 +16,7 @@ from api.routers._chat_shared import (
     extract_chat_messages,
     get_source_or_404,
     get_verified_source_session,
+    readable_traces,
 )
 from open_notebook.agent.graph import get_agent_graph
 from open_notebook.agent.sessions import (
@@ -212,8 +213,8 @@ async def get_source_chat_session(
 
         # Source chat runs the research agent scoped to this source; there are
         # no "context indicators" (nothing is pasted into the prompt).
-        messages: list[ChatMessage] = extract_chat_messages(
-            await thread_messages(full_session_id)
+        messages: list[ChatMessage] = await readable_traces(
+            extract_chat_messages(await thread_messages(full_session_id))
         )
         context_indicators = None
 

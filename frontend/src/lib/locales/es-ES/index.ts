@@ -1058,6 +1058,7 @@ export const esES = {
     traceDocuments: "{{count}} documentos",
     tracePagesViewed: "{{count}} páginas vistas",
     sourcesCited: "Fuentes · {{count}}",
+    traceDocument: "un documento",
     starterTraceTitle: "Seguir una idea",
     starterTracePrompt: "¿Cómo se desarrolla {{concept}} a lo largo de los documentos? ¿Dónde se introduce y dónde se usa después?",
     starterEveryTitle: "Encontrar cada mención",

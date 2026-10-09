@@ -17,6 +17,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
+from open_notebook.agent.display import display_trace
 from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.domain.notebook import ChatSession, Source
 
@@ -80,6 +81,18 @@ async def get_verified_source_session(
         raise HTTPException(status_code=404, detail="Session not found for this source")
 
     return full_source_id, source, full_session_id, session
+
+
+async def readable_traces(messages: List[ChatMessage]) -> List[ChatMessage]:
+    """Messages whose research traces name documents instead of record ids.
+
+    Traces saved before steps carried readable text get it here; for newer ones
+    this only refreshes the subjects (a renamed document shows its new name).
+    """
+    for message in messages:
+        if message.trace:
+            message.trace = await display_trace(message.trace)
+    return messages
 
 
 def extract_chat_messages(raw_messages: Iterable[Any]) -> List[ChatMessage]:

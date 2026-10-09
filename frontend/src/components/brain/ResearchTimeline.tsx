@@ -24,7 +24,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/hooks/use-translation'
-import { describeStep } from '@/components/sources/AgentActivity'
+import { describeStep, withoutRecordIds } from '@/components/sources/AgentActivity'
 import type { AgentActivity } from '@/lib/hooks/use-notebook-chat'
 import type { AgentStep } from '@/lib/types/api'
 
@@ -62,18 +62,21 @@ export function traceStats(steps: { tool: string; args: Record<string, unknown> 
 function StepRow({
   tool,
   args,
-  result,
+  subject,
+  result: rawResult,
   running,
   index,
 }: {
   tool: string
   args: Record<string, unknown>
+  subject?: string | null
   result?: string
   running?: boolean
   index: number
 }) {
   const { t } = useTranslation()
   const Icon = TOOL_ICONS[tool] ?? Wrench
+  const result = rawResult && withoutRecordIds(rawResult, t)
   return (
     <li className="relative flex gap-3 pb-3 last:pb-0 animate-fade-up" style={{ animationDelay: `${Math.min(index, 6) * 20}ms` }}>
       <span
@@ -86,7 +89,7 @@ function StepRow({
       </span>
       <div className="min-w-0 flex-1 pt-0.5">
         <p className={cn('text-[12.5px] leading-snug break-words', running ? 'text-foreground' : 'text-ink-soft')}>
-          {describeStep(tool, args, t)}
+          {describeStep(tool, args, t, subject)}
         </p>
         {result && (
           <p className="mt-0.5 truncate font-mono text-[10.5px] text-muted-foreground" title={result}>
@@ -144,6 +147,7 @@ export function LiveResearch({ activity, startedAt }: { activity: AgentActivity;
               index={index}
               tool={step.tool}
               args={step.args}
+              subject={step.subject}
               result={step.summary}
               running={step.summary === undefined}
             />
@@ -188,7 +192,7 @@ export function ResearchTrace({ trace }: { trace: AgentStep[] }) {
         <div className="border-t px-3 py-3">
           <Timeline>
             {trace.map((step, index) => (
-              <StepRow key={index} index={index} tool={step.tool} args={step.args} result={step.result} />
+              <StepRow key={index} index={index} tool={step.tool} args={step.args} subject={step.subject} result={step.result} />
             ))}
           </Timeline>
         </div>

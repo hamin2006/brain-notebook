@@ -1060,6 +1060,7 @@ export const deDE = {
     traceDocuments: "{{count}} Dokumente",
     tracePagesViewed: "{{count}} Seiten angesehen",
     sourcesCited: "Quellen · {{count}}",
+    traceDocument: "ein Dokument",
     starterTraceTitle: "Eine Idee verfolgen",
     starterTracePrompt: "Wie entwickelt sich {{concept}} über die Dokumente hinweg? Wo wird es eingeführt und wo später verwendet?",
     starterEveryTitle: "Jede Erwähnung finden",

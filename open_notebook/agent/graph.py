@@ -39,6 +39,7 @@ from typing_extensions import TypedDict
 
 from open_notebook.agent import memory as agent_memory
 from open_notebook.agent.addresses import AddressError, parse_address
+from open_notebook.agent.display import display_step, humanize, step_subject
 from open_notebook.agent.scope import AgentScope, ToolError, load_scope
 from open_notebook.agent.tools import AddressList, build_tools
 from open_notebook.agent.web import web_tools
@@ -132,16 +133,33 @@ async def _stream_step(
     )
 
 
+def _titles(scope: AgentScope) -> Dict[str, str]:
+    """Record id -> title for everything in scope (readable trace text)."""
+    return {
+        **{sid: s.title for sid, s in scope.sources.items()},
+        **{nid: n.title for nid, n in scope.notes.items()},
+    }
+
+
 async def _run_tools(
     calls: List[ToolCall],
     tools: Dict[str, Any],
     seen: Dict[str, str],
     writer,
     step: int,
+    titles: Dict[str, str],
 ) -> List[ToolMessage]:
     async def run(call: ToolCall) -> ToolMessage:
         name, args = call["name"], call.get("args") or {}
-        writer({"type": "step", "step": step, "tool": name, "args": args})
+        writer(
+            {
+                "type": "step",
+                "step": step,
+                "tool": name,
+                "args": args,
+                "subject": step_subject(args, titles),
+            }
+        )
         key = _call_key(call)
         if key in seen:
             result = "You already made this exact call; its result is above. Use it or try something different."
@@ -159,7 +177,7 @@ async def _run_tools(
                 "type": "step_result",
                 "step": step,
                 "tool": name,
-                "summary": _first_line(result),
+                "summary": humanize(_first_line(result), titles),
             }
         )
         return ToolMessage(content=result, tool_call_id=call["id"], name=name)
@@ -221,6 +239,7 @@ async def run_loop(
     the whole transcript. The research model's text is then not streamed.
     """
     tools = {t.name: t for t in tool_list}
+    titles = _titles(scope)
     llm = model.bind_tools(tool_list)
     seen: Dict[str, str] = {}
     trace: List[Dict[str, Any]] = []
@@ -241,12 +260,16 @@ async def run_loop(
                         "type": "step_result",
                         "step": step,
                         "tool": "review",
-                        "summary": "; ".join(missing) or "complete",
+                        "summary": humanize("; ".join(missing), titles) or "complete",
                     }
                 )
                 if missing:
                     trace.append(
-                        {"tool": "review", "args": {}, "result": "; ".join(missing)}
+                        {
+                            "tool": "review",
+                            "args": {},
+                            "result": humanize("; ".join(missing), titles),
+                        }
                     )
                     working.append(
                         HumanMessage(
@@ -259,14 +282,19 @@ async def run_loop(
             if answer_writer is not None:
                 return await answer_writer(working, step + 1), trace
             return answer, trace
-        results = await _run_tools(message.tool_calls, tools, seen, writer, step)
+        results = await _run_tools(
+            message.tool_calls, tools, seen, writer, step, titles
+        )
         working.extend(results)
         trace += [
-            {
-                "tool": c["name"],
-                "args": c.get("args") or {},
-                "result": _first_line(str(r.content)),
-            }
+            display_step(
+                {
+                    "tool": c["name"],
+                    "args": c.get("args") or {},
+                    "result": _first_line(str(r.content)),
+                },
+                titles,
+            )
             for c, r in zip(message.tool_calls, results)
         ]
         image = _image_message(scope)

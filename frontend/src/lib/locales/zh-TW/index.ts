@@ -1057,6 +1057,7 @@ export const zhTW = {
     traceDocuments: "{{count}} 份文件",
     tracePagesViewed: "檢視了 {{count}} 頁",
     sourcesCited: "來源 · {{count}}",
+    traceDocument: "文件",
     starterTraceTitle: "追蹤一個想法",
     starterTracePrompt: "{{concept}} 在各文件中如何發展？在哪裡引入，之後又在哪裡使用？",
     starterEveryTitle: "找出所有提及",

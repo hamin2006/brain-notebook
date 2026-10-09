@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { applyAgentEvent, type AgentActivity } from '@/lib/hooks/use-notebook-chat'
-import { describeStep, localizedLocator } from './AgentActivity'
+import { describeStep, localizedLocator, withoutRecordIds } from './AgentActivity'
 
 const t = (key: string, options?: Record<string, unknown>) =>
   options ? `${key}:${JSON.stringify(options)}` : key
@@ -31,6 +31,23 @@ describe('describeStep', () => {
     expect(describeStep('list', { sequence: 4 }, t)).toBe('chat.agentToolList “#4”')
     expect(describeStep('list', {}, t)).toBe('chat.agentToolList')
     expect(describeStep('mystery', {}, t)).toBe('mystery')
+  })
+
+  it('prefers the readable subject the server sends', () => {
+    expect(describeStep('read', { address: 'source:kwj1#p73-81' }, t, 'Lecture 6.pdf pp. 73–81')).toBe(
+      'chat.agentToolRead “Lecture 6.pdf pp. 73–81”'
+    )
+  })
+
+  it('never shows a record id, even without a readable subject', () => {
+    expect(describeStep('view', { address: 'source:kwj1#p76' }, t)).not.toContain('source:')
+    expect(withoutRecordIds('Showing source:kwj1#p76. The image follows', t)).toBe(
+      'Showing brain.traceDocument chat.citePage:{"page":"76"}. The image follows'
+    )
+    expect(withoutRecordIds('[note:n1] and source:x/summary', t)).toBe(
+      '[brain.traceDocument] and brain.traceDocument chat.citeSummary'
+    )
+    expect(withoutRecordIds('41 match(es) for /residual/', t)).toBe('41 match(es) for /residual/')
   })
 })
 

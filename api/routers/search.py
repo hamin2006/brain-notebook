@@ -6,6 +6,7 @@ from fastapi.responses import StreamingResponse
 from loguru import logger
 
 from api.models import AskRequest, AskResponse, SearchRequest, SearchResponse
+from open_notebook.agent.display import step_subject
 from open_notebook.ai.models import Model, model_manager
 from open_notebook.domain.notebook import (
     resolve_notebook_scope,
@@ -122,13 +123,9 @@ async def stream_ask_response(
         ):
             if mode == "custom":
                 if chunk.get("type") == "step" and chunk.get("tool") in RESEARCH_TOOLS:
-                    args = chunk.get("args") or {}
-                    term = (
-                        args.get("query")
-                        or args.get("pattern")
-                        or args.get("address")
-                        or args.get("source")
-                        or ""
+                    # The step's readable subject: document names, not ids.
+                    term = chunk.get("subject") or step_subject(
+                        chunk.get("args") or {}, {}
                     )
                     searches.append(
                         {

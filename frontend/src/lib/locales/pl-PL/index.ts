@@ -1057,6 +1057,7 @@ export const plPL = {
     traceDocuments: "{{count}} dokumentów",
     tracePagesViewed: "{{count}} obejrzanych stron",
     sourcesCited: "Źródła · {{count}}",
+    traceDocument: "dokument",
     starterTraceTitle: "Prześledź ideę",
     starterTracePrompt: "Jak {{concept}} rozwija się w dokumentach? Gdzie jest wprowadzone i gdzie używane później?",
     starterEveryTitle: "Znajdź każdą wzmiankę",

@@ -72,7 +72,7 @@ async def test_stream_maps_agent_steps_to_strategy_and_answer():
     ]
     assert events[1]["searches"] == [
         {"term": "adam", "instructions": "search"},
-        {"term": "source:l4#p94", "instructions": "view"},
+        {"term": "a document p. 94", "instructions": "view"},  # never a record id
     ]
     assert events[2]["content"].endswith("[source:l4#p94].")
     assert seen["source_ids"] == ["source:l4"] and seen["notebook_id"] == "notebook:nb"

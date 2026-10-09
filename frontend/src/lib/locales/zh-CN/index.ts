@@ -1057,6 +1057,7 @@ export const zhCN = {
     traceDocuments: "{{count}} 份文档",
     tracePagesViewed: "查看了 {{count}} 页",
     sourcesCited: "来源 · {{count}}",
+    traceDocument: "文档",
     starterTraceTitle: "追踪一个想法",
     starterTracePrompt: "{{concept}} 在各文档中是如何发展的？在哪里引入，后来又在哪里使用？",
     starterEveryTitle: "找出所有提及",

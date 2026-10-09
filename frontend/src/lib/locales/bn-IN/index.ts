@@ -1058,6 +1058,7 @@ export const bnIN = {
     traceDocuments: "{{count}}টি ডকুমেন্ট",
     tracePagesViewed: "{{count}}টি পৃষ্ঠা দেখা হয়েছে",
     sourcesCited: "সূত্র · {{count}}",
+    traceDocument: "একটি নথি",
     starterTraceTitle: "একটি ধারণা অনুসরণ করুন",
     starterTracePrompt: "ডকুমেন্টগুলো জুড়ে {{concept}} কীভাবে বিকশিত হয়? কোথায় প্রথম আসে এবং পরে কোথায় ব্যবহৃত হয়?",
     starterEveryTitle: "প্রতিটি উল্লেখ খুঁজুন",

@@ -1057,6 +1057,7 @@ export const jaJP = {
     traceDocuments: "{{count}} 件のドキュメント",
     tracePagesViewed: "{{count}} ページを確認",
     sourcesCited: "出典 · {{count}}",
+    traceDocument: "ドキュメント",
     starterTraceTitle: "アイデアをたどる",
     starterTracePrompt: "{{concept}} はドキュメント全体でどう展開されますか？どこで導入され、後でどこで使われますか？",
     starterEveryTitle: "すべての言及を探す",

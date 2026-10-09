@@ -35,6 +35,7 @@ Normative rules for working on the Python backend. Architecture and design ratio
 
 - Chat, source chat, Ask and MCP all use `agent/graph.py` (async, `AsyncSqliteSaver` from `graphs/checkpoint.py`). Only the question and answer (+ `agent_trace`) are checkpointed; tool traffic, images and attachments (passed in `config["configurable"]`) are not.
 - Tools return plain text with addresses and raise `ToolError` for fixable mistakes; never let a tool exception end the turn.
+- **Users never see record ids in the research trace.** Steps carry a readable `subject` and results with addresses replaced by document names and pages (`agent/display.py`: live events in `run_loop`, stored traces through `readable_traces` in `api/routers/_chat_shared.py`). Raw `args` stay as they are (the UI counts documents from them); anything new that shows trace text goes through these.
 - **SurrealDB quirk:** `WHERE source IN $ids` returns nothing on tables with a composite unique index on `(source, …)` (`source_page`, `source_section`) — use `scope.per_source` (equality per source). Cover new queries with `tests/integration/`.
 - `repo_query` returns record ids as strings: wrap with `ensure_record_id()` before comparing against record fields.
 - Web fetching must go through `agent/web.py` (public IPs only, per-hop checks, IP pinning), never `validate_url()` (which allows private hosts).

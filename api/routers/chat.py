@@ -16,6 +16,7 @@ from api.routers._chat_shared import (
     SuccessResponse,
     extract_chat_messages,
     get_session_or_404,
+    readable_traces,
 )
 from open_notebook.agent.graph import get_agent_graph
 from open_notebook.agent.sessions import (
@@ -280,8 +281,8 @@ async def get_session(session_id: str):
         # Get session (normalizes the ID and 404s if missing)
         full_session_id, session = await get_session_or_404(session_id)
 
-        messages: list[ChatMessage] = extract_chat_messages(
-            await _thread_messages(full_session_id)
+        messages: list[ChatMessage] = await readable_traces(
+            extract_chat_messages(await _thread_messages(full_session_id))
         )
 
         # Find notebook_id (we need to query the relationship)
@@ -403,7 +404,9 @@ async def execute_chat(request: ExecuteChatRequest):
         await session.save()  # bump the session timestamp
         return ExecuteChatResponse(
             session_id=request.session_id,
-            messages=extract_chat_messages(result.get("messages", [])),
+            messages=await readable_traces(
+                extract_chat_messages(result.get("messages", []))
+            ),
         )
     except NotFoundError:
         raise HTTPException(status_code=404, detail="Session not found")

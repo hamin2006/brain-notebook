@@ -278,3 +278,33 @@ async def test_dense_summary_is_not_applied_to_uploads_by_default(db):
         "SELECT name, apply_default FROM transformation WHERE name = 'Dense Summary'"
     )
     assert rows and rows[0]["apply_default"] is False
+
+
+@pytest.mark.asyncio
+async def test_trace_titles_come_from_sources_and_notes(db):
+    from open_notebook.agent.display import display_trace
+
+    repo_query, make_source = db
+    deck = await make_source("Lecture 6.pdf")
+    note = str(
+        (await repo_query("CREATE note CONTENT {title: 'Exam notes', content: 'x'}"))[
+            0
+        ]["id"]
+    )
+    trace = await display_trace(
+        [
+            {
+                "tool": "view",
+                "args": {"address": f"{deck}#p76"},
+                "result": f"Showing {deck}#p76.",
+            },
+            {
+                "tool": "read",
+                "args": {"address": note},
+                "result": f"{note}: Exam notes",
+            },
+        ]
+    )
+    assert trace[0]["subject"] == "Lecture 6.pdf p. 76"
+    assert trace[0]["result"] == "Showing Lecture 6.pdf p. 76."
+    assert trace[1]["subject"] == "Exam notes"

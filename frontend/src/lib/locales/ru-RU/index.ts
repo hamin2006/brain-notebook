@@ -1057,6 +1057,7 @@ export const ruRU = {
     traceDocuments: "{{count}} документов",
     tracePagesViewed: "{{count}} страниц просмотрено",
     sourcesCited: "Источники · {{count}}",
+    traceDocument: "документ",
     starterTraceTitle: "Проследить идею",
     starterTracePrompt: "Как {{concept}} развивается в документах? Где оно вводится и где используется позже?",
     starterEveryTitle: "Найти все упоминания",

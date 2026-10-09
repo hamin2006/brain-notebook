@@ -23,6 +23,7 @@ export interface LiveAgentStep {
   step: number
   tool: string
   args: Record<string, unknown>
+  subject?: string | null
   summary?: string
 }
 
@@ -37,7 +38,7 @@ export function applyAgentEvent(activity: AgentActivity, event: AgentStreamEvent
   switch (event.type) {
     case 'step':
       // Text written before a tool call is the model thinking aloud, not the answer.
-      return { steps: [...activity.steps, { step: event.step, tool: event.tool, args: event.args }], text: '' }
+      return { steps: [...activity.steps, { step: event.step, tool: event.tool, args: event.args, subject: event.subject }], text: '' }
     case 'step_result': {
       const index = activity.steps.findIndex(
         s => s.step === event.step && s.tool === event.tool && s.summary === undefined

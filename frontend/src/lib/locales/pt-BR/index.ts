@@ -1057,6 +1057,7 @@ export const ptBR = {
     traceDocuments: "{{count}} documentos",
     tracePagesViewed: "{{count}} páginas vistas",
     sourcesCited: "Fontes · {{count}}",
+    traceDocument: "um documento",
     starterTraceTitle: "Seguir uma ideia",
     starterTracePrompt: "Como {{concept}} se desenvolve ao longo dos documentos? Onde é introduzido e onde é usado depois?",
     starterEveryTitle: "Achar cada menção",

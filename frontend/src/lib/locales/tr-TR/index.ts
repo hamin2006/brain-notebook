@@ -1057,6 +1057,7 @@ export const trTR = {
     traceDocuments: "{{count}} belge",
     tracePagesViewed: "{{count}} sayfa incelendi",
     sourcesCited: "Kaynaklar · {{count}}",
+    traceDocument: "bir belge",
     starterTraceTitle: "Bir fikri izle",
     starterTracePrompt: "{{concept}} belgeler boyunca nasıl gelişiyor? Nerede tanıtılıyor ve sonra nerede kullanılıyor?",
     starterEveryTitle: "Her geçişi bul",

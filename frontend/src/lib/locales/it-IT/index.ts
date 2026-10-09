@@ -1057,6 +1057,7 @@ export const itIT = {
     traceDocuments: "{{count}} documenti",
     tracePagesViewed: "{{count}} pagine viste",
     sourcesCited: "Fonti · {{count}}",
+    traceDocument: "un documento",
     starterTraceTitle: "Segui un'idea",
     starterTracePrompt: "Come si sviluppa {{concept}} nei documenti? Dove viene introdotto e dove viene usato in seguito?",
     starterEveryTitle: "Trova ogni menzione",

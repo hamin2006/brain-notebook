@@ -1057,6 +1057,7 @@ export const caES = {
     traceDocuments: "{{count}} documents",
     tracePagesViewed: "{{count}} pàgines vistes",
     sourcesCited: "Fonts · {{count}}",
+    traceDocument: "un document",
     starterTraceTitle: "Segueix una idea",
     starterTracePrompt: "Com evoluciona {{concept}} al llarg dels documents? On s'introdueix i on s'utilitza després?",
     starterEveryTitle: "Troba cada menció",

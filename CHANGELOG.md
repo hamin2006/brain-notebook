@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The notebook's grounding switch moved from the chat box to the notebook header; effort is a Quick / Standard / Deep toggle in the message box
 
 ### Fixed
+- The research trace showed record ids (`Reading “source:kwjin…#p73-81”`); steps now name the document and its pages or section (`Reading “Lecture 6.pdf pp. 73–81”`), in live answers, saved chats, source chat and Ask
 - The worker kept its peak memory after ingestion (2.3 GB idle after a 29-deck run, against 126 MB fresh): it now runs with `MALLOC_ARENA_MAX=2` and returns freed memory after each ingestion step
 - Jobs running when the worker stopped (a deploy, a crash) stayed "running" forever and their sources never finished; the worker now re-queues them when it starts (`OPEN_NOTEBOOK_REQUEUE_INTERRUPTED=false` for several workers on one database)
 - Re-running a source's processing (retry, or a job resumed after a restart) duplicated its default-transformation insights; they are replaced now

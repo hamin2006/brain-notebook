@@ -172,6 +172,8 @@ export interface SourceChatMessage {
 export interface AgentStep {
   tool: string
   args: Record<string, unknown>
+  /** What the step is about, readable (document names and pages, never record ids). */
+  subject?: string | null
   result?: string
 }
 
@@ -179,7 +181,7 @@ export type ChatEffort = 'quick' | 'standard' | 'deep'
 
 /** Events from POST /api/chat/execute/stream. */
 export type AgentStreamEvent =
-  | { type: 'step'; step: number; tool: string; args: Record<string, unknown> }
+  | { type: 'step'; step: number; tool: string; args: Record<string, unknown>; subject?: string | null }
   | { type: 'step_result'; step: number; tool: string; summary: string }
   | { type: 'text_delta'; step: number; text: string }
   | { type: 'ai_message'; message: NotebookChatMessage }
