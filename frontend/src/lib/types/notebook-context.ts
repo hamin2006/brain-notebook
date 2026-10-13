@@ -1,8 +1,7 @@
-/** Chat-context inclusion mode for a notebook source or note. */
-export type ContextMode = 'off' | 'insights' | 'full'
-export type NoteContextMode = Exclude<ContextMode, 'insights'>
+/** Chat-context inclusion for a notebook source or note: searched by the agent, or off. */
+export type ContextMode = 'off' | 'full'
 
 export interface ContextSelections {
   sources: Record<string, ContextMode>
-  notes: Record<string, NoteContextMode>
+  notes: Record<string, ContextMode>
 }

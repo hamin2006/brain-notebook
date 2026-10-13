@@ -117,7 +117,7 @@ Ollama credentials have a **Context Window (num_ctx)** field. Empty means 8192 t
 
 Ollama doesn't return an error when a prompt is longer than the window: it drops the start of the prompt and answers anyway (its server log shows a `truncating input prompt` warning). Symptoms in Brain Notebook are answers that ignore your sources, chats that forget earlier messages, and transformations of long documents that only cover the end.
 
-To fix it, edit the Ollama credential in Manage → Models and raise **Context Window (num_ctx)**, for example to `32768`, if your hardware has the memory for it. If Ollama then runs out of memory or becomes very slow, lower it again or use a smaller model. Including fewer sources in chat context ("Insights only" instead of "Full content") also helps.
+To fix it, edit the Ollama credential in Manage → Models and raise **Context Window (num_ctx)**, for example to `32768`, if your hardware has the memory for it. If Ollama then runs out of memory or becomes very slow, lower it again or use a smaller model.
 
 ---
 

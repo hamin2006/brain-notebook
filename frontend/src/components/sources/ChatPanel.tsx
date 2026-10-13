@@ -31,8 +31,7 @@ import { useTranslation } from '@/lib/hooks/use-translation'
 import { cn } from '@/lib/utils'
 
 interface NotebookContextStats {
-  sourcesInsights: number
-  sourcesFull: number
+  sourcesCount: number
   notesCount: number
   tokenCount?: number
   charCount?: number
@@ -148,7 +147,7 @@ export function ChatPanel({
   const hasSessions = !!(onSelectSession && onCreateSession && onDeleteSession)
   const scopeLabel = notebookContextStats
     ? t('brain.scopeLabel', {
-        sources: notebookContextStats.sourcesFull + notebookContextStats.sourcesInsights,
+        sources: notebookContextStats.sourcesCount,
         notes: notebookContextStats.notesCount,
       })
     : null

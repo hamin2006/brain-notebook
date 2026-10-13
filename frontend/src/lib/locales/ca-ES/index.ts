@@ -120,8 +120,7 @@ export const caES = {
     saveSuccess: "S'ha desat correctament",
     contextModes: {
       off: "No s'inclou al xat",
-      insights: "Només anàlisis",
-      full: "Contingut complet",
+      full: "S'inclou al xat",
       clickToCycle: "Fes clic per canviar",
     },
     clickToEdit: "Fes clic per editar",
@@ -260,8 +259,6 @@ export const caES = {
     newSource: "Font nova",
     bulkContext: "Context",
     includeAllInContext: "Inclou-les totes al context",
-    includeAllInsights: "Inclou-les totes (només informacions)",
-    includeAllFull: "Inclou-les totes (contingut complet)",
     excludeAllFromContext: "Exclou-les totes del context",
     title: "Fonts",
     add: "Afegeix una font",

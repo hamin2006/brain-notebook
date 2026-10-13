@@ -120,8 +120,7 @@ export const bnIN = {
     saveSuccess: "সফলভাবে সংরক্ষিত",
     contextModes: {
       off: "চ্যাটে অন্তর্ভুক্ত নয়",
-      insights: "শুধুমাত্র অন্তর্দৃষ্টি",
-      full: "সম্পূর্ণ কন্টেন্ট",
+      full: "চ্যাটে অন্তর্ভুক্ত",
       clickToCycle: "সাইকেল করতে ক্লিক করুন",
     },
     clickToEdit: "সম্পাদনা করতে ক্লিক করুন",
@@ -260,8 +259,6 @@ export const bnIN = {
     newSource: "নতুন উৎস",
     bulkContext: "প্রসঙ্গ",
     includeAllInContext: "সবগুলো প্রসঙ্গে যোগ করুন",
-    includeAllInsights: "সব যোগ করুন (শুধু অন্তর্দৃষ্টি)",
-    includeAllFull: "সব যোগ করুন (সম্পূর্ণ বিষয়বস্তু)",
     excludeAllFromContext: "সবগুলো প্রসঙ্গ থেকে বাদ দিন",
     title: "উৎসগুলি",
     add: "উৎস যোগ করুন",

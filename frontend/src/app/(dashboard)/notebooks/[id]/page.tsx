@@ -22,19 +22,15 @@ import { useTranslation } from '@/lib/hooks/use-translation'
 import { cn } from '@/lib/utils'
 import { FileText, StickyNote, Share2 } from 'lucide-react'
 import {
-  applyBulkSourceContext,
-  applyBulkNoteContext,
-  computeSourceSelections,
-  computeNoteSelections,
-  type SourceContextDefault,
-  type SourceBulkAction,
-  type NoteContextDefault,
+  applyBulkContext,
+  computeSelections,
+  type ContextDefault,
 } from '@/lib/utils/source-context'
 
 // Re-exported from the shared types module for backward compatibility; several
 // components historically import these from this route file.
-import type { ContextMode, ContextSelections, NoteContextMode } from '@/lib/types/notebook-context'
-export type { ContextMode, ContextSelections, NoteContextMode }
+import type { ContextMode, ContextSelections } from '@/lib/types/notebook-context'
+export type { ContextMode, ContextSelections }
 
 export default function NotebookPage() {
   const { t } = useTranslation()
@@ -94,17 +90,17 @@ export default function NotebookPage() {
   // The default context mode applied to sources as they load. A bulk
   // include/exclude updates this so sources loaded later via pagination follow
   // the same intent instead of reverting to "included" (#223/#915).
-  const [sourceContextDefault, setSourceContextDefault] = useState<SourceContextDefault>('include')
+  const [sourceContextDefault, setSourceContextDefault] = useState<ContextDefault>('include')
 
-  // Same idea for notes loaded later (notes are binary: included/off).
-  const [noteContextDefault, setNoteContextDefault] = useState<NoteContextDefault>('include')
+  // Same idea for notes loaded later.
+  const [noteContextDefault, setNoteContextDefault] = useState<ContextDefault>('include')
 
   // Initialize and update selections when sources load or change
   useEffect(() => {
     if (sources && sources.length > 0) {
       setContextSelections(prev => ({
         ...prev,
-        sources: computeSourceSelections(prev.sources, sources, sourceContextDefault),
+        sources: computeSelections(prev.sources, sources, sourceContextDefault),
       }))
     }
   }, [sources, sourceContextDefault])
@@ -113,7 +109,7 @@ export default function NotebookPage() {
     if (notes && notes.length > 0) {
       setContextSelections(prev => ({
         ...prev,
-        notes: computeNoteSelections(prev.notes, notes, noteContextDefault),
+        notes: computeSelections(prev.notes, notes, noteContextDefault),
       }))
     }
   }, [notes, noteContextDefault])
@@ -128,7 +124,7 @@ export default function NotebookPage() {
     }))
   }
 
-  const handleNoteContextModeChange = (noteId: string, mode: NoteContextMode) => {
+  const handleNoteContextModeChange = (noteId: string, mode: ContextMode) => {
     setContextSelections(prev => ({
       ...prev,
       notes: {
@@ -138,23 +134,22 @@ export default function NotebookPage() {
     }))
   }
 
-  // Bulk-apply a context action (insights-only / full / exclude) to every
-  // source at once (#223). Also records the action as the default for sources
-  // loaded later (#915).
-  const handleBulkSourceContext = (action: SourceBulkAction) => {
+  // Bulk include/exclude every source at once (#223). Also records the action
+  // as the default for sources loaded later (#915).
+  const handleBulkSourceContext = (action: ContextDefault) => {
     setSourceContextDefault(action)
     setContextSelections(prev => ({
       ...prev,
-      sources: applyBulkSourceContext(prev.sources, sources ?? [], action),
+      sources: applyBulkContext(prev.sources, sources ?? [], action),
     }))
   }
 
   // Bulk include/exclude every note from the chat context at once (#223).
-  const handleBulkNoteContext = (action: NoteContextDefault) => {
+  const handleBulkNoteContext = (action: ContextDefault) => {
     setNoteContextDefault(action)
     setContextSelections(prev => ({
       ...prev,
-      notes: applyBulkNoteContext(prev.notes, notes ?? [], action),
+      notes: applyBulkContext(prev.notes, notes ?? [], action),
     }))
   }
 

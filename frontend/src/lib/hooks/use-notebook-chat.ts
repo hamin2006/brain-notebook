@@ -174,10 +174,7 @@ export function useNotebookChat({ notebookId, sources, notes, contextSelections 
   // The sidebar selection is the agent's search scope (ids only, nothing pasted).
   const scope = useCallback(() => ({
     source_ids: sources
-      .filter(source => {
-        const mode = contextSelections.sources[source.id]
-        return mode === 'insights' || mode === 'full'
-      })
+      .filter(source => contextSelections.sources[source.id] === 'full')
       .map(source => source.id),
     note_ids: notes
       .filter(note => contextSelections.notes[note.id] === 'full')

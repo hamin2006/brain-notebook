@@ -16,8 +16,8 @@ import { NoteEditorDialog } from './NoteEditorDialog'
 import { getDateLocale } from '@/lib/utils/date-locale'
 import { formatDistanceToNow } from 'date-fns'
 import { ContextToggle } from '@/components/common/ContextToggle'
-import type { NoteContextMode } from '../[id]/page'
-import type { NoteContextDefault } from '@/lib/utils/source-context'
+import type { ContextMode } from '../[id]/page'
+import type { ContextDefault } from '@/lib/utils/source-context'
 import { useDeleteNote } from '@/lib/hooks/use-notes'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { cn } from '@/lib/utils'
@@ -27,9 +27,9 @@ interface NotesColumnProps {
   notes?: NoteResponse[]
   isLoading: boolean
   notebookId: string
-  contextSelections?: Record<string, NoteContextMode>
-  onContextModeChange?: (noteId: string, mode: NoteContextMode) => void
-  onBulkContextModeChange?: (action: NoteContextDefault) => void
+  contextSelections?: Record<string, ContextMode>
+  onContextModeChange?: (noteId: string, mode: ContextMode) => void
+  onBulkContextModeChange?: (action: ContextDefault) => void
 }
 
 export function NotesColumn({
@@ -165,7 +165,6 @@ export function NotesColumn({
                       <div onClick={(event) => event.stopPropagation()}>
                         <ContextToggle
                           mode={contextSelections[note.id]}
-                          hasInsights={false}
                           onChange={(mode) => onContextModeChange(note.id, mode)}
                           className="h-7 w-7"
                         />

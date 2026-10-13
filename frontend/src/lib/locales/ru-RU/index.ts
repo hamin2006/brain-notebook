@@ -120,8 +120,7 @@ export const ruRU = {
     saveSuccess: "Успешно сохранено",
     contextModes: {
       off: "Не включено в чат",
-      insights: "Только инсайты",
-      full: "Полное содержимое",
+      full: "Включено в чат",
       clickToCycle: "Нажмите для переключения",
     },
     clickToEdit: "Нажмите для редактирования",
@@ -260,8 +259,6 @@ export const ruRU = {
     newSource: "Новый источник",
     bulkContext: "Контекст",
     includeAllInContext: "Включить все в контекст",
-    includeAllInsights: "Включить все (только выводы)",
-    includeAllFull: "Включить все (полный текст)",
     excludeAllFromContext: "Исключить все из контекста",
     title: "Источники",
     add: "Добавить источник",

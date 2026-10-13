@@ -120,8 +120,7 @@ export const frFR = {
     saveSuccess: "Enregistré avec succès",
     contextModes: {
       off: "Non inclus dans le chat",
-      insights: "Analyses uniquement",
-      full: "Contenu complet",
+      full: "Inclus dans le chat",
       clickToCycle: "Cliquez pour faire défiler",
     },
     clickToEdit: "Cliquez pour modifier",
@@ -260,8 +259,6 @@ export const frFR = {
     newSource: "Nouvelle Source",
     bulkContext: "Contexte",
     includeAllInContext: "Tout inclure dans le contexte",
-    includeAllInsights: "Tout inclure (aperçus uniquement)",
-    includeAllFull: "Tout inclure (contenu complet)",
     excludeAllFromContext: "Tout exclure du contexte",
     title: "Sources",
     add: "Ajouter une source",

@@ -85,11 +85,11 @@ and **⋯** with **New cheat sheet…** and the notebook's existing [cheat sheet
 ### Library: Sources
 
 - **Add Source** opens a menu: **Add Source** (the wizard for new content) or **Add Existing Sources** (link sources from your library). See [Adding Sources](adding-sources.md).
-- **☰** (context) sets every source at once: **Include all (insights only)**, **Include all (full content)** or **Exclude all from context**.
+- **☰** (context) sets every source at once: **Include all in context** or **Exclude all from context**.
 - While documents are being indexed, a strip at the top shows how many are ready, a progress bar and the steps
   running now (describing visuals, outlining, mapping concepts…); it disappears when everything is done. See
   [How Documents Are Ingested](../2-CORE-CONCEPTS/ingestion.md#following-progress).
-- Each **source row** shows page one as a thumbnail, the title, its topics (or type) and the processing status while it isn't finished; after extraction, the step it is on, or a failed step with **Retry**. The **context icon** cycles whether the source is in the research agent's [scope](../2-CORE-CONCEPTS/ai-context-rag.md#scope-what-the-agent-may-look-at) (*Insights only* and *Full content* both mean in scope; excluded sources are dimmed). The **⋮ menu** has **Remove from Notebook**, **Retry Processing** (failed sources), **Refresh content** (completed links) and **Delete Source**.
+- Each **source row** shows page one as a thumbnail, the title, its topics (or type) and the processing status while it isn't finished; after extraction, the step it is on, or a failed step with **Retry**. The **context icon** switches the source in or out of the research agent's [scope](../2-CORE-CONCEPTS/ai-context-rag.md#scope-what-the-agent-may-look-at) (excluded sources are dimmed). The **⋮ menu** has **Remove from Notebook**, **Retry Processing** (failed sources), **Refresh content** (completed links) and **Delete Source**.
 - Click a row to open the source view.
 
 ### Library: Notes

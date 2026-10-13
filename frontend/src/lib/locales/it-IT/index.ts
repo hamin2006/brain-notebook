@@ -120,8 +120,7 @@ export const itIT = {
     saveSuccess: "Salvato con successo",
     contextModes: {
       off: "Non incluso nella chat",
-      insights: "Solo approfondimenti",
-      full: "Contenuto completo",
+      full: "Incluso nella chat",
       clickToCycle: "Clicca per cambiare",
     },
     clickToEdit: "Clicca per modificare",
@@ -260,8 +259,6 @@ export const itIT = {
     newSource: "Nuova fonte",
     bulkContext: "Contesto",
     includeAllInContext: "Includi tutte nel contesto",
-    includeAllInsights: "Includi tutte (solo approfondimenti)",
-    includeAllFull: "Includi tutte (contenuto completo)",
     excludeAllFromContext: "Escludi tutte dal contesto",
     title: "Fonti",
     add: "Aggiungi fonte",

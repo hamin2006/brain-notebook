@@ -120,8 +120,7 @@ export const plPL = {
     saveSuccess: "Zapisano pomyślnie",
     contextModes: {
       off: "Nieuwzględniane w czacie",
-      insights: "Tylko wglądy",
-      full: "Pełna treść",
+      full: "Uwzględniane w czacie",
       clickToCycle: "Kliknij, aby przełączyć",
     },
     clickToEdit: "Kliknij, aby edytować",
@@ -260,8 +259,6 @@ export const plPL = {
     newSource: "Nowe źródło",
     bulkContext: "Kontekst",
     includeAllInContext: "Uwzględnij wszystkie w kontekście",
-    includeAllInsights: "Uwzględnij wszystkie (tylko wnioski)",
-    includeAllFull: "Uwzględnij wszystkie (pełna treść)",
     excludeAllFromContext: "Wyklucz wszystkie z kontekstu",
     title: "Źródła",
     add: "Dodaj źródło",

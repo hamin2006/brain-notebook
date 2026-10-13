@@ -60,17 +60,13 @@ export function ChatColumn({ notebookId, contextSelections, sources, sourcesLoad
 
   // Calculate context stats for indicator
   const contextStats = useMemo(() => {
-    let sourcesInsights = 0
-    let sourcesFull = 0
+    let sourcesCount = 0
     let notesCount = 0
 
-    // Count sources by mode
+    // Count included sources
     sources.forEach(source => {
-      const mode = contextSelections.sources[source.id]
-      if (mode === 'insights') {
-        sourcesInsights++
-      } else if (mode === 'full') {
-        sourcesFull++
+      if (contextSelections.sources[source.id] === 'full') {
+        sourcesCount++
       }
     })
 
@@ -84,8 +80,7 @@ export function ChatColumn({ notebookId, contextSelections, sources, sourcesLoad
 
     // No token count: the agent searches the selection instead of pasting it.
     return {
-      sourcesInsights,
-      sourcesFull,
+      sourcesCount,
       notesCount
     }
   }, [sources, notes, contextSelections])

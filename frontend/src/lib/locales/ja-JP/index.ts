@@ -120,8 +120,7 @@ export const jaJP = {
     saveSuccess: "保存しました",
     contextModes: {
       off: "含めない",
-      insights: "インサイトのみ含める",
-      full: "全文",
+      full: "含める",
       clickToCycle: "クリックで切り替え",
     },
     clickToEdit: "クリックして編集",
@@ -260,8 +259,6 @@ export const jaJP = {
     newSource: "新規ソース",
     bulkContext: "コンテキスト",
     includeAllInContext: "すべてをコンテキストに含める",
-    includeAllInsights: "すべて含める（インサイトのみ）",
-    includeAllFull: "すべて含める（全文）",
     excludeAllFromContext: "すべてをコンテキストから除外",
     title: "ソース",
     add: "ソースを追加",

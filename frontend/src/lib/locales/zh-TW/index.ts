@@ -120,8 +120,7 @@ export const zhTW = {
     saveSuccess: "儲存成功",
     contextModes: {
       off: "未包含在聊天中",
-      insights: "僅限見解",
-      full: "全部內容",
+      full: "包含在聊天中",
       clickToCycle: "點擊循環切換",
     },
     clickToEdit: "點擊編輯",
@@ -260,8 +259,6 @@ export const zhTW = {
     newSource: "新增來源",
     bulkContext: "上下文",
     includeAllInContext: "全部加入上下文",
-    includeAllInsights: "全部加入（僅見解）",
-    includeAllFull: "全部加入（完整內容）",
     excludeAllFromContext: "全部移出上下文",
     title: "來源",
     add: "新增來源",

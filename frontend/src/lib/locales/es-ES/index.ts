@@ -120,8 +120,7 @@ export const esES = {
     saveSuccess: "Guardado exitosamente",
     contextModes: {
       off: "No incluido en el chat",
-      insights: "Solo análisis",
-      full: "Contenido completo",
+      full: "Incluido en el chat",
       clickToCycle: "Clic para cambiar",
     },
     clickToEdit: "Clic para editar",
@@ -260,8 +259,6 @@ export const esES = {
     newSource: "Nueva fuente",
     bulkContext: "Contexto",
     includeAllInContext: "Incluir todas en el contexto",
-    includeAllInsights: "Incluir todas (solo insights)",
-    includeAllFull: "Incluir todas (contenido completo)",
     excludeAllFromContext: "Excluir todas del contexto",
     title: "Fuentes",
     add: "Agregar fuente",

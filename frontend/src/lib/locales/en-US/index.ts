@@ -118,8 +118,7 @@ export const enUS = {
     saveSuccess: "Saved successfully",
     contextModes: {
       off: "Not included in chat",
-      insights: "Insights only",
-      full: "Full content",
+      full: "Included in chat",
       clickToCycle: "Click to cycle",
     },
     clickToEdit: "Click to edit",
@@ -259,8 +258,6 @@ export const enUS = {
     newSource: "New Source",
     bulkContext: "Context",
     includeAllInContext: "Include all in context",
-    includeAllInsights: "Include all (insights only)",
-    includeAllFull: "Include all (full content)",
     excludeAllFromContext: "Exclude all from context",
     add: "Add Source",
     addNew: "Add New Source",

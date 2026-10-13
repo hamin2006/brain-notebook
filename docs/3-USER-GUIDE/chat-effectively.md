@@ -39,10 +39,9 @@ span many documents or need everything ("list every activation function the cour
 
 ## What the agent can look at
 
-The library's Sources and Notes tabs decide the agent's **scope**: anything not set to **Not included in chat** can be
-searched and read (excluded items are dimmed). *Insights only* and *Full content* both mean "in scope"; nothing is
-sent up front either way. Click a row's context icon to change it, or use the **☰** menu at the top of the tab for
-all at once. The message box shows the current scope ("Searching 7 sources · 4 notes"). Choices aren't saved and
+The library's Sources and Notes tabs decide the agent's **scope**: anything **Included in chat** can be searched and
+read; items set to **Not included in chat** are dimmed. Nothing is sent up front. Click a row's context icon to switch
+it on or off, or use the **☰** menu at the top of the tab for all at once. The message box shows the current scope ("Searching 7 sources · 4 notes"). Choices aren't saved and
 reset when you reload.
 
 Narrowing the scope helps when a notebook mixes topics; for a single course or project, leave everything in.

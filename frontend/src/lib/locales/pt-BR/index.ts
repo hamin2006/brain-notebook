@@ -120,8 +120,7 @@ export const ptBR = {
     saveSuccess: "Salvo com sucesso",
     contextModes: {
       off: "Não incluído no chat",
-      insights: "Apenas insights",
-      full: "Conteúdo completo",
+      full: "Incluído no chat",
       clickToCycle: "Clique para alternar",
     },
     clickToEdit: "Clique para editar",
@@ -260,8 +259,6 @@ export const ptBR = {
     newSource: "Nova Fonte",
     bulkContext: "Contexto",
     includeAllInContext: "Incluir todas no contexto",
-    includeAllInsights: "Incluir todas (apenas insights)",
-    includeAllFull: "Incluir todas (conteúdo completo)",
     excludeAllFromContext: "Excluir todas do contexto",
     title: "Fontes",
     add: "Adicionar Fonte",

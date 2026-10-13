@@ -120,8 +120,7 @@ export const zhCN = {
     saveSuccess: "保存成功",
     contextModes: {
       off: "未包含在聊天中",
-      insights: "仅限见解",
-      full: "全部内容",
+      full: "包含在聊天中",
       clickToCycle: "点击循环切换",
     },
     clickToEdit: "点击编辑",
@@ -260,8 +259,6 @@ export const zhCN = {
     newSource: "新建来源",
     bulkContext: "上下文",
     includeAllInContext: "全部加入上下文",
-    includeAllInsights: "全部加入（仅见解）",
-    includeAllFull: "全部加入（完整内容）",
     excludeAllFromContext: "全部移出上下文",
     title: "来源",
     add: "添加来源",

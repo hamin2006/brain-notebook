@@ -82,6 +82,5 @@ When you run a transformation from the Insights tab and it fails, an error toast
 
 ## Tips
 
-- **Keep summaries short if you chat with insights.** A source set to *Insights only* sends all its insights with every chat message.
 - **One job per transformation.** "Key arguments" and "Open questions" as two transformations give cleaner insights than one prompt asking for both.
 - **Large sources** over about 105,000 tokens are sent to your **Large Context Model**, regardless of the transformation's model.

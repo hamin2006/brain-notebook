@@ -16,9 +16,8 @@ receives.
 | **Ask page** | The notebooks you pick, or your whole knowledge base if you pick none |
 | **MCP `ask` / tools** | The notebook named in the call, or everything |
 
-In notebook chat, the per-source selector still offers *Insights only* and *Full content* (inherited from Open
-Notebook); both mean "in scope". Nothing is sent up front either way: the agent reads the pages it needs. Selections
-live in the page and reset when you reload it.
+In notebook chat, each source and note is either **Included in chat** or **Not included in chat**. Nothing is sent up
+front: the agent reads the pages it needs. Selections live in the page and reset when you reload it.
 
 **Grounding** (per notebook) decides whether answers may go beyond the notebook: see
 [Grounding](research-agent.md#grounding).

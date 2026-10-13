@@ -1,6 +1,6 @@
 'use client'
 
-import { EyeOff, Lightbulb, FileText } from 'lucide-react'
+import { EyeOff, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Tooltip,
@@ -14,20 +14,15 @@ import { useTranslation } from '@/lib/hooks/use-translation'
 
 interface ContextToggleProps {
   mode: ContextMode
-  hasInsights?: boolean // For sources - determines if 'insights' mode is available
   onChange: (mode: ContextMode) => void
   className?: string
 }
 
-export function ContextToggle<TMode extends ContextMode = ContextMode>({
+export function ContextToggle({
   mode,
-  hasInsights = false,
   onChange,
   className
-}: Omit<ContextToggleProps, 'mode' | 'onChange'> & {
-  mode: TMode
-  onChange: (mode: TMode) => void
-}) {
+}: ContextToggleProps) {
   const { t } = useTranslation()
 
   const MODE_CONFIG = {
@@ -36,12 +31,6 @@ export function ContextToggle<TMode extends ContextMode = ContextMode>({
       label: t('common.contextModes.off'),
       color: 'text-muted-foreground',
       bgColor: 'hover:bg-muted'
-    },
-    insights: {
-      icon: Lightbulb,
-      label: t('common.contextModes.insights'),
-      color: 'text-ctx-insights',
-      bgColor: 'hover:bg-ctx-insights-tint'
     },
     full: {
       icon: FileText,
@@ -53,18 +42,9 @@ export function ContextToggle<TMode extends ContextMode = ContextMode>({
   const config = MODE_CONFIG[mode]
   const Icon = config.icon
 
-  // Determine available modes based on whether item has insights
-  const availableModes = (hasInsights
-    ? ['off', 'insights', 'full']
-    : ['off', 'full']) as TMode[]
-
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation() // Prevent card click
-
-    // Cycle to next mode
-    const currentIndex = availableModes.indexOf(mode)
-    const nextIndex = (currentIndex + 1) % availableModes.length
-    onChange(availableModes[nextIndex])
+    onChange(mode === 'off' ? 'full' : 'off')
   }
 
   return (

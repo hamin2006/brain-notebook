@@ -123,8 +123,7 @@ export const deDE = {
     saveSuccess: "Erfolgreich gespeichert",
     contextModes: {
       off: "Nicht im Chat enthalten",
-      insights: "Nur Insights",
-      full: "Vollständiger Inhalt",
+      full: "Im Chat enthalten",
       clickToCycle: "Klicken zum Wechseln",
     },
     clickToEdit: "Zum Bearbeiten klicken",
@@ -263,8 +262,6 @@ export const deDE = {
     newSource: "Neue Quelle",
     bulkContext: "Kontext",
     includeAllInContext: "Alle in den Kontext aufnehmen",
-    includeAllInsights: "Alle aufnehmen (nur Erkenntnisse)",
-    includeAllFull: "Alle aufnehmen (vollständiger Inhalt)",
     excludeAllFromContext: "Alle aus dem Kontext ausschließen",
     title: "Quellen",
     add: "Quelle hinzufügen",
