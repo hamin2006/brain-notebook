@@ -467,9 +467,72 @@ def _is_kept_verbatim(line: Dict[str, Any]) -> bool:
     return bool(line.get("pinned") or line.get("edited"))
 
 
+def split_topics(layout: Dict[str, Any], parts: int) -> List[List[Dict[str, Any]]]:
+    """The sheet's topics cut into at most `parts` contiguous groups of about
+    equal length, for revising in parts; a topic is never split."""
+    topics = layout.get("topics", [])
+    if parts <= 1 or len(topics) <= 1:
+        return [topics]
+    sizes = [layout_chars({"topics": [t]}) for t in topics]
+    total = sum(sizes)
+    groups: List[List[Dict[str, Any]]] = []
+    current: List[Dict[str, Any]] = []
+    done = 0
+    for topic, size in zip(topics, sizes):
+        # Cut before a topic whose middle passes the next part boundary.
+        if current and done + size / 2 > total * (len(groups) + 1) / parts:
+            groups.append(current)
+            current = []
+        current.append(topic)
+        done += size
+    groups.append(current)
+    return groups
+
+
+def part_pools(
+    groups: List[List[Dict[str, Any]]],
+    unused: List[Dict[str, Any]],
+    items: List[Dict[str, Any]],
+) -> List[List[Dict[str, Any]]]:
+    """Items not on the sheet, shared out between the parts by course position:
+    each goes to the first part whose lines reach that far into the course,
+    else to the last part. `items` is in course order."""
+    position = {str(item["id"]): n for n, item in enumerate(items)}
+    reach: List[int] = []
+    furthest = -1
+    for topics in groups:
+        used = [position.get(i, -1) for i in used_items({"topics": topics})]
+        furthest = max([furthest, *used])
+        reach.append(furthest)
+    pools: List[List[Dict[str, Any]]] = [[] for _ in groups]
+    for item in unused:
+        at = position.get(str(item["id"]), len(items))
+        pools[
+            next((k for k, r in enumerate(reach) if r >= at), len(groups) - 1)
+        ].append(item)
+    return pools
+
+
+def merge_revisions(parts: List[RevisionOps]) -> RevisionOps:
+    """The parts' operations as one; a comment answered by several parts gets
+    their notes joined."""
+    notes: Dict[str, List[str]] = {}
+    for ops in parts:
+        for c in ops.comments:
+            note = c.note.strip()
+            if note and note not in notes.setdefault(c.id, []):
+                notes[c.id].append(note)
+    return RevisionOps(
+        remove=[i for ops in parts for i in ops.remove],
+        edit=[e for ops in parts for e in ops.edit],
+        add=[a for ops in parts for a in ops.add],
+        comments=[CommentNote(id=k, note=" ".join(v)) for k, v in notes.items()],
+    )
+
+
 def apply_revision(
     previous: Dict[str, Any],
-    raw: str,
+    ops: RevisionOps,
     ids: Dict[str, str],
     items_by_id: Dict[str, Dict[str, Any]],
 ) -> Dict[str, Any]:
@@ -480,7 +543,6 @@ def apply_revision(
     get ids after the highest one used, so comments stay anchored; they go
     after the line named in `after`, else at the end of the topic with that
     title, else into a new topic at the end."""
-    ops = RevisionOps.model_validate(json_object(raw))
     topics = copy.deepcopy(previous.get("topics", []))
     lines_by_id = {line["id"]: line for t in topics for line in t["lines"]}
     protected = {i for i, line in lines_by_id.items() if _is_kept_verbatim(line)}

@@ -50,12 +50,15 @@ from open_notebook.utils.cheat_sheet import (
     build_layout,
     json_object,
     layout_chars,
+    merge_revisions,
     parse_recall_items,
     part_budgets,
+    part_pools,
     pool_lines,
     revision_lines,
     short_ids,
     split_items,
+    split_topics,
     used_items,
 )
 from open_notebook.utils.pdf_pages import PdfPage, group_builds
@@ -347,19 +350,43 @@ async def _compose(
     budget = budget_chars(options)
 
     if previous is not None:
+        # A sheet bigger than one reply is revised in parts (runs of its
+        # topics), in parallel; a comment on the whole sheet goes to every part.
         unused = [i for i in items if str(i["id"]) not in used_items(previous)]
-        layout = await ask(
-            "cheat_sheet/revise",
-            PydanticOutputParser(pydantic_object=RevisionOps),
-            {
-                "budget": budget,
-                "chars": layout_chars(previous),
-                "current": revision_lines(previous, {v: k for k, v in ids.items()}),
-                "comments": comments or [],
-                "pool": pool_lines(unused, ids, labels),
-            },
-            lambda raw: apply_revision(previous, raw, ids, items_by_id),
+        total = layout_chars(previous) or 1
+        groups = split_topics(previous, math.ceil(total / PART_CHARS))
+        pools = part_pools(groups, unused, items)
+        short_of = {v: k for k, v in ids.items()}
+        revise_parser: PydanticOutputParser[RevisionOps] = PydanticOutputParser(
+            pydantic_object=RevisionOps
         )
+
+        async def revise(part: int) -> RevisionOps:
+            current = {"topics": groups[part]}
+            lines = {line["id"] for t in groups[part] for line in t["lines"]}
+            applies = [
+                c for c in comments or [] if not c.get("line") or c["line"] in lines
+            ]
+            if comments and not applies:
+                return RevisionOps()
+            chars = layout_chars(current)
+            return await ask(
+                "cheat_sheet/revise",
+                revise_parser,
+                {
+                    "budget": int(budget * chars / total),
+                    "chars": chars,
+                    "current": revision_lines(current, short_of),
+                    "comments": applies,
+                    "pool": pool_lines(pools[part], ids, labels),
+                    "part": part + 1,
+                    "parts": len(groups),
+                },
+                lambda raw: RevisionOps.model_validate(json_object(raw)),
+            )
+
+        ops = await asyncio.gather(*(revise(k) for k in range(len(groups))))
+        layout = apply_revision(previous, merge_revisions(list(ops)), ids, items_by_id)
     else:
         # One reply holds at most about 16K characters of sheet: a bigger
         # budget is composed in parts (contiguous runs of the course), in

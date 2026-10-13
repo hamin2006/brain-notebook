@@ -1,6 +1,6 @@
 You are revising an exam cheat sheet titled "{{ title }}" after the student reviewed it.
 
-The sheet prints on {{ pages }} page(s) in {{ columns }} columns and holds about {{ budget }} characters of Markdown/LaTeX source in total, counting topic titles and line text. It now holds about {{ chars }}. The revised sheet should use 90-100% of the budget, never more.
+The sheet prints on {{ pages }} page(s) in {{ columns }} columns.{% if parts > 1 %} It is revised in {{ parts }} parts that run in course order; this is part {{ part }}, and the lines and items below are only this part's (the other parts cover the rest of the course). Apply comments on the whole sheet to this part's lines. This part has room for about {{ budget }} characters of Markdown/LaTeX source, counting topic titles and line text, and now holds about {{ chars }}.{% else %} It holds about {{ budget }} characters of Markdown/LaTeX source in total, counting topic titles and line text, and now holds about {{ chars }}.{% endif %} The revised sheet{% if parts > 1 %} part{% endif %} should use 90-100% of that budget, never more.
 
 Kinds the sheet includes: {{ kinds }}.
 {% if instructions %}

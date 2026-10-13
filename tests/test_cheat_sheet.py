@@ -8,18 +8,22 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from open_notebook.utils.cheat_sheet import (
+    RevisionOps,
     SheetOptions,
     apply_revision,
     budget_chars,
     build_layout,
     layout_chars,
     markdown_to_tex,
+    merge_revisions,
     parse_recall_items,
     part_budgets,
+    part_pools,
     pool_lines,
     revision_lines,
     short_ids,
     split_items,
+    split_topics,
     to_tex,
 )
 
@@ -144,7 +148,7 @@ def test_revision_applies_ops_but_never_to_pinned_or_edited_lines():
             "comments": [{"id": "c1", "note": "Shortened the ratio test."}],
         }
     )  # fmt: skip
-    layout = apply_revision(PREVIOUS, raw, IDS, BY_ID)
+    layout = apply_revision(PREVIOUS, RevisionOps.model_validate_json(raw), IDS, BY_ID)
     tests, new = layout["topics"]
     assert [line["id"] for line in tests["lines"]] == ["l1", "l8", "l2", "l3"]
     lines = {line["id"]: line for line in tests["lines"]}
@@ -200,6 +204,51 @@ def test_parts_are_joined_in_order_and_a_shared_topic_is_merged():
         ("t2", "Taylor", ["l3"]),
     ]
     assert layout["title"] == "fallback"  # the sheet's title, not a part's
+
+
+def _topic(title: str, chars: int, items: List[str]) -> Dict[str, Any]:
+    line = {"id": f"l-{title}", "text": "x" * chars, "items": items}
+    return {"title": title, "lines": [line]}
+
+
+def test_a_big_sheet_is_revised_in_parts_of_whole_topics():
+    layout = {"topics": [_topic(t, 100, []) for t in "ABCDEF"]}
+    groups = split_topics(layout, 3)
+    assert [[t["title"] for t in g] for g in groups] == [
+        ["A", "B"],
+        ["C", "D"],
+        ["E", "F"],
+    ]
+    assert split_topics(layout, 1) == [layout["topics"]]
+    # One topic bigger than a part stays whole: fewer parts, never a split topic.
+    big = {"topics": [_topic("A", 1000, []), _topic("B", 10, [])]}
+    assert [[t["title"] for t in g] for g in split_topics(big, 3)] == [["A"], ["B"]]
+
+
+def test_unused_items_go_to_the_part_that_covers_their_place_in_the_course():
+    groups = [
+        [_topic("A", 10, ["recall_item:a"])],
+        [_topic("B", 10, ["recall_item:b"])],
+    ]
+    late = {"id": "recall_item:z"}  # not in the course order: last part
+    pools = part_pools(groups, [ITEMS[2], late], [*ITEMS])
+    assert pools == [[], [ITEMS[2], late]]
+    early = part_pools(groups, [ITEMS[0]], ITEMS)
+    assert early == [[ITEMS[0]], []]
+
+
+def test_parts_revisions_are_merged_and_shared_comment_notes_joined():
+    a = RevisionOps.model_validate(
+        {"remove": ["l1"], "comments": [{"id": "c1", "note": "Cut basics."}]}
+    )
+    b = RevisionOps.model_validate(
+        {"edit": [{"line": "l9", "text": "t"}], "comments": [{"id": "c1", "note": "Dropped DAGs."}, {"id": "c2", "note": ""}]}
+    )  # fmt: skip
+    merged = merge_revisions([a, RevisionOps(), b])
+    assert merged.remove == ["l1"] and [e.line for e in merged.edit] == ["l9"]
+    assert [(c.id, c.note) for c in merged.comments] == [
+        ("c1", "Cut basics. Dropped DAGs.")
+    ]
 
 
 def test_revision_lines_show_ids_flags_and_item_refs():
