@@ -1042,6 +1042,8 @@ export const itIT = {
     filterConcepts: "Filtra {{count}} concetti…",
     conceptSpread: "In {{documents}} documenti, {{mentions}} menzioni",
     toggleLibrary: "Mostra/nascondi libreria",
+    resizeLibrary: "Ridimensiona la libreria",
+    resizeEvidence: "Ridimensiona il pannello delle prove",
     statDocuments: "{{count}} doc",
     statPages: "{{count}} pagine",
     statConcepts: "{{count}} concetti",

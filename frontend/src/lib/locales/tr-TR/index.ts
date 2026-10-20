@@ -1042,6 +1042,8 @@ export const trTR = {
     filterConcepts: "{{count}} kavramı filtrele…",
     conceptSpread: "{{documents}} belgede, {{mentions}} geçiş",
     toggleLibrary: "Kütüphaneyi göster/gizle",
+    resizeLibrary: "Kütüphaneyi yeniden boyutlandır",
+    resizeEvidence: "Kanıt panelini yeniden boyutlandır",
     statDocuments: "{{count}} belge",
     statPages: "{{count}} sayfa",
     statConcepts: "{{count}} kavram",

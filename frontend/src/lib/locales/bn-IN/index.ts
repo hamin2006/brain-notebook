@@ -1043,6 +1043,8 @@ export const bnIN = {
     filterConcepts: "{{count}}টি ধারণা ফিল্টার করুন…",
     conceptSpread: "{{documents}}টি ডকুমেন্টে, {{mentions}}টি উল্লেখ",
     toggleLibrary: "লাইব্রেরি দেখান/লুকান",
+    resizeLibrary: "লাইব্রেরির আকার বদলান",
+    resizeEvidence: "প্রমাণ প্যানেলের আকার বদলান",
     statDocuments: "{{count}}টি ডক",
     statPages: "{{count}} পৃষ্ঠা",
     statConcepts: "{{count}}টি ধারণা",

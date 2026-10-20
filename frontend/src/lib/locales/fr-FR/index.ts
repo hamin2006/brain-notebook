@@ -1042,6 +1042,8 @@ export const frFR = {
     filterConcepts: "Filtrer {{count}} concepts…",
     conceptSpread: "Dans {{documents}} documents, {{mentions}} mentions",
     toggleLibrary: "Afficher/masquer la bibliothèque",
+    resizeLibrary: "Redimensionner la bibliothèque",
+    resizeEvidence: "Redimensionner le panneau des preuves",
     statDocuments: "{{count}} docs",
     statPages: "{{count}} pages",
     statConcepts: "{{count}} concepts",

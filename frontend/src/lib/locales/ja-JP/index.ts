@@ -1042,6 +1042,8 @@ export const jaJP = {
     filterConcepts: "{{count}} 個の概念を絞り込み…",
     conceptSpread: "{{documents}} 件のドキュメント、{{mentions}} 回の言及",
     toggleLibrary: "ライブラリの表示切替",
+    resizeLibrary: "ライブラリのサイズを変更",
+    resizeEvidence: "根拠パネルのサイズを変更",
     statDocuments: "{{count}} 件",
     statPages: "{{count}} ページ",
     statConcepts: "{{count}} 概念",

@@ -1041,6 +1041,8 @@ export const enUS = {
     filterConcepts: "Filter {{count}} concepts…",
     conceptSpread: "In {{documents}} documents, {{mentions}} mentions",
     toggleLibrary: "Toggle library",
+    resizeLibrary: "Resize library",
+    resizeEvidence: "Resize evidence panel",
     statDocuments: "{{count}} docs",
     statPages: "{{count}} pages",
     statConcepts: "{{count}} concepts",

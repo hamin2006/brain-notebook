@@ -1042,6 +1042,8 @@ export const zhTW = {
     filterConcepts: "篩選 {{count}} 個概念…",
     conceptSpread: "出現在 {{documents}} 份文件，{{mentions}} 次提及",
     toggleLibrary: "顯示/隱藏資料庫",
+    resizeLibrary: "調整資料庫大小",
+    resizeEvidence: "調整證據面板大小",
     statDocuments: "{{count}} 份文件",
     statPages: "{{count}} 頁",
     statConcepts: "{{count}} 個概念",

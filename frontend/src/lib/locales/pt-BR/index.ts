@@ -1042,6 +1042,8 @@ export const ptBR = {
     filterConcepts: "Filtrar {{count}} conceitos…",
     conceptSpread: "Em {{documents}} documentos, {{mentions}} menções",
     toggleLibrary: "Mostrar/ocultar biblioteca",
+    resizeLibrary: "Redimensionar biblioteca",
+    resizeEvidence: "Redimensionar painel de evidências",
     statDocuments: "{{count}} docs",
     statPages: "{{count}} páginas",
     statConcepts: "{{count}} conceitos",

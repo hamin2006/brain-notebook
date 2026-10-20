@@ -1042,6 +1042,8 @@ export const zhCN = {
     filterConcepts: "筛选 {{count}} 个概念…",
     conceptSpread: "出现在 {{documents}} 份文档，{{mentions}} 次提及",
     toggleLibrary: "显示/隐藏资料库",
+    resizeLibrary: "调整资料库大小",
+    resizeEvidence: "调整证据面板大小",
     statDocuments: "{{count}} 份文档",
     statPages: "{{count}} 页",
     statConcepts: "{{count}} 个概念",

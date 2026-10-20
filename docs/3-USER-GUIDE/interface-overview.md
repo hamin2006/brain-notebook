@@ -72,7 +72,7 @@ panel on the right when you open a citation or a concept.
 └───────────────────┴──────────────────────────────────────┴─────────────────────┘
 ```
 
-The library hides with the panel button at the top left (and gives way to the evidence panel on narrower screens).
+The library hides with the panel button at the top left (and gives way to the evidence panel on narrower screens). Drag the edge between panes to resize the library or the evidence panel (widen the evidence panel to see a cited slide larger); arrow keys work on a focused edge, double-click resets it, and the widths are remembered.
 On phones the panes become tabs: **Chat**, **Sources**, **Notes** and **Concepts**; evidence opens full screen.
 
 ### Header

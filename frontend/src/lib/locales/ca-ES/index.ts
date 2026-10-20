@@ -1042,6 +1042,8 @@ export const caES = {
     filterConcepts: "Filtra {{count}} conceptes…",
     conceptSpread: "En {{documents}} documents, {{mentions}} mencions",
     toggleLibrary: "Mostra/amaga la biblioteca",
+    resizeLibrary: "Canvia la mida de la biblioteca",
+    resizeEvidence: "Canvia la mida del tauler d'evidències",
     statDocuments: "{{count}} docs",
     statPages: "{{count}} pàgines",
     statConcepts: "{{count}} conceptes",

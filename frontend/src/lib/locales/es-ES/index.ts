@@ -1043,6 +1043,8 @@ export const esES = {
     filterConcepts: "Filtrar {{count}} conceptos…",
     conceptSpread: "En {{documents}} documentos, {{mentions}} menciones",
     toggleLibrary: "Mostrar/ocultar biblioteca",
+    resizeLibrary: "Cambiar tamaño de la biblioteca",
+    resizeEvidence: "Cambiar tamaño del panel de evidencias",
     statDocuments: "{{count}} docs",
     statPages: "{{count}} páginas",
     statConcepts: "{{count}} conceptos",

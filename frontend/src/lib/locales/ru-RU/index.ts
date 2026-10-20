@@ -1042,6 +1042,8 @@ export const ruRU = {
     filterConcepts: "Фильтр по {{count}} понятиям…",
     conceptSpread: "В {{documents}} документах, {{mentions}} упоминаний",
     toggleLibrary: "Показать/скрыть библиотеку",
+    resizeLibrary: "Изменить размер библиотеки",
+    resizeEvidence: "Изменить размер панели источников",
     statDocuments: "{{count}} док.",
     statPages: "{{count}} стр.",
     statConcepts: "{{count}} понятий",

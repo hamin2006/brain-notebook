@@ -1045,6 +1045,8 @@ export const deDE = {
     filterConcepts: "{{count}} Begriffe filtern…",
     conceptSpread: "In {{documents}} Dokumenten, {{mentions}} Erwähnungen",
     toggleLibrary: "Bibliothek ein-/ausblenden",
+    resizeLibrary: "Bibliotheksgröße ändern",
+    resizeEvidence: "Größe des Belegbereichs ändern",
     statDocuments: "{{count}} Dok.",
     statPages: "{{count}} Seiten",
     statConcepts: "{{count}} Begriffe",

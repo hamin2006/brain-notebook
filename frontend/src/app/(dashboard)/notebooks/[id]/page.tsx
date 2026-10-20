@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import { AppShell } from '@/components/layout/AppShell'
 import { NotebookHeader } from '../components/NotebookHeader'
@@ -11,7 +11,13 @@ import { useNotebook } from '@/lib/hooks/use-notebooks'
 import { useNotebookSources } from '@/lib/hooks/use-sources'
 import { useNotes } from '@/lib/hooks/use-notes'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
-import { useWorkspaceStore, type LibraryTab } from '@/lib/stores/workspace-store'
+import {
+  useWorkspaceStore,
+  DEFAULT_EVIDENCE_WIDTH,
+  DEFAULT_LIBRARY_WIDTH,
+  type LibraryTab,
+} from '@/lib/stores/workspace-store'
+import { ResizeHandle } from '@/components/ui/resize-handle'
 import { useNotebookOverview } from '@/lib/hooks/use-explore'
 import { useModalManager } from '@/lib/hooks/use-modal-manager'
 import { ConceptsPanel } from '@/components/brain/ConceptsPanel'
@@ -31,6 +37,14 @@ import {
 // components historically import these from this route file.
 import type { ContextMode, ContextSelections } from '@/lib/types/notebook-context'
 export type { ContextMode, ContextSelections }
+
+// Side pane limits: the library stays a list, the evidence pane can take what
+// the chat doesn't need (to enlarge a slide), and the chat never drops below
+// CHAT_MIN. Panes shrink toward their minimums when the window narrows.
+const LIBRARY_MIN = 220
+const LIBRARY_MAX_VW = 40
+const EVIDENCE_MIN = 300
+const CHAT_MIN = 380
 
 export default function NotebookPage() {
   const { t } = useTranslation()
@@ -58,6 +72,11 @@ export default function NotebookPage() {
   const evidence = useWorkspaceStore((s) => s.evidence)
   const view = useWorkspaceStore((s) => s.view)
   const closeEvidence = useWorkspaceStore((s) => s.closeEvidence)
+  const libraryWidth = useWorkspaceStore((s) => s.libraryWidth)
+  const evidenceWidth = useWorkspaceStore((s) => s.evidenceWidth)
+  const setLibraryWidth = useWorkspaceStore((s) => s.setLibraryWidth)
+  const setEvidenceWidth = useWorkspaceStore((s) => s.setEvidenceWidth)
+  const paneRow = useRef<HTMLDivElement>(null)
 
   // The evidence panel belongs to one notebook; close it when switching.
   useEffect(() => {
@@ -252,9 +271,12 @@ export default function NotebookPage() {
 
         {/* Desktop: library | conversation | evidence */}
         {isDesktop && (
-          <div className="flex min-h-0 flex-1">
+          <div ref={paneRow} className="flex min-h-0 flex-1">
             {libraryOpen && (!evidence || isWide) && (
-              <aside className="flex w-[300px] shrink-0 flex-col border-r bg-sidebar/60 xl:w-[320px]">
+              <aside
+                className="flex flex-col border-r bg-sidebar/60"
+                style={{ width: libraryWidth, minWidth: LIBRARY_MIN }}
+              >
                 <div className="flex gap-1 p-3">
                   {libraryTabs.map((tab) => (
                     <button
@@ -283,13 +305,47 @@ export default function NotebookPage() {
                 </div>
               </aside>
             )}
+            {libraryOpen && (!evidence || isWide) && (
+              <ResizeHandle
+                side="left"
+                label={t('brain.resizeLibrary')}
+                width={libraryWidth}
+                min={LIBRARY_MIN}
+                max={() =>
+                  Math.min(
+                    (window.innerWidth * LIBRARY_MAX_VW) / 100,
+                    (paneRow.current?.clientWidth ?? 0) - (evidence ? evidenceWidth : 0) - CHAT_MIN
+                  )
+                }
+                onResize={setLibraryWidth}
+                onReset={() => setLibraryWidth(DEFAULT_LIBRARY_WIDTH)}
+              />
+            )}
 
-            <main className="flex min-w-0 flex-1 flex-col">
+            <main className="flex flex-1 flex-col" style={{ minWidth: CHAT_MIN }}>
               {view === 'graph' ? <ConceptGraph notebookId={notebookId} /> : chat}
             </main>
 
             {evidence && (
-              <aside className="flex w-[400px] shrink-0 flex-col border-l bg-sidebar/60 2xl:w-[460px]">
+              <ResizeHandle
+                side="right"
+                label={t('brain.resizeEvidence')}
+                width={evidenceWidth}
+                min={EVIDENCE_MIN}
+                max={() =>
+                  (paneRow.current?.clientWidth ?? 0) -
+                  (libraryOpen && (!evidence || isWide) ? libraryWidth : 0) -
+                  CHAT_MIN
+                }
+                onResize={setEvidenceWidth}
+                onReset={() => setEvidenceWidth(DEFAULT_EVIDENCE_WIDTH)}
+              />
+            )}
+            {evidence && (
+              <aside
+                className="flex flex-col border-l bg-sidebar/60"
+                style={{ width: evidenceWidth, minWidth: EVIDENCE_MIN }}
+              >
                 <EvidencePanel notebookId={notebookId} sourceTitles={sourceTitles} onOpenSource={openSource} />
               </aside>
             )}

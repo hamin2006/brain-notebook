@@ -1042,6 +1042,8 @@ export const plPL = {
     filterConcepts: "Filtruj {{count}} pojęć…",
     conceptSpread: "W {{documents}} dokumentach, {{mentions}} wzmianek",
     toggleLibrary: "Pokaż/ukryj bibliotekę",
+    resizeLibrary: "Zmień rozmiar biblioteki",
+    resizeEvidence: "Zmień rozmiar panelu dowodów",
     statDocuments: "{{count}} dok.",
     statPages: "{{count}} stron",
     statConcepts: "{{count}} pojęć",
