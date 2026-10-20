@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The notebook's grounding switch moved from the chat box to the notebook header; effort is a Quick / Standard / Deep toggle in the message box
 
 ### Fixed
+- **Clicking a citation no longer scrolls the chat back to the top.** Every re-render rebuilt the whole rendered answer (the Markdown renderer created its element components anew each time), so opening a cited page in the evidence panel lost your reading position. The renderer's components are now fixed, and citation chips read titles and the click handler from context
 - **Revising a large cheat sheet timed out** ("The model's sheet could not be read: TimeoutError()"): the whole sheet went to the model in one call, so a comment on the whole sheet ("drop the trivial lines") asked for more edits than fit in the call's 200 seconds. A sheet over 9,000 characters is now revised in parts, in parallel, like composing: whole-sheet comments go to every part, line comments to the part that has the line
 - The research trace showed record ids (`Reading “source:kwjin…#p73-81”`); steps now name the document and its pages or section (`Reading “Lecture 6.pdf pp. 73–81”`), in live answers, saved chats, source chat and Ask
 - The worker kept its peak memory after ingestion (2.3 GB idle after a 29-deck run, against 126 MB fresh): it now runs with `MALLOC_ARENA_MAX=2` and returns freed memory after each ingestion step

@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { createContext, useContext, useMemo } from 'react'
 import { useQueries } from '@tanstack/react-query'
 import { MarkdownRenderer } from '@/components/ui/markdown-renderer'
 import { useTranslation } from '@/lib/hooks/use-translation'
@@ -31,6 +31,37 @@ function useMissingTitles(ids: string[]) {
   }, [results, ids])
 }
 
+const AnswerLinks = createContext<{ titles: Record<string, string>; onReferenceClick: ReferenceClick }>({
+  titles: {},
+  onReferenceClick: () => {},
+})
+
+// A fixed component type that reads titles and the click handler from context:
+// a new type per render would remount the whole answer and reset the scroll.
+function AnswerLink({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) {
+  const { titles, onReferenceClick } = useContext(AnswerLinks)
+  const ref = href ? parseReferenceHref(href) : null
+  if (ref) {
+    return (
+      <CitationChip
+        number={children}
+        type={ref.type}
+        id={ref.id}
+        locator={ref.locator}
+        title={titles[`${ref.type}:${ref.id}`]}
+        onClick={onReferenceClick}
+      />
+    )
+  }
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" {...props} className="text-iris underline-offset-2 hover:underline">
+      {children}
+    </a>
+  )
+}
+
+const ANSWER_COMPONENTS = { a: AnswerLink }
+
 /** An answer: prose with numbered citation chips, then the cited pages. */
 export function AnswerContent({
   content,
@@ -54,33 +85,14 @@ export function AnswerContent({
   const fetched = useMissingTitles(missing)
   const titles = useMemo(() => ({ ...fetched, ...referenceTitles }), [fetched, referenceTitles])
 
-  const components = useMemo(() => ({
-    a: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => {
-      const ref = href ? parseReferenceHref(href) : null
-      if (ref) {
-        return (
-          <CitationChip
-            number={children}
-            type={ref.type}
-            id={ref.id}
-            locator={ref.locator}
-            title={titles[`${ref.type}:${ref.id}`]}
-            onClick={onReferenceClick}
-          />
-        )
-      }
-      return (
-        <a href={href} target="_blank" rel="noopener noreferrer" {...props} className="text-iris underline-offset-2 hover:underline">
-          {children}
-        </a>
-      )
-    },
-  }), [titles, onReferenceClick])
+  const links = useMemo(() => ({ titles, onReferenceClick }), [titles, onReferenceClick])
 
   return (
     <div className="space-y-5">
       <div className="answer-prose">
-        <MarkdownRenderer components={components}>{markdown}</MarkdownRenderer>
+        <AnswerLinks.Provider value={links}>
+          <MarkdownRenderer components={ANSWER_COMPONENTS}>{markdown}</MarkdownRenderer>
+        </AnswerLinks.Provider>
       </div>
       <CitedSources references={references} titles={titles} onClick={onReferenceClick} />
     </div>

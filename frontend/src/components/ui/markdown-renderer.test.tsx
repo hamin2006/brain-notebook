@@ -26,6 +26,14 @@ describe('MarkdownRenderer', () => {
     expect(container.textContent).toContain('some content')
   })
 
+  it('keeps the rendered nodes across re-renders (a remount resets the scroll)', () => {
+    const md = '# Title\n\nSome text'
+    const { container, rerender } = render(<MarkdownRenderer>{md}</MarkdownRenderer>)
+    const heading = container.querySelector('h1')
+    rerender(<MarkdownRenderer components={{}}>{md}</MarkdownRenderer>)
+    expect(container.querySelector('h1')).toBe(heading)
+  })
+
   it('renders inline code without a highlighter block', () => {
     const { container } = render(<MarkdownRenderer>{'Use `npm ci` here'}</MarkdownRenderer>)
     expect(container.querySelector('code')?.textContent).toBe('npm ci')
