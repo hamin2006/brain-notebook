@@ -82,10 +82,12 @@ MAX_CONCURRENT_SECTIONS = int(os.environ.get("OPEN_NOTEBOOK_SECTION_CONCURRENCY"
 # A composed sheet this far over budget is recomposed once with a tighter one.
 OVERFLOW_RETRY_RATIO = 1.3
 # A composer or reviser reply (one part, about 9K characters of sheet in JSON)
-# needs about 6K tokens; the cap keeps a reply that runs on from outlasting
-# the call timeout, and an attempt past COMPOSE_CALL_SECONDS counts as failed
-# (the HTTP client's own timeout retries silently, for minutes).
-COMPOSE_MAX_TOKENS = 10000
+# needs about 6K tokens, but GLM-5.3 ignores the reasoning cap on big pools
+# (measured up to 10K reasoning tokens, leaving an empty reply), so the budget
+# leaves room for both. It still keeps a reply that runs on from outlasting the
+# call timeout (~210 tokens/s), and an attempt past COMPOSE_CALL_SECONDS counts
+# as failed (the HTTP client's own timeout retries silently, for minutes).
+COMPOSE_MAX_TOKENS = 24000
 COMPOSE_CALL_SECONDS = 200
 
 
